@@ -41,7 +41,7 @@ export default function LoginPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-2)' }}>Email</span>
             <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={255}
               style={inputStyle} placeholder="your@email.com"
             />
           </label>
@@ -50,7 +50,7 @@ export default function LoginPage() {
             <span style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-2)' }}>Пароль</span>
             <div style={{ position: 'relative' }}>
               <input
-                type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
+                type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required maxLength={128}
                 style={{ ...inputStyle, paddingRight: '2.5rem' }} placeholder="••••••"
               />
               <button type="button" onClick={() => setShowPassword(v => !v)}

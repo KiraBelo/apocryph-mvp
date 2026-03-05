@@ -5,6 +5,7 @@ export type Theme = 'light' | 'dark'
 export type FontSize = 'small' | 'medium' | 'large'
 export type GameFont = 'serif' | 'serif-body' | 'mono'
 export type GameSpacing = 'compact' | 'normal' | 'spacious'
+export type GameLayout = 'dialog' | 'feed' | 'book'
 
 export interface TagPreset {
   name: string
@@ -14,9 +15,12 @@ export interface TagPreset {
 export interface Settings {
   theme: Theme
   fontSize: FontSize
+  siteFont: string
   gameFont: GameFont
   gameSpacing: GameSpacing
+  gameLayout: GameLayout
   emailNotifs: boolean
+  notesEnabled: boolean
 }
 
 interface SettingsCtx extends Settings {
@@ -31,9 +35,12 @@ interface SettingsCtx extends Settings {
 const DEFAULTS: Settings = {
   theme: 'light',
   fontSize: 'medium',
+  siteFont: 'Georgia, serif',
   gameFont: 'serif-body',
   gameSpacing: 'normal',
+  gameLayout: 'dialog',
   emailNotifs: true,
+  notesEnabled: true,
 }
 
 const DEFAULT_PRESETS: TagPreset[] = [
@@ -45,9 +52,12 @@ const DEFAULT_PRESETS: TagPreset[] = [
 const KEYS: Record<keyof Settings, string> = {
   theme: 'apocryph-theme',
   fontSize: 'apocryph-font-size',
+  siteFont: 'apocryph-site-font',
   gameFont: 'apocryph-game-font',
   gameSpacing: 'apocryph-game-spacing',
+  gameLayout: 'apocryph-game-layout',
   emailNotifs: 'apocryph-email-notifs',
+  notesEnabled: 'apocryph-notes-enabled',
 }
 
 const TAG_PRESETS_KEY = 'apocryph-tag-presets'
@@ -70,6 +80,10 @@ function applyOne(key: keyof Settings, value: Settings[keyof Settings]) {
   const h = document.documentElement
   if (key === 'theme')       h.setAttribute('data-theme', value as string)
   if (key === 'fontSize')    h.style.fontSize = FONT_SIZES[value as FontSize]
+  if (key === 'siteFont') {
+    h.style.setProperty('--site-font', value as string)
+    h.style.setProperty('--serif-body', value as string)
+  }
   if (key === 'gameFont')    h.style.setProperty('--game-font', GAME_FONTS[value as GameFont])
   if (key === 'gameSpacing') h.style.setProperty('--game-gap', GAME_SPACINGS[value as GameSpacing])
 }
@@ -77,6 +91,7 @@ function applyOne(key: keyof Settings, value: Settings[keyof Settings]) {
 function applyAllToDOM(s: Settings) {
   applyOne('theme', s.theme)
   applyOne('fontSize', s.fontSize)
+  applyOne('siteFont', s.siteFont)
   applyOne('gameFont', s.gameFont)
   applyOne('gameSpacing', s.gameSpacing)
 }
@@ -100,9 +115,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const loaded: Settings = {
       theme: (localStorage.getItem(KEYS.theme) as Theme) ?? DEFAULTS.theme,
       fontSize: (localStorage.getItem(KEYS.fontSize) as FontSize) ?? DEFAULTS.fontSize,
+      siteFont: localStorage.getItem(KEYS.siteFont) ?? DEFAULTS.siteFont,
       gameFont: (localStorage.getItem(KEYS.gameFont) as GameFont) ?? DEFAULTS.gameFont,
       gameSpacing: (localStorage.getItem(KEYS.gameSpacing) as GameSpacing) ?? DEFAULTS.gameSpacing,
+      gameLayout: (localStorage.getItem(KEYS.gameLayout) as GameLayout) ?? DEFAULTS.gameLayout,
       emailNotifs: localStorage.getItem(KEYS.emailNotifs) !== 'false',
+      notesEnabled: localStorage.getItem(KEYS.notesEnabled) !== 'false',
     }
     setSettings(loaded)
     applyAllToDOM(loaded)

@@ -8,7 +8,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   const user = await getUser()
   if (!user) redirect('/auth/login')
 
-  const game = await queryOne<{ id: string; request_id: string | null; banner_url: string | null; created_at: string }>(
+  const game = await queryOne<{ id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; created_at: string }>(
     'SELECT * FROM games WHERE id=$1', [gameId]
   )
   if (!game) notFound()
@@ -22,7 +22,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
 
   const messages = await query<{
     id: string; game_id: string; participant_id: string; content: string; created_at: string;
-    edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string
+    edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string; type: string
   }>(
     `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
      FROM messages m

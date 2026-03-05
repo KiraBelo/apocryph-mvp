@@ -92,6 +92,21 @@ CREATE TABLE IF NOT EXISTS user_tag_blacklist (
   PRIMARY KEY (user_id, tag)
 );
 
+-- ── GAME NOTES (личные заметки игрока) ───────────────────────────
+CREATE TABLE IF NOT EXISTS game_notes (
+  id         BIGSERIAL PRIMARY KEY,
+  game_id    UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL DEFAULT '',
+  content    TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ
+);
+-- Migration for existing databases
+ALTER TABLE game_notes ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_game_notes_game_user ON game_notes(game_id, user_id);
+
 -- ── REPORTS ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS reports (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

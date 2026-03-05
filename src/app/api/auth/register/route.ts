@@ -8,6 +8,9 @@ export async function POST(req: NextRequest) {
   if (!email || !password || password.length < 6) {
     return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 })
   }
+  if (email.length > 255 || password.length > 128) {
+    return NextResponse.json({ error: 'Слишком длинные данные' }, { status: 400 })
+  }
 
   try {
     const user = await createUser(email, password)

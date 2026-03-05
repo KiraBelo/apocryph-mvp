@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useSettings, type Settings } from './SettingsContext'
+import { useSettings, type Settings, type GameLayout } from './SettingsContext'
 import type { TagPreset } from './SettingsContext'
+import { FONT_GROUPS } from '@/lib/fonts'
 
 function BtnGroup<T extends string>({ current, options, onSelect }: {
   current: T
@@ -64,7 +65,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function SettingsPanel() {
-  const { panelOpen, closePanel, theme, fontSize, gameFont, gameSpacing, emailNotifs, set, tagPresets, setTagPreset } = useSettings()
+  const { panelOpen, closePanel, theme, fontSize, siteFont, gameFont, gameSpacing, gameLayout, emailNotifs, notesEnabled, set, tagPresets, setTagPreset } = useSettings()
   const [editingPreset, setEditingPreset] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
   const [editTags, setEditTags] = useState('')
@@ -163,6 +164,33 @@ export default function SettingsPanel() {
               onSelect={v => set('fontSize', v)}
             />
           </Field>
+          <Field label="Шрифт сайта">
+            <select
+              value={siteFont}
+              onChange={e => set('siteFont', e.target.value)}
+              style={{
+                fontFamily: 'var(--mono)', fontSize: '0.68rem',
+                background: 'var(--bg-2)', border: '1px solid var(--border)',
+                color: 'var(--text-2)', padding: '0.3rem 0.5rem',
+                cursor: 'pointer', width: '100%',
+              }}
+            >
+              {FONT_GROUPS.map(g => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.fonts.map(f => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <p style={{
+              fontFamily: 'var(--mono)', fontSize: '0.58rem',
+              letterSpacing: '0.06em', color: 'var(--text-2)',
+              marginTop: '0.4rem',
+            }}>
+              Применяется ко всему тексту сайта
+            </p>
+          </Field>
         </Section>
 
         <div style={{ height: '1px', background: 'var(--border)' }} />
@@ -191,6 +219,22 @@ export default function SettingsPanel() {
               onSelect={v => set('gameSpacing', v)}
             />
           </Field>
+          <Field label="Раскладка постов">
+            <BtnGroup<GameLayout>
+              current={gameLayout}
+              options={[
+                { value: 'dialog', label: 'Диалог' },
+                { value: 'feed', label: 'Лента' },
+                { value: 'book', label: 'Книга' },
+              ]}
+              onSelect={v => set('gameLayout', v)}
+            />
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.06em', color: 'var(--text-2)', marginTop: '0.4rem' }}>
+              {gameLayout === 'dialog' && 'Мой пост справа, чужой слева'}
+              {gameLayout === 'feed' && 'Все посты подряд, аватарка слева'}
+              {gameLayout === 'book' && 'Без аватарок, только имя и текст'}
+            </p>
+          </Field>
         </Section>
 
         <div style={{ height: '1px', background: 'var(--border)' }} />
@@ -215,6 +259,40 @@ export default function SettingsPanel() {
               <span style={{
                 position: 'absolute', top: '3px',
                 left: emailNotifs ? '21px' : '3px',
+                width: '16px', height: '16px', borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s',
+              }} />
+            </button>
+          </div>
+        </Section>
+
+        <div style={{ height: '1px', background: 'var(--border)' }} />
+
+        {/* Заметки */}
+        <Section title="Заметки к играм">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontFamily: 'var(--serif-body)', fontSize: '0.95rem', color: 'var(--text)' }}>
+                Вкладка «Заметки»
+              </span>
+              <p style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.06em', color: 'var(--text-2)', marginTop: '0.15rem' }}>
+                Личные заметки к каждой игре
+              </p>
+            </div>
+            <button
+              onClick={() => set('notesEnabled', !notesEnabled)}
+              role="switch"
+              aria-checked={notesEnabled}
+              style={{
+                width: '42px', height: '22px', borderRadius: '11px', border: 'none',
+                background: notesEnabled ? 'var(--accent)' : 'var(--border)',
+                cursor: 'pointer', position: 'relative', flexShrink: 0,
+                transition: 'background 0.2s',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: '3px',
+                left: notesEnabled ? '21px' : '3px',
                 width: '16px', height: '16px', borderRadius: '50%',
                 background: '#fff', transition: 'left 0.2s',
               }} />

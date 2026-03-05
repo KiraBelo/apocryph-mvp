@@ -10,6 +10,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { reason } = await req.json()
 
   if (!reason) return NextResponse.json({ error: 'Укажите причину выхода' }, { status: 400 })
+  if (reason.length > 500) return NextResponse.json({ error: 'Причина слишком длинная' }, { status: 400 })
 
   await query(
     `UPDATE game_participants SET left_at=NOW(), leave_reason=$3

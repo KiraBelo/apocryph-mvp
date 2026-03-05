@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
+import { sanitizeBody } from '@/lib/sanitize'
 
 // PATCH — редактировать своё сообщение
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; msgId: string }> }) {
@@ -11,6 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id: gameId, msgId } = await params
   const { content } = await req.json()
   if (!content?.trim()) return NextResponse.json({ error: 'Пустое сообщение' }, { status: 400 })
+  if (content.length > 200_000) return NextResponse.json({ error: 'Сообщение слишком длинное' }, { status: 400 })
 
   // Проверяем: сообщение принадлежит текущему пользователю
   const existing = await queryOne<{ id: string; participant_id: string }>(
@@ -25,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updated = await queryOne(
     `UPDATE messages SET content = $1, edited_at = NOW() WHERE id = $2
      RETURNING id, content, edited_at`,
-    [content, msgId]
+    [sanitizeBody(content), msgId]
   )
 
   notifyGame(gameId, { _type: 'edit', ...(updated as object) })

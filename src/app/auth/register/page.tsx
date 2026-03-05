@@ -41,7 +41,7 @@ export default function RegisterPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-2)' }}>Email</span>
             <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={255}
               style={inputStyle}
               placeholder="your@email.com"
             />
@@ -51,7 +51,7 @@ export default function RegisterPage() {
             <span style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-2)' }}>Пароль</span>
             <div style={{ position: 'relative' }}>
               <input
-                type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
+                type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={6} maxLength={128}
                 style={{ ...inputStyle, paddingRight: '2.5rem' }}
                 placeholder="Минимум 6 символов"
               />

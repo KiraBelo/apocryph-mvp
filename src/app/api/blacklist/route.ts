@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
   const { tag } = await req.json()
   const normalized = tag?.trim().toLowerCase()
   if (!normalized) return NextResponse.json({ error: 'Тег не может быть пустым' }, { status: 400 })
+  if (normalized.length > 50) return NextResponse.json({ error: 'Тег слишком длинный (макс. 50 символов)' }, { status: 400 })
 
   await queryOne(
     'INSERT INTO user_tag_blacklist (user_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING',

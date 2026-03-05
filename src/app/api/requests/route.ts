@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
+import { sanitizeBody } from '@/lib/sanitize'
 
 // GET /api/requests — лента с фильтрами
 export async function GET(req: NextRequest) {
@@ -76,11 +77,21 @@ export async function POST(req: NextRequest) {
   if (!title || !type || !content_level) {
     return NextResponse.json({ error: 'Заполните обязательные поля' }, { status: 400 })
   }
+  if (title.length > 200) {
+    return NextResponse.json({ error: 'Заголовок не может быть длиннее 200 символов' }, { status: 400 })
+  }
+  if (description && description.length > 200_000) {
+    return NextResponse.json({ error: 'Текст заявки слишком длинный' }, { status: 400 })
+  }
+  const tagsArr: string[] = tags || []
+  if (tagsArr.length > 20 || tagsArr.some((t: string) => t.length > 50)) {
+    return NextResponse.json({ error: 'Слишком много тегов или тег слишком длинный (макс. 50 симв.)' }, { status: 400 })
+  }
 
   const row = await queryOne(
     `INSERT INTO requests (author_id, title, body, type, content_level, fandom_type, pairing, tags, is_public, status)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-    [user.id, title, description || null, type, content_level,
+    [user.id, title, sanitizeBody(description), type, content_level,
      fandom_type || 'original', pairing || 'any',
      tags || [], is_public ?? true, status || 'draft']
   )

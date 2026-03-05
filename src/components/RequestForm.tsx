@@ -36,18 +36,15 @@ export default function RequestForm({ initial }: Props) {
   const [fandomType, setFandomType] = useState(initial?.fandom_type ?? 'original')
   const [pairing, setPairing] = useState(initial?.pairing ?? 'any')
   const [tagsInput, setTagsInput] = useState(initial?.tags.join(', ') ?? '')
-  const [isPublic, setIsPublic] = useState(initial?.is_public ?? true)
-  const [status, setStatus] = useState(initial?.status ?? 'active')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
+  async function submit(statusArg: string) {
     if (!title.trim()) { setError('Укажите название заявки'); return }
     setLoading(true); setError('')
 
     const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean)
-    const payload = { title, description: body, type, content_level: contentLevel, fandom_type: fandomType, pairing, tags, is_public: isPublic, status }
+    const payload = { title, description: body, type, content_level: contentLevel, fandom_type: fandomType, pairing, tags, is_public: true, status: statusArg }
 
     const url  = initial ? `/api/requests/${initial.id}` : '/api/requests'
     const method = initial ? 'PATCH' : 'POST'
@@ -65,17 +62,16 @@ export default function RequestForm({ initial }: Props) {
       return
     }
 
-    const data = await res.json()
-    router.push(`/requests/${data.id}`)
+    router.push(`/my/requests?tab=${statusArg === 'draft' ? 'draft' : 'active'}`)
     router.refresh()
   }
 
   return (
-    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <form style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
       {/* Title */}
       <Field label="Название заявки *">
         <input
-          type="text" value={title} onChange={e => setTitle(e.target.value)} required
+          type="text" value={title} onChange={e => setTitle(e.target.value)} required maxLength={200}
           placeholder="Коротко и ёмко..."
           style={inputStyle}
         />
@@ -153,7 +149,8 @@ export default function RequestForm({ initial }: Props) {
       <Field label="Теги (через запятую)">
         <input
           type="text" value={tagsInput} onChange={e => setTagsInput(e.target.value)}
-          placeholder="фэнтези, оригинал, медленный бёрн..."
+          placeholder="отель Хазбин, Валдасты..."
+          maxLength={1000}
           style={inputStyle}
         />
       </Field>
@@ -163,36 +160,16 @@ export default function RequestForm({ initial }: Props) {
         <RichEditor content={body} onChange={setBody} placeholder="Расскажи, что хочешь отыграть..." />
       </Field>
 
-      {/* Visibility & Status */}
-      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-        <Field label="Видимость">
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontFamily: 'var(--serif-body)', color: isPublic ? 'var(--accent)' : 'var(--text-2)' }}>
-              <input type="radio" checked={isPublic} onChange={() => setIsPublic(true)} style={{ accentColor: 'var(--accent)' }} /> Публичная
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontFamily: 'var(--serif-body)', color: !isPublic ? 'var(--accent)' : 'var(--text-2)' }}>
-              <input type="radio" checked={!isPublic} onChange={() => setIsPublic(false)} style={{ accentColor: 'var(--accent)' }} /> Приватная
-            </label>
-          </div>
-        </Field>
-
-        <Field label="Статус">
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            {['draft', 'active'].map(s => (
-              <label key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontFamily: 'var(--serif-body)', color: status === s ? 'var(--accent)' : 'var(--text-2)' }}>
-                <input type="radio" checked={status === s} onChange={() => setStatus(s)} style={{ accentColor: 'var(--accent)' }} />
-                {s === 'draft' ? 'Черновик' : 'Активная'}
-              </label>
-            ))}
-          </div>
-        </Field>
-      </div>
-
       {error && <p style={{ color: '#c0392b', fontFamily: 'var(--mono)', fontSize: '0.8rem' }}>{error}</p>}
 
-      <button type="submit" disabled={loading} style={btnStyle}>
-        {loading ? '...' : (initial ? 'Сохранить изменения →' : 'Опубликовать заявку →')}
-      </button>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button type="button" onClick={() => submit('active')} disabled={loading} style={btnStyle}>
+          {loading ? '...' : 'Опубликовать заявку →'}
+        </button>
+        <button type="button" onClick={() => submit('draft')} disabled={loading} style={draftBtnStyle}>
+          {loading ? '...' : 'Сохранить в черновики'}
+        </button>
+      </div>
     </form>
   )
 }
@@ -216,5 +193,10 @@ const btnStyle: React.CSSProperties = {
   background: 'var(--accent)', color: '#fff',
   fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '1rem',
   padding: '0.75rem 1.75rem', border: 'none', cursor: 'pointer',
-  alignSelf: 'flex-start',
+}
+
+const draftBtnStyle: React.CSSProperties = {
+  background: 'none', color: 'var(--text-2)',
+  fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '1rem',
+  padding: '0.75rem 1.75rem', border: '1px solid var(--border)', cursor: 'pointer',
 }

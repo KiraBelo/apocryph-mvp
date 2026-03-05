@@ -39,10 +39,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
 
   const { id: gameId } = await params
-  const { banner_url, nickname, avatar_url } = await req.json()
+  const { banner_url, nickname, avatar_url, ooc_enabled } = await req.json()
+
+  if (nickname && nickname.length > 50) {
+    return NextResponse.json({ error: 'Никнейм не может быть длиннее 50 символов' }, { status: 400 })
+  }
+  if (avatar_url && avatar_url.length > 512) {
+    return NextResponse.json({ error: 'Ссылка на аватар слишком длинная' }, { status: 400 })
+  }
+  if (banner_url && banner_url.length > 512) {
+    return NextResponse.json({ error: 'Ссылка на баннер слишком длинная' }, { status: 400 })
+  }
 
   if (banner_url !== undefined) {
     await query('UPDATE games SET banner_url=$2 WHERE id=$1', [gameId, banner_url])
+  }
+  if (ooc_enabled !== undefined) {
+    await query('UPDATE games SET ooc_enabled=$2 WHERE id=$1', [gameId, ooc_enabled])
   }
   if (nickname !== undefined || avatar_url !== undefined) {
     await query(

@@ -103,7 +103,7 @@ export default function RequestCard({
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
         <Link href={`/requests/${request.id}`}>
-          <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 400, color: 'var(--text)', lineHeight: 1.3 }}>
+          <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 400, color: 'var(--text)', lineHeight: 1.3, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
             {request.title}
           </h3>
         </Link>
@@ -179,6 +179,7 @@ export default function RequestCard({
                 color: 'var(--text-2)', fontSize: '0.95rem', lineHeight: 1.7,
                 overflow: 'hidden',
                 maxHeight: isLong && !expanded ? '17rem' : 'none',
+                overflowWrap: 'break-word', wordBreak: 'break-word',
               }}
               dangerouslySetInnerHTML={{ __html: request.body }}
             />

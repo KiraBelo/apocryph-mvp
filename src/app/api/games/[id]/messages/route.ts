@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
+import { sanitizeBody } from '@/lib/sanitize'
 
 // GET — история сообщений
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -26,8 +27,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
 
   const { id: gameId } = await params
-  const { content } = await req.json()
+  const { content, type = 'ic' } = await req.json()
   if (!content?.trim()) return NextResponse.json({ error: 'Пустое сообщение' }, { status: 400 })
+  if (content.length > 200_000) return NextResponse.json({ error: 'Сообщение слишком длинное' }, { status: 400 })
+  const msgType = type === 'ooc' ? 'ooc' : 'ic'
 
   // Найти participant
   const participant = await queryOne<{ id: string; left_at: string | null }>(
@@ -39,9 +42,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const message = await queryOne(
-    `INSERT INTO messages (game_id, participant_id, content)
-     VALUES ($1, $2, $3) RETURNING *`,
-    [gameId, participant.id, content]
+    `INSERT INTO messages (game_id, participant_id, content, type)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [gameId, participant.id, sanitizeBody(content), msgType]
   )
 
   // Получаем полные данные с никнеймом

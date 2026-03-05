@@ -10,6 +10,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id: requestId } = await params
   const { nickname } = await req.json()
 
+  if (nickname && nickname.length > 50) {
+    return NextResponse.json({ error: 'Никнейм не может быть длиннее 50 символов' }, { status: 400 })
+  }
+
   const request = await queryOne<{
     id: string; author_id: string; type: string; status: string
   }>('SELECT * FROM requests WHERE id=$1', [requestId])

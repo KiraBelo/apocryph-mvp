@@ -21,12 +21,23 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
     ? await query<{ request_id: string }>('SELECT request_id FROM bookmarks WHERE user_id=$1 AND request_id=$2', [user.id, id])
     : []
 
+  const existingGame = user
+    ? await queryOne<{ id: string }>(
+        `SELECT g.id FROM games g
+         JOIN game_participants gp ON gp.game_id = g.id AND gp.user_id = $1 AND gp.left_at IS NULL
+         WHERE g.request_id = $2
+         LIMIT 1`,
+        [user.id, id]
+      )
+    : null
+
   return (
     <RequestDetailClient
       request={request}
       user={user}
       isAuthor={isAuthor}
       isBookmarked={bookmarks.length > 0}
+      existingGameId={existingGame?.id ?? null}
     />
   )
 }

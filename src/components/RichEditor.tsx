@@ -1,5 +1,6 @@
 'use client'
 import { useEditor, EditorContent } from '@tiptap/react'
+import { Node, mergeAttributes } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
@@ -7,14 +8,50 @@ import Highlight from '@tiptap/extension-highlight'
 import TextAlign from '@tiptap/extension-text-align'
 import FontFamily from '@tiptap/extension-font-family'
 import { useState, useEffect } from 'react'
+import { FONT_GROUPS } from '@/lib/fonts'
 
-const FONTS = [
-  { label: 'EB Garamond', value: 'EB Garamond, Georgia, serif' },
-  { label: 'Cormorant', value: 'Cormorant Garamond, Georgia, serif' },
-  { label: 'Courier Prime', value: 'Courier Prime, monospace' },
-  { label: 'Georgia', value: 'Georgia, serif' },
-  { label: 'По умолчанию', value: '' },
-]
+// Custom TipTap node for SMS-style bubbles
+const SMSBlock = Node.create({
+  name: 'smsBlock',
+  group: 'block',
+  content: 'block+',
+  defining: true,
+  parseHTML() {
+    return [{ tag: 'div.sms-bubble' }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes({ class: 'sms-bubble' }, HTMLAttributes), 0]
+  },
+  addCommands() {
+    return {
+      toggleSMSBlock: () => ({ commands }: any) => commands.toggleWrap('smsBlock'),
+    } as any
+  },
+})
+
+// Custom Tiptap node for music embeds
+const IframeNode = Node.create({
+  name: 'iframe',
+  group: 'block',
+  atom: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+      width: { default: '100%' },
+      height: { default: '152' },
+      frameborder: { default: '0' },
+      allow: { default: null },
+      allowtransparency: { default: null },
+    }
+  },
+  parseHTML() {
+    return [{ tag: 'iframe[src]' }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['iframe', mergeAttributes(HTMLAttributes)]
+  },
+})
+
 
 const COLORS = ['#1c1813', '#8b1a1a', '#1a4a8b', '#1a7a3a', '#5a4e40', '#7c1a8b', '#8b6a1a']
 const HIGHLIGHTS = ['#fff3cd', '#fce4e4', '#e4f4e4', '#e4eef4', '#f4e4f4', '#e4f4f4']
@@ -24,11 +61,14 @@ interface Props {
   onChange: (html: string) => void
   placeholder?: string
   minHeight?: string
+  onDiceClick?: () => void
+  diceActive?: boolean
 }
 
-export default function RichEditor({ content, onChange, placeholder = 'Начни писать...', minHeight = '180px' }: Props) {
-  const [htmlMode, setHtmlMode] = useState(false)
-  const [rawHtml, setRawHtml] = useState(content)
+export default function RichEditor({ content, onChange, placeholder = 'Начни писать...', minHeight = '180px', onDiceClick, diceActive }: Props) {
+  const [musicOpen, setMusicOpen] = useState(false)
+  const [embedInput, setEmbedInput] = useState('')
+  const [embedError, setEmbedError] = useState('')
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -39,6 +79,8 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       FontFamily,
+      IframeNode,
+      SMSBlock,
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -60,10 +102,43 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
     }
   }, [])
 
-  function applyHtml() {
-    editor?.commands.setContent(rawHtml)
-    setHtmlMode(false)
-    onChange(rawHtml)
+  function insertEmbed() {
+    if (!editor) return
+    setEmbedError('')
+
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(embedInput, 'text/html')
+    const iframe = doc.querySelector('iframe')
+
+    if (!iframe) {
+      setEmbedError('Не найден iframe в коде')
+      return
+    }
+
+    const src = iframe.getAttribute('src') ?? ''
+    const allowed =
+      src.startsWith('https://open.spotify.com/embed/') ||
+      src.startsWith('https://music.yandex.ru/iframe/')
+
+    if (!allowed) {
+      setEmbedError('Разрешены только Spotify и Яндекс.Музыка')
+      return
+    }
+
+    editor.chain().focus().insertContent({
+      type: 'iframe',
+      attrs: {
+        src,
+        width: iframe.getAttribute('width') || '100%',
+        height: iframe.getAttribute('height') || '152',
+        frameborder: iframe.getAttribute('frameborder') || '0',
+        allow: iframe.getAttribute('allow') || null,
+        allowtransparency: iframe.getAttribute('allowtransparency') || null,
+      },
+    }).run()
+
+    setMusicOpen(false)
+    setEmbedInput('')
   }
 
   if (!editor) return null
@@ -135,7 +210,12 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
           style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '0.2rem 0.4rem', cursor: 'pointer' }}
           title="Шрифт"
         >
-          {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+          <option value="">По умолчанию</option>
+          {FONT_GROUPS.map(g => (
+            <optgroup key={g.label} label={g.label}>
+              {g.fonts.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+            </optgroup>
+          ))}
         </select>
 
         {sep()}
@@ -166,36 +246,80 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
 
         {sep()}
 
-        {/* Clear + HTML mode */}
+        {/* Clear + Music embed */}
         {btn(false, () => editor.chain().focus().unsetAllMarks().clearNodes().run(), '✕', 'Очистить форматирование')}
-        {btn(htmlMode, () => {
-          if (!htmlMode) setRawHtml(editor.getHTML())
-          setHtmlMode(m => !m)
-        }, '‹/›', 'HTML-режим')}
+        {btn(musicOpen, () => { setMusicOpen(m => !m); setEmbedError('') }, <span style={{ fontSize: '1rem', lineHeight: 1 }}>♫</span>, 'Встроить музыку')}
+        {btn((editor as any).isActive('smsBlock'), () => (editor as any).chain().focus().toggleSMSBlock().run(), <span style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.7rem' }}>sms</span>, 'SMS-пузырь')}
+        {onDiceClick && (
+          <button
+            type="button"
+            onClick={onDiceClick}
+            title="Бросить кубик"
+            style={{
+              background: diceActive ? 'var(--accent-dim)' : 'none',
+              border: 'none', color: diceActive ? 'var(--accent)' : 'var(--text-2)',
+              padding: '0.25rem 0.45rem', cursor: 'pointer', borderRadius: '2px',
+              lineHeight: 1, display: 'inline-flex', alignItems: 'center',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="3"/>
+              <circle cx="8" cy="8" r="1.3" fill="currentColor"/>
+              <circle cx="16" cy="8" r="1.3" fill="currentColor"/>
+              <circle cx="8" cy="16" r="1.3" fill="currentColor"/>
+              <circle cx="16" cy="16" r="1.3" fill="currentColor"/>
+              <circle cx="12" cy="12" r="1.3" fill="currentColor"/>
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* Editor or HTML textarea */}
-      {htmlMode ? (
-        <div style={{ padding: '0.75rem' }}>
+      {/* Music embed panel */}
+      {musicOpen && (
+        <div style={{
+          padding: '0.75rem 0.9rem',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg-3)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem',
+        }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--text-2)', textTransform: 'uppercase' }}>
+            Вставьте embed-код со Spotify или Яндекс.Музыки
+          </span>
           <textarea
-            value={rawHtml}
-            onChange={e => setRawHtml(e.target.value)}
+            value={embedInput}
+            onChange={e => { setEmbedInput(e.target.value); setEmbedError('') }}
+            placeholder={'<iframe src="https://open.spotify.com/embed/..." ...></iframe>'}
+            rows={3}
             style={{
-              width: '100%', minHeight, fontFamily: 'var(--mono)', fontSize: '0.82rem',
-              background: 'var(--bg)', color: 'var(--text)', border: 'none', outline: 'none', resize: 'vertical',
-              lineHeight: 1.6, padding: '0.5rem',
+              fontFamily: 'var(--mono)', fontSize: '0.75rem',
+              background: 'var(--bg)', color: 'var(--text)',
+              border: embedError ? '1px solid var(--accent)' : '1px solid var(--border)',
+              outline: 'none', resize: 'vertical', padding: '0.5rem',
+              lineHeight: 1.5, width: '100%',
             }}
             spellCheck={false}
           />
-          <button type="button" onClick={applyHtml}
-            style={{ fontFamily: 'var(--mono)', fontSize: '0.7rem', letterSpacing: '0.08em', background: 'var(--accent)', color: '#fff', border: 'none', padding: '0.35rem 0.9rem', cursor: 'pointer', marginTop: '0.5rem' }}
-          >
-            Применить HTML
-          </button>
+          {embedError && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '0.65rem', color: 'var(--accent)' }}>{embedError}</span>
+          )}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="button" onClick={insertEmbed}
+              style={{ fontFamily: 'var(--mono)', fontSize: '0.7rem', letterSpacing: '0.08em', background: 'var(--accent)', color: '#fff', border: 'none', padding: '0.35rem 0.9rem', cursor: 'pointer' }}
+            >
+              Вставить
+            </button>
+            <button type="button" onClick={() => { setMusicOpen(false); setEmbedInput(''); setEmbedError('') }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '0.7rem', letterSpacing: '0.08em', background: 'none', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '0.35rem 0.9rem', cursor: 'pointer' }}
+            >
+              Отмена
+            </button>
+          </div>
         </div>
-      ) : (
-        <EditorContent editor={editor} />
       )}
+
+      <EditorContent editor={editor} />
     </div>
   )
 }

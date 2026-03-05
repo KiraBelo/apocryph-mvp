@@ -18,11 +18,12 @@ interface Props {
   user: { id: string; email: string } | null
   isAuthor: boolean
   isBookmarked: boolean
+  existingGameId: string | null
 }
 
 const LEAVE_REASONS = ['Нет времени', 'Сменились интересы', 'Неподходящий партнёр', 'История завершена', 'Другое']
 
-export default function RequestDetailClient({ request, user, isAuthor, isBookmarked: initBm }: Props) {
+export default function RequestDetailClient({ request, user, isAuthor, isBookmarked: initBm, existingGameId }: Props) {
   const router = useRouter()
   const [bookmarked, setBookmarked] = useState(initBm)
   const [nickname, setNickname] = useState('Игрок')
@@ -89,7 +90,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontStyle: 'italic', fontWeight: 300, color: 'var(--text)', lineHeight: 1.2 }}>
+        <h1 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontStyle: 'italic', fontWeight: 300, color: 'var(--text)', lineHeight: 1.2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
           {request.title}
         </h1>
         {user && (
@@ -120,20 +121,30 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
 
       {/* Actions */}
       {user && !isAuthor && request.status === 'active' && (
-        <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', padding: '1.5rem', marginBottom: '1.5rem' }}>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '0.75rem' }}>Твой никнейм в этой игре</p>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <input
-              value={nickname} onChange={e => setNickname(e.target.value)}
-              style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--serif-body)', fontSize: '1rem', padding: '0.5rem 0.8rem', outline: 'none' }}
-              placeholder="Игрок"
-            />
-            <button onClick={respond} disabled={respondLoading}
-              style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.95rem', border: 'none', padding: '0.55rem 1.25rem', cursor: 'pointer' }}>
-              {respondLoading ? '...' : 'Ответить →'}
-            </button>
+        existingGameId ? (
+          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderLeft: '3px solid var(--accent)', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+            <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', color: 'var(--text-2)', fontSize: '0.95rem' }}>Вы уже участвуете в этой игре</p>
+            <Link href={`/games/${existingGameId}`}
+              style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.95rem', padding: '0.55rem 1.25rem', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              Открыть игру →
+            </Link>
           </div>
-        </div>
+        ) : (
+          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', padding: '1.5rem', marginBottom: '1.5rem' }}>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '0.75rem' }}>Твой никнейм в этой игре</p>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                value={nickname} onChange={e => setNickname(e.target.value)}
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--serif-body)', fontSize: '1rem', padding: '0.5rem 0.8rem', outline: 'none' }}
+                placeholder="Игрок"
+              />
+              <button onClick={respond} disabled={respondLoading}
+                style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.95rem', border: 'none', padding: '0.55rem 1.25rem', cursor: 'pointer' }}>
+                {respondLoading ? '...' : 'Ответить →'}
+              </button>
+            </div>
+          </div>
+        )
       )}
 
       {/* Author controls */}

@@ -9,6 +9,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id: gameId } = await params
   const { reason } = await req.json()
 
+  if (reason && reason.length > 2000) return NextResponse.json({ error: 'Жалоба слишком длинная' }, { status: 400 })
+
   await query(
     'INSERT INTO reports (game_id, reporter_id, reason) VALUES ($1,$2,$3)',
     [gameId, user.id, reason || 'Не указано']
