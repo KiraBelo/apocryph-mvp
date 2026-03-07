@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (description && description.length > 200_000) {
     return NextResponse.json({ error: 'Текст заявки слишком длинный' }, { status: 400 })
   }
-  const tagsArr: string[] = tags || []
+  const tagsArr: string[] = (tags || []).map((t: string) => t.trim().toLowerCase()).filter(Boolean)
   if (tagsArr.length > 20 || tagsArr.some((t: string) => t.length > 50)) {
     return NextResponse.json({ error: 'Слишком много тегов или тег слишком длинный (макс. 50 симв.)' }, { status: 400 })
   }
@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
      WHERE id=$1 RETURNING *`,
     [id, title, sanitizeBody(description), type, content_level,
      fandom_type || 'original', pairing || 'any',
-     tags || [], is_public, status]
+     tagsArr, is_public, status]
   )
   return NextResponse.json(row)
 }

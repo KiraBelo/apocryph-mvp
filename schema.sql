@@ -116,6 +116,13 @@ CREATE TABLE IF NOT EXISTS reports (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Migrations for banner preferences
+ALTER TABLE games ADD COLUMN IF NOT EXISTS ooc_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_url TEXT;
+ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_pref TEXT NOT NULL DEFAULT 'own' CHECK (banner_pref IN ('own','partner','none'));
+ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS starred_at TIMESTAMPTZ;
+ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;
+
 -- ── TRIGGERS ─────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION lowercase_tags()
 RETURNS TRIGGER AS $$

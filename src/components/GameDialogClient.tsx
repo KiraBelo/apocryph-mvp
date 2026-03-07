@@ -13,7 +13,7 @@ interface Message {
 }
 
 interface Participant {
-  id: string; user_id: string; nickname: string; avatar_url: string | null; left_at: string | null
+  id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: string; left_at: string | null
 }
 
 interface NoteEntry {
@@ -30,7 +30,7 @@ interface Props {
   requestTitle: string | null
 }
 
-const LEAVE_REASONS = ['Нет времени', 'Сменились интересы', 'Неподходящий партнёр', 'История завершена', 'Другое']
+const LEAVE_REASONS = ['Спасибо, всё было здорово', 'Сейчас нет времени продолжать', 'Формат игры не подошёл', 'Ожидания от игры не совпали', 'Сменились интересы']
 const NOTE_COLLAPSE_CHARS = 350
 
 const FEED_BG_PALETTE = [
@@ -65,7 +65,8 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   const [reportReason, setReportReason] = useState('')
   const [nickname, setNickname] = useState(me.nickname)
   const [avatarUrl, setAvatarUrl] = useState(me.avatar_url ?? '')
-  const [bannerUrl, setBannerUrl] = useState(game.banner_url ?? '')
+  const [bannerUrl, setBannerUrl] = useState(me.banner_url ?? '')
+  const [bannerPref, setBannerPref] = useState<'own' | 'partner' | 'none'>(me.banner_pref as 'own' | 'partner' | 'none' ?? 'own')
   const [oocEnabled, setOocEnabled] = useState(game.ooc_enabled)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editSaving, setEditSaving] = useState(false)
@@ -398,7 +399,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
     await fetch(`/api/games/${gameId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ banner_url: bannerUrl, nickname, avatar_url: avatarUrl, ooc_enabled: oocEnabled }),
+      body: JSON.stringify({ banner_url: bannerUrl, banner_pref: bannerPref, nickname, avatar_url: avatarUrl, ooc_enabled: oocEnabled }),
     })
     setShowSettings(false)
     router.refresh()
@@ -421,63 +422,89 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   const isOoc = activeTab === 'ooc'
   const isNotes = activeTab === 'notes'
   const visibleMessages = isOoc ? oocMessages : icMessages
+  const partner = participants.find(p => p.user_id !== userId && !p.left_at)
+  const effectiveBanner = bannerPref === 'none' ? null : bannerPref === 'partner' ? (partner?.banner_url ?? null) : (bannerUrl || null)
 
   return (
     <div style={fullscreen ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 500, display: 'flex', flexDirection: 'column', background: 'var(--bg)' } : { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', background: 'var(--bg)' }}>
       {/* Banner */}
-      {(game.banner_url || bannerUrl) && (
-        <div style={{ height: '180px', background: `url(${game.banner_url || bannerUrl}) center/cover`, flexShrink: 0 }} />
+      {effectiveBanner && !fullscreen && (
+        <div style={{ position: 'relative', height: '180px', flexShrink: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, background: `url(${effectiveBanner}) center/cover` }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.7) 100%)' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.75rem 1.5rem' }}>
+            {requestTitle && (
+              <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '1.25rem', color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 6px rgba(0,0,0,0.7)', margin: 0 }}>
+                {requestTitle}
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* Top bar */}
-      {fullscreen ? (
-        <div style={{ padding: '0.3rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, background: 'var(--bg-2)', gap: '0.5rem' }}>
-          {!isLeft && (
-            <button onClick={() => setShowSettings(true)} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center' }} title="Настройки">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-            </button>
+      {/* Unified top bar */}
+      <div style={{ padding: '0.35rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', flexShrink: 0, background: 'var(--bg-2)', gap: '0.4rem' }}>
+        {/* Left: back link + tabs */}
+        {!fullscreen && (
+          <Link href="/my/games" style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', marginRight: '0.5rem', whiteSpace: 'nowrap' }}>←</Link>
+        )}
+        {requestTitle && !effectiveBanner && (
+          <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.9rem', color: 'var(--border)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{requestTitle}</span>
+        )}
+        {(oocEnabled || notesEnabled) && (
+          <>
+            {requestTitle && !effectiveBanner && <span style={{ width: '1px', height: '16px', background: 'var(--border)', flexShrink: 0 }} />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+              <button onClick={() => setActiveTab('ic')} style={tabBtnStyle(activeTab === 'ic', 'ic')}>
+                История
+              </button>
+              {oocEnabled && (
+                <button onClick={() => setActiveTab('ooc')} style={tabBtnStyle(activeTab === 'ooc', 'ooc')}>
+                  Оффтоп
+                </button>
+              )}
+              {notesEnabled && (
+                <button onClick={() => setActiveTab('notes')} style={tabBtnStyle(activeTab === 'notes', 'notes')}>
+                  Заметки {notes.length > 0 && <span style={{ marginLeft: '0.3em', opacity: 0.6 }}>{notes.length}</span>}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Right: avatars + actions */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+          {!fullscreen && (
+            <div style={{ display: 'flex', gap: '0.25rem', marginRight: '0.15rem' }}>
+              {participants.filter(p => !p.left_at).map(p => (
+                <div key={p.id} title={p.nickname} style={{
+                  width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden',
+                  border: `2px solid ${p.user_id === userId ? 'var(--accent)' : 'var(--border)'}`,
+                  background: 'var(--bg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  {p.avatar_url
+                    ? <img src={p.avatar_url} alt={p.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ fontFamily: 'var(--serif)', fontSize: '0.8rem', color: 'var(--text-2)' }}>{p.nickname[0]}</span>
+                  }
+                </div>
+              ))}
+            </div>
           )}
-        </div>
-      ) : (
-      <div style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: 'var(--bg-2)' }}>
-        <div>
-          <Link href="/my/games" style={{ fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)' }}>← Мои игры</Link>
-          {requestTitle && <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '1rem', color: 'var(--text)', marginTop: '0.15rem' }}>{requestTitle}</p>}
-        </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '0.35rem' }}>
-            {participants.filter(p => !p.left_at).map(p => (
-              <div key={p.id} title={p.nickname} style={{
-                width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden',
-                border: `2px solid ${p.user_id === userId ? 'var(--accent)' : 'var(--border)'}`,
-                background: 'var(--bg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                {p.avatar_url
-                  ? <img src={p.avatar_url} alt={p.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <span style={{ fontFamily: 'var(--serif)', fontSize: '1rem', color: 'var(--text-2)' }}>{p.nickname[0]}</span>
-                }
-              </div>
-            ))}
-          </div>
-
-          <span style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 0.1rem' }} />
+          <span style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
 
           <button
             onClick={() => { setSearchOpen(s => !s); setSearchQuery(''); setSearchScope(activeTab === 'notes' ? 'notes' : activeTab === 'ooc' ? 'ooc' : 'ic') }}
             style={{ ...topBtn, color: searchOpen ? 'var(--text)' : 'var(--text-2)' }}
             title="Поиск"
           >
-            <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               <circle cx="5.5" cy="5.5" r="4" />
               <line x1="8.8" y1="8.8" x2="13" y2="13" />
             </svg>
           </button>
           <button onClick={() => setShowExport(true)} style={{ ...topBtn, color: 'var(--text-2)' }} title="Экспорт">
-            <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <line x1="7" y1="1" x2="7" y2="9" />
               <polyline points="4,6 7,9 10,6" />
               <line x1="2" y1="12" x2="12" y2="12" />
@@ -486,19 +513,19 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
           {!isLeft && (
             <>
               <button onClick={() => setShowSettings(true)} style={topBtn} title="Настройки">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </button>
               <button onClick={() => setShowReport(true)} style={topBtn} title="Пожаловаться">
-                <svg width="14" height="15" viewBox="0 0 14 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="14" viewBox="0 0 14 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 1v14M2 1h9l-2.5 3.5L11 8H2"/>
                 </svg>
               </button>
-              <span style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 0.1rem' }} />
+              <span style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
               <button onClick={() => setShowLeave(true)} style={{ ...topBtn, color: 'var(--accent)' }} title="Выйти из игры">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/>
                   <path d="M17 8l4 4-4 4"/>
                   <line x1="21" y1="12" x2="9" y2="12"/>
@@ -506,34 +533,52 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
               </button>
             </>
           )}
+
+          <span style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
+          <button
+            onClick={() => setFullscreen(f => { const next = !f; if (next) setEditorCollapsed(true); else setEditorCollapsed(false); return next; })}
+            title={fullscreen ? 'Выйти из полного экрана' : 'На весь экран'}
+            style={topBtn}
+          >
+            {fullscreen ? (
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="2,6 6,6 6,2"/><polyline points="8,2 8,6 12,6"/>
+                <polyline points="12,8 8,8 8,12"/><polyline points="6,12 6,8 2,8"/>
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1,5 1,1 5,1"/><polyline points="9,1 13,1 13,5"/>
+                <polyline points="13,9 13,13 9,13"/><polyline points="5,13 1,13 1,9"/>
+              </svg>
+            )}
+          </button>
         </div>
       </div>
-      )}
 
       {/* Search bar */}
       {searchOpen && (
-        <div style={{ padding: '0.65rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
           <input
             autoFocus
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Поиск..."
-            style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: '0.85rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '0.4rem 0.65rem', outline: 'none' }}
+            style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: '0.8rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '0.3rem 0.55rem', outline: 'none' }}
           />
           <div style={{ display: 'flex', gap: '0.25rem' }}>
             {(['ic', 'ooc', 'notes'] as const).map(s => (
               <button key={s} onClick={() => setSearchScope(s)} style={{
-                fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+                fontFamily: 'var(--mono)', fontSize: '0.55rem', letterSpacing: '0.08em', textTransform: 'uppercase',
                 background: searchScope === s ? 'var(--bg-3)' : 'none',
                 border: `1px solid ${searchScope === s ? 'var(--border)' : 'transparent'}`,
                 color: searchScope === s ? 'var(--text)' : 'var(--text-2)',
-                padding: '0.25rem 0.5rem', cursor: 'pointer',
+                padding: '0.2rem 0.4rem', cursor: 'pointer',
               }}>
-                {s === 'ic' ? 'История' : s === 'ooc' ? 'Оффтоп' : 'Заметки'}
+                {s === 'ic' ? 'IC' : s === 'ooc' ? 'OOC' : 'Notes'}
               </button>
             ))}
           </div>
-          <button onClick={() => setSearchOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+          <button onClick={() => setSearchOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: '0.9rem' }}>✕</button>
         </div>
       )}
 
@@ -574,42 +619,6 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
               )
             })
           )}
-        </div>
-      )}
-
-      {/* Tabs */}
-      {(oocEnabled || notesEnabled) && (
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)', flexShrink: 0, alignItems: 'stretch' }}>
-          <button onClick={() => setActiveTab('ic')} style={tabBtnStyle(activeTab === 'ic', 'ic')}>
-            История
-          </button>
-          {oocEnabled && (
-            <button onClick={() => setActiveTab('ooc')} style={tabBtnStyle(activeTab === 'ooc', 'ooc')}>
-              Оффтоп
-            </button>
-          )}
-          {notesEnabled && (
-            <button onClick={() => setActiveTab('notes')} style={tabBtnStyle(activeTab === 'notes', 'notes')}>
-              Заметки {notes.length > 0 && <span style={{ marginLeft: '0.3em', opacity: 0.6 }}>{notes.length}</span>}
-            </button>
-          )}
-          <button
-            onClick={() => setFullscreen(f => { const next = !f; if (next) setEditorCollapsed(true); else setEditorCollapsed(false); return next; })}
-            title={fullscreen ? 'Выйти из полного экрана' : 'На весь экран'}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', padding: '0 0.9rem' }}
-          >
-            {fullscreen ? (
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="2,6 6,6 6,2"/><polyline points="8,2 8,6 12,6"/>
-                <polyline points="12,8 8,8 8,12"/><polyline points="6,12 6,8 2,8"/>
-              </svg>
-            ) : (
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1,5 1,1 5,1"/><polyline points="9,1 13,1 13,5"/>
-                <polyline points="13,9 13,13 9,13"/><polyline points="5,13 1,13 1,9"/>
-              </svg>
-            )}
-          </button>
         </div>
       )}
 
@@ -829,7 +838,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                 {isOoc ? 'Оффтоп пока пуст.' : 'История пока пуста. Напишите первый пост.'}
               </p>
             )}
-            <div style={!isOoc && gameLayout === 'feed' ? { maxWidth: '700px', marginLeft: 'auto', marginRight: 'auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--game-gap, 1.5rem)' } : { display: 'contents' }}>
+            <div style={!isOoc && gameLayout === 'feed' ? { maxWidth: '1050px', marginLeft: 'auto', marginRight: 'auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--game-gap, 1.5rem)' } : { display: 'contents' }}>
             {visibleMessages.map(msg => {
               const isMine = msg.user_id === userId
               const isEditing = editingId === msg.id
@@ -865,7 +874,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                 )
                 : gameLayout === 'book' && !smsOnly ? (
                   /* ── BOOK: без аватарок, имя курсивом перед постом ── */
-                  <div key={msg.id} style={{ maxWidth: '1400px', marginLeft: 'auto', marginRight: 'auto', width: '100%', padding: '0 2rem' }}>
+                  <div key={msg.id} style={{ maxWidth: '1550px', marginLeft: 'auto', marginRight: 'auto', width: '100%', padding: '0 2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', paddingBottom: '0.35rem', marginBottom: '0.4rem', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                       <span style={{ fontFamily: 'var(--serif)', fontSize: '1rem', color: 'var(--text-2)', fontStyle: 'italic' }}>
                         {msg.nickname}
@@ -894,50 +903,62 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                     display: 'flex', gap: '0.85rem',
                     flexDirection: gameLayout === 'dialog' ? (isMine ? 'row-reverse' : 'row') : 'row',
                     alignItems: 'flex-start',
-                    ...(smsOnly && gameLayout !== 'feed' ? { maxWidth: '560px', marginLeft: 'auto', marginRight: 'auto', width: '100%' } : {}),
+                    ...(smsOnly && gameLayout !== 'feed' ? { maxWidth: '860px', marginLeft: 'auto', marginRight: 'auto', width: '100%' } : {}),
                     ...(gameLayout === 'feed' ? { background: feedPostBg(msg.user_id), padding: '0.75rem 1rem' } : {}),
                   }}>
                     {/* Avatar */}
-                    {smsOnly ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-3)', border: `2px solid ${isMine ? 'var(--accent)' : 'var(--border)'}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {msg.avatar_url ? <img src={msg.avatar_url} alt={msg.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily: 'var(--serif)', fontSize: '0.85rem', color: 'var(--text-2)' }}>{msg.nickname[0]}</span>}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'var(--bg-3)', border: `2px solid ${isMine ? 'var(--accent)' : 'var(--border)'}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {msg.avatar_url ? <img src={msg.avatar_url} alt={msg.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily: 'var(--serif)', fontSize: '0.85rem', color: 'var(--text-2)' }}>{msg.nickname[0]}</span>}
-                      </div>
-                    )}
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'var(--bg-3)', border: `2px solid ${isMine ? 'var(--accent)' : 'var(--border)'}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {msg.avatar_url ? <img src={msg.avatar_url} alt={msg.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily: 'var(--serif)', fontSize: '0.85rem', color: 'var(--text-2)' }}>{msg.nickname[0]}</span>}
+                    </div>
                     <div style={{ maxWidth: gameLayout === 'feed' ? '100%' : '72%', minWidth: 0, flex: 1 }}>
-                      <p style={{ fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.1em', color: 'var(--text-2)', marginBottom: '0.3rem', textAlign: gameLayout === 'dialog' && isMine ? 'right' : 'left' }}>
-                        {msg.nickname}
-                        {msg.edited_at && <span style={{ marginLeft: '0.4em', opacity: 0.6 }}>(ред.)</span>}
-                        {notesEnabled && (
-                          <button onClick={() => quotePost(msg)} style={{ marginLeft: '0.5em', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'var(--serif)', fontSize: '0.85rem', padding: '0', lineHeight: 1 }}>«…»</button>
-                        )}
-                        {isMine && !isLeft && (
-                          <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? 'Отменить' : 'Редактировать'} style={{ marginLeft: '0.5em', background: 'none', border: 'none', color: isEditing ? 'var(--accent)' : 'var(--text-2)', cursor: 'pointer', padding: '0', lineHeight: 1, verticalAlign: 'middle' }}>
-                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z"/></svg>
-                          </button>
-                        )}
-                      </p>
-                      <div
-                        className={`tiptap-content${gameLayout === 'dialog' && isMine ? ' sms-right' : ''}`}
-                        style={{
-                          overflowWrap: 'break-word', wordBreak: 'break-word', minWidth: 0,
-                          ...(smsOnly || gameLayout === 'feed' ? {
-                            background: 'transparent', border: 'none', padding: '0',
-                          } : {
-                            background: isMine ? 'var(--post-mine-bg)' : 'transparent',
-                            borderTop: 'none', borderBottom: 'none',
-                            borderLeft: isMine ? 'none' : `2px solid ${isEditing ? 'var(--accent)' : 'var(--border)'}`,
-                            borderRight: isMine ? `2px solid ${isEditing ? 'var(--accent)' : 'var(--post-mine-stripe)'}` : 'none',
-                            padding: '0.75rem 1.25rem', borderRadius: 0,
-                          }),
-                        }}
-                        dangerouslySetInnerHTML={{ __html: msg.content }}
-                      />
+                      {smsOnly ? (
+                        <>
+                          <p style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.08em', color: isMine ? 'var(--accent)' : 'var(--text-2)', marginBottom: '0.2rem', textAlign: gameLayout === 'dialog' && isMine ? 'right' : 'left', fontWeight: 600 }}>
+                            {msg.nickname}
+                            {isMine && !isLeft && (
+                              <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? 'Отменить' : 'Редактировать'} style={{ marginLeft: '0.5em', background: 'none', border: 'none', color: isEditing ? 'var(--accent)' : 'var(--text-2)', cursor: 'pointer', padding: '0', lineHeight: 1, verticalAlign: 'middle' }}>
+                                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z"/></svg>
+                              </button>
+                            )}
+                          </p>
+                          <div
+                            className={`tiptap-content${isMine && gameLayout === 'dialog' ? ' sms-right' : ''}`}
+                            style={{ overflowWrap: 'break-word', wordBreak: 'break-word', minWidth: 0, background: 'transparent', border: 'none', padding: '0' }}
+                            dangerouslySetInnerHTML={{ __html: msg.content }}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <p style={{ fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.1em', color: 'var(--text-2)', marginBottom: '0.3rem', textAlign: gameLayout === 'dialog' && isMine ? 'right' : 'left' }}>
+                            {msg.nickname}
+                            {msg.edited_at && <span style={{ marginLeft: '0.4em', opacity: 0.6 }}>(ред.)</span>}
+                            {notesEnabled && (
+                              <button onClick={() => quotePost(msg)} style={{ marginLeft: '0.5em', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'var(--serif)', fontSize: '0.85rem', padding: '0', lineHeight: 1 }}>«…»</button>
+                            )}
+                            {isMine && !isLeft && (
+                              <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? 'Отменить' : 'Редактировать'} style={{ marginLeft: '0.5em', background: 'none', border: 'none', color: isEditing ? 'var(--accent)' : 'var(--text-2)', cursor: 'pointer', padding: '0', lineHeight: 1, verticalAlign: 'middle' }}>
+                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z"/></svg>
+                              </button>
+                            )}
+                          </p>
+                          <div
+                            className="tiptap-content"
+                            style={{
+                              overflowWrap: 'break-word', wordBreak: 'break-word', minWidth: 0,
+                              ...(gameLayout === 'feed' ? {
+                                background: 'transparent', border: 'none', padding: '0',
+                              } : {
+                                background: isMine ? 'var(--post-mine-bg)' : 'transparent',
+                                borderTop: 'none', borderBottom: 'none',
+                                borderLeft: isMine ? 'none' : `2px solid ${isEditing ? 'var(--accent)' : 'var(--border)'}`,
+                                borderRight: isMine ? `2px solid ${isEditing ? 'var(--accent)' : 'var(--post-mine-stripe)'}` : 'none',
+                                padding: '0.75rem 1.25rem', borderRadius: 0,
+                              }),
+                            }}
+                            dangerouslySetInnerHTML={{ __html: msg.content }}
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                 )
@@ -988,13 +1009,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '0.7rem', color: 'var(--text-2)', letterSpacing: '0.08em' }}>d</span>
                   <input
                     type="number" min={2} max={100} value={diceSides}
-                    onChange={e => setDiceSides(e.target.value)}
+                    onChange={e => { const v = e.target.value; if (v === '' || (Number(v) >= 0 && Number(v) <= 100)) setDiceSides(v) }}
                     onKeyDown={e => { if (e.key === 'Enter') rollDice() }}
                     style={{ width: '3.5rem', fontFamily: 'var(--mono)', fontSize: '0.8rem', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '0.2rem 0.4rem', textAlign: 'center' }}
                   />
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '0.55rem', color: 'var(--border)', letterSpacing: '0.04em' }}>2–100</span>
                   <button
-                    onClick={rollDice} disabled={diceRolling}
-                    style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.85rem', border: 'none', padding: '0.25rem 0.9rem', cursor: 'pointer', opacity: diceRolling ? 0.6 : 1 }}
+                    onClick={rollDice} disabled={diceRolling || isNaN(parseInt(diceSides)) || parseInt(diceSides) < 2 || parseInt(diceSides) > 100}
+                    style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.85rem', border: 'none', padding: '0.25rem 0.9rem', cursor: 'pointer', opacity: (diceRolling || isNaN(parseInt(diceSides)) || parseInt(diceSides) < 2 || parseInt(diceSides) > 100) ? 0.4 : 1 }}
                   >
                     {diceRolling ? '...' : 'Бросить'}
                   </button>
@@ -1154,6 +1176,21 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
               <span style={fieldLabel}>URL баннера игры</span>
               <input value={bannerUrl} onChange={e => setBannerUrl(e.target.value)} style={settingInput} placeholder="https://..." maxLength={512} />
             </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <span style={fieldLabel}>Отображение баннера</span>
+              {([['own', 'Мой баннер'], ['partner', 'Баннер соигрока'], ['none', 'Без баннера']] as const).map(([val, label]) => (
+                <label key={val} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="banner_pref"
+                    checked={bannerPref === val}
+                    onChange={() => setBannerPref(val)}
+                    style={{ accentColor: 'var(--text-2)', width: '14px', height: '14px', flexShrink: 0 }}
+                  />
+                  <span style={{ fontFamily: 'var(--serif-body)', fontSize: '0.9rem', color: 'var(--text)' }}>{label}</span>
+                </label>
+              ))}
+            </div>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -1179,10 +1216,10 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
 }
 
 function tabBtnStyle(isActive: boolean, tab: 'ic' | 'ooc' | 'notes'): React.CSSProperties {
-  const color = tab === 'ic' ? '#7d2c3e' : tab === 'notes' ? 'var(--text-2)' : 'var(--text-2)'
+  const color = tab === 'ic' ? '#7d2c3e' : 'var(--text-2)'
   return {
-    fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.12em',
-    textTransform: 'uppercase', padding: '0.6rem 1.25rem',
+    fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.1em',
+    textTransform: 'uppercase', padding: '0.3rem 0.7rem',
     background: 'none', border: 'none', cursor: 'pointer',
     color: isActive ? color : 'var(--border)',
     borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent',

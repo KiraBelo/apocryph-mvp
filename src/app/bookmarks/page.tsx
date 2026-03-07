@@ -13,7 +13,7 @@ export default async function BookmarksPage() {
   )
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 1.75rem' }}>
+    <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '3rem 1.75rem' }}>
       <p style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--accent-2)', marginBottom: '0.5rem' }}>§ Закладки</p>
       <h1 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontStyle: 'italic', fontWeight: 300, color: 'var(--text)', marginBottom: '2.5rem' }}>
         Закладки <span style={{ fontFamily: 'var(--mono)', fontSize: '0.9rem', color: 'var(--text-2)' }}>({requests.length}/50)</span>
@@ -25,7 +25,7 @@ export default async function BookmarksPage() {
         </p>
       )}
 
-      <div style={{ display: 'grid', gap: '1px', background: 'var(--border)' }}>
+      <div style={{ display: 'grid', gap: 'var(--game-gap, 1rem)' }}>
         {requests.map(r => <RequestCard key={r.id} request={r} isBookmarked />)}
       </div>
     </div>

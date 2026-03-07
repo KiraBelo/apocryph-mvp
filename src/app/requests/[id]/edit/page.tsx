@@ -16,7 +16,7 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
   if (!request || request.author_id !== user.id) notFound()
 
   return (
-    <div style={{ maxWidth: '720px', margin: '0 auto', padding: '3rem 1.75rem' }}>
+    <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '3rem 1.75rem' }}>
       <p style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--accent-2)', marginBottom: '0.75rem' }}>§ Редактирование</p>
       <h1 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontStyle: 'italic', fontWeight: 300, color: 'var(--text)', marginBottom: '2.5rem' }}>
         Изменить заявку

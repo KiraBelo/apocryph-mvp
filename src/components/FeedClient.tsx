@@ -127,6 +127,7 @@ export default function FeedClient({ user }: Props) {
   const [pairing, setPairing] = useState('')
   const [content, setContent] = useState('')
   const [tags, setTags] = useState('')
+  const [tagInput, setTagInput] = useState('')
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set())
   const [blacklist, setBlacklist] = useState<string[]>([])
   const [blacklistInput, setBlacklistInput] = useState('')
@@ -210,6 +211,33 @@ export default function FeedClient({ user }: Props) {
     load()
   }
 
+  const tagsList = tags.split(',').map(t => t.trim()).filter(Boolean)
+
+  function addTag(raw: string) {
+    const tag = raw.trim().replace(/,+$/, '').trim().toLowerCase()
+    if (!tag) return
+    const current = tags.split(',').map(t => t.trim()).filter(Boolean)
+    if (current.includes(tag)) { setTagInput(''); return }
+    const next = [...current, tag].join(', ')
+    setTags(next)
+    setTagInput('')
+  }
+
+  function removeTag(tag: string) {
+    const current = tags.split(',').map(t => t.trim()).filter(Boolean)
+    setTags(current.filter(t => t !== tag).join(', '))
+  }
+
+  function handleTagInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      addTag(tagInput)
+    }
+    if (e.key === 'Backspace' && !tagInput && tagsList.length > 0) {
+      removeTag(tagsList[tagsList.length - 1])
+    }
+  }
+
   function openSavePreset() {
     const firstEmpty = tagPresets.findIndex(p => !p.tags)
     setPresetSlot(firstEmpty >= 0 ? firstEmpty : 0)
@@ -229,7 +257,7 @@ export default function FeedClient({ user }: Props) {
   const showPresetPanel = hasPresets || showSavePreset
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '3rem 1.75rem' }}>
+    <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '3rem 1.75rem' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '2.5rem', gap: '1rem' }}>
         <div>
@@ -295,9 +323,14 @@ export default function FeedClient({ user }: Props) {
         <div style={{ display: 'flex', gap: '0.4rem', flex: '1 1 160px' }}>
           <input
             type="text"
-            placeholder="Теги через запятую..."
-            value={tags}
-            onChange={e => setTags(e.target.value)}
+            placeholder="Добавить тег..."
+            value={tagInput}
+            onChange={e => {
+              const v = e.target.value
+              if (v.includes(',')) { addTag(v); return }
+              setTagInput(v)
+            }}
+            onKeyDown={handleTagInputKeyDown}
             style={{ ...filterInput, flex: 1, minWidth: 0 }}
           />
           <button
@@ -318,6 +351,33 @@ export default function FeedClient({ user }: Props) {
           Найти
         </button>
       </div>
+
+      {/* Active tag chips */}
+      {tagsList.length > 0 && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center',
+          padding: '0.6rem 1.5rem',
+          background: 'var(--bg-2)', border: '1px solid var(--border)', borderTop: 'none',
+        }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--accent-2)', marginRight: '0.25rem' }}>
+            Теги:
+          </span>
+          {tagsList.map(tag => (
+            <span key={tag} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+              fontFamily: 'var(--mono)', fontSize: '0.7rem', letterSpacing: '0.05em',
+              padding: '0.2rem 0.55rem', background: 'rgba(180, 100, 120, 0.08)', border: '1px solid rgba(180, 100, 120, 0.3)',
+              color: 'var(--text)',
+            }}>
+              #{tag}
+              <button
+                onClick={() => removeTag(tag)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: '0.8rem', lineHeight: 1, padding: 0, opacity: 0.7 }}
+              >×</button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Preset panel: chips + save form */}
       {showPresetPanel && (
@@ -451,13 +511,14 @@ export default function FeedClient({ user }: Props) {
           Заявок не найдено. Попробуй изменить фильтры или создай свою.
         </p>
       ) : (
-        <div style={{ display: 'grid', gap: '1rem' }}>
+        <div style={{ display: 'grid', gap: 'var(--game-gap, 1rem)' }}>
           {requests.map(r => (
             <RequestCard
               key={r.id}
               request={r}
               isBookmarked={bookmarked.has(r.id)}
               showRespond={!!user}
+              isOwn={!!user && r.author_id === user.id}
               onBookmark={(id, state) => {
                 const next = new Set(bookmarked)
                 state ? next.add(id) : next.delete(id)

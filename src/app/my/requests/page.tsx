@@ -18,7 +18,7 @@ export default async function MyRequestsPage({ searchParams }: { searchParams: P
   )
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 1.75rem' }}>
+    <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '3rem 1.75rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2.5rem' }}>
         <div>
           <p style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--accent-2)', marginBottom: '0.5rem' }}>§ Мои заявки</p>

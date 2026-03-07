@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   if (fandomType)   { conditions.push(`r.fandom_type = $${p++}`);   params.push(fandomType) }
   if (pairing)      { conditions.push(`r.pairing = $${p++}`);       params.push(pairing) }
   if (tags) {
-    const tagArr = tags.split(',').map(t => t.trim()).filter(Boolean)
+    const tagArr = tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
     if (tagArr.length) {
       conditions.push(`r.tags && $${p++}`)
       params.push(tagArr)
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
      FROM requests r
      JOIN users u ON u.id = r.author_id
      ${where}
-     ORDER BY r.created_at DESC`,
+     ORDER BY COALESCE(r.updated_at, r.created_at) DESC`,
     params
   )
   return NextResponse.json(rows)
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
   if (description && description.length > 200_000) {
     return NextResponse.json({ error: 'Текст заявки слишком длинный' }, { status: 400 })
   }
-  const tagsArr: string[] = tags || []
+  const tagsArr: string[] = (tags || []).map((t: string) => t.trim().toLowerCase()).filter(Boolean)
   if (tagsArr.length > 20 || tagsArr.some((t: string) => t.length > 50)) {
     return NextResponse.json({ error: 'Слишком много тегов или тег слишком длинный (макс. 50 симв.)' }, { status: 400 })
   }
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [user.id, title, sanitizeBody(description), type, content_level,
      fandom_type || 'original', pairing || 'any',
-     tags || [], is_public ?? true, status || 'draft']
+     tagsArr, is_public ?? true, status || 'draft']
   )
   return NextResponse.json(row, { status: 201 })
 }

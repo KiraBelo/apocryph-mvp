@@ -9,12 +9,13 @@ export function sanitizeBody(html: string | null | undefined): string | null {
       'h1', 'h2', 'h3',
       'ul', 'ol', 'li',
       'blockquote', 'pre', 'code', 'hr',
-      'span', 'a',
+      'span', 'a', 'div',
       'iframe',
     ],
     allowedAttributes: {
       'a': ['href', 'target', 'rel'],
       'span': ['style'],
+      'div': ['class'],
       'p': ['style'],
       'h1': ['style'],
       'h2': ['style'],
@@ -34,6 +35,10 @@ export function sanitizeBody(html: string | null | undefined): string | null {
       'a': ['https', 'http', 'mailto'],
     },
     allowedIframeHostnames: ['open.spotify.com', 'music.yandex.ru'],
+    allowedClasses: {
+      'div': ['sms-bubble'],
+      'p': ['sms-meta'],
+    },
     transformTags: {
       'a': (tagName, attribs) => ({
         tagName,

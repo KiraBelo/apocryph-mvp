@@ -7,8 +7,22 @@ import { Color } from '@tiptap/extension-color'
 import Highlight from '@tiptap/extension-highlight'
 import TextAlign from '@tiptap/extension-text-align'
 import FontFamily from '@tiptap/extension-font-family'
-import { useState, useEffect } from 'react'
+import Underline from '@tiptap/extension-underline'
+import { useState, useEffect, useRef } from 'react'
 import { FONT_GROUPS } from '@/lib/fonts'
+
+// Custom TipTap node for SMS meta line (time + checkmarks)
+const SMSMeta = Node.create({
+  name: 'smsMeta',
+  group: 'block',
+  content: 'inline*',
+  parseHTML() {
+    return [{ tag: 'p.sms-meta' }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['p', mergeAttributes({ class: 'sms-meta' }, HTMLAttributes), 0]
+  },
+})
 
 // Custom TipTap node for SMS-style bubbles
 const SMSBlock = Node.create({
@@ -21,11 +35,6 @@ const SMSBlock = Node.create({
   },
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes({ class: 'sms-bubble' }, HTMLAttributes), 0]
-  },
-  addCommands() {
-    return {
-      toggleSMSBlock: () => ({ commands }: any) => commands.toggleWrap('smsBlock'),
-    } as any
   },
 })
 
@@ -53,6 +62,37 @@ const IframeNode = Node.create({
 })
 
 
+const EMOJI_LIST = [
+  '😊','😂','🥺','😍','😭','😏','😈','🤔','🙄','😳','🥰','😤',
+  '🤣','😅','😎','🥲','😢','😡','🤗','😴','🤭','😱','🫠','🫣',
+  '❤️','🖤','💔','💜','🔥','✨','💫','⭐','🌙','🌹','🗡️','⚔️',
+  '🎭','🎪','👑','💀','🦊','🐺','🐉','🦇','🌑','🌕','🕯️','📖',
+  '👀','🫶','🤝','✍️','💭','💬','🎵','🎶','💐','🥀','🍷','☕',
+]
+
+function EmojiDropdown({ onSelect }: { onSelect: (emoji: string) => void }) {
+  return (
+    <div style={{
+      position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 200,
+      background: 'var(--bg)', border: '1px solid var(--border)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+      padding: '0.5rem', width: '320px', maxHeight: '260px', overflowY: 'auto',
+      display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2px',
+    }}>
+      {EMOJI_LIST.map(e => (
+        <button key={e} type="button" onClick={() => onSelect(e)} style={{
+          background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer',
+          padding: '0.2rem', borderRadius: '4px', lineHeight: 1,
+        }}
+          onMouseEnter={ev => { ev.currentTarget.style.background = 'var(--bg-3)' }}
+          onMouseLeave={ev => { ev.currentTarget.style.background = 'none' }}
+        >
+          {e}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const COLORS = ['#1c1813', '#8b1a1a', '#1a4a8b', '#1a7a3a', '#5a4e40', '#7c1a8b', '#8b6a1a']
 const HIGHLIGHTS = ['#fff3cd', '#fce4e4', '#e4f4e4', '#e4eef4', '#f4e4f4', '#e4f4f4']
 
@@ -69,6 +109,9 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
   const [musicOpen, setMusicOpen] = useState(false)
   const [embedInput, setEmbedInput] = useState('')
   const [embedError, setEmbedError] = useState('')
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  const emojiRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -79,7 +122,9 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       FontFamily,
+      Underline,
       IframeNode,
+      SMSMeta,
       SMSBlock,
     ],
     content,
@@ -101,6 +146,34 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
       editor.commands.setContent(content)
     }
   }, [])
+
+  // Close emoji picker on click outside
+  useEffect(() => {
+    if (!emojiOpen) return
+    function close(e: MouseEvent) {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) setEmojiOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [emojiOpen])
+
+  async function translateContent() {
+    if (!editor || translating) return
+    const text = editor.getText().trim()
+    if (!text) return
+    setTranslating(true)
+    try {
+      const isRu = /[а-яёА-ЯЁ]/.test(text)
+      const langpair = isRu ? 'ru|en' : 'en|ru'
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 4500))}&langpair=${langpair}`)
+      const data = await res.json()
+      const translated = data?.responseData?.translatedText
+      if (translated) {
+        editor.commands.setContent(`<p>${translated}</p>`)
+      }
+    } catch { /* ignore */ }
+    setTranslating(false)
+  }
 
   function insertEmbed() {
     if (!editor) return
@@ -173,9 +246,10 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
         background: 'var(--bg-3)',
       }}>
         {/* Text style */}
-        {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), <strong>B</strong>, 'Жирный')}
-        {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), <em>I</em>, 'Курсив')}
-        {btn(editor.isActive('strike'), () => editor.chain().focus().toggleStrike().run(), <span style={{ textDecoration: 'line-through' }}>S</span>, 'Зачёркнутый')}
+        {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), <strong>B</strong>, 'Жирный (Ctrl+B)')}
+        {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), <em>I</em>, 'Курсив (Ctrl+I)')}
+        {btn(editor.isActive('underline'), () => editor.chain().focus().toggleUnderline().run(), <span style={{ textDecoration: 'underline' }}>U</span>, 'Подчёркнутый (Ctrl+U)')}
+        {btn(editor.isActive('strike'), () => editor.chain().focus().toggleStrike().run(), <span style={{ textDecoration: 'line-through' }}>S</span>, 'Зачёркнутый (Ctrl+Shift+S)')}
 
         {sep()}
 
@@ -246,10 +320,45 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
 
         {sep()}
 
-        {/* Clear + Music embed */}
+        {/* Horizontal rule (scene separator) */}
+        {btn(false, () => editor.chain().focus().setHorizontalRule().run(), '―', 'Разделитель сцен')}
+
+        {sep()}
+
+        {/* Clear + Music embed + SMS + Emoji */}
         {btn(false, () => editor.chain().focus().unsetAllMarks().clearNodes().run(), '✕', 'Очистить форматирование')}
         {btn(musicOpen, () => { setMusicOpen(m => !m); setEmbedError('') }, <span style={{ fontSize: '1rem', lineHeight: 1 }}>♫</span>, 'Встроить музыку')}
-        {btn((editor as any).isActive('smsBlock'), () => (editor as any).chain().focus().toggleSMSBlock().run(), <span style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.7rem' }}>sms</span>, 'SMS-пузырь')}
+        {btn(editor.isActive('smsBlock'), () => {
+          // Check if any content is already inside smsBlock
+          let hasSms = false
+          editor.state.doc.descendants((node) => {
+            if (node.type.name === 'smsBlock') hasSms = true
+          })
+          if (hasSms) {
+            editor.chain().focus().selectAll().lift('smsBlock').run()
+            // Remove sms-meta paragraphs after unwrap
+            const html = editor.getHTML()
+            const cleaned = html.replace(/<p class="sms-meta">.*?<\/p>/g, '')
+            editor.commands.setContent(cleaned)
+          } else {
+            // Build timestamp
+            const now = new Date()
+            const hh = String(now.getHours()).padStart(2, '0')
+            const mm = String(now.getMinutes()).padStart(2, '0')
+            const metaHtml = `<p class="sms-meta">${hh}:${mm}</p>`
+            // Wrap all content in smsBlock with timestamp at top
+            editor.chain().focus().selectAll().wrapIn('smsBlock').run()
+            const html = editor.getHTML()
+            // Insert meta right after opening <div class="sms-bubble">
+            const patched = html.replace(/<div class="sms-bubble">/, `<div class="sms-bubble">${metaHtml}`)
+            editor.commands.setContent(patched)
+          }
+        }, <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="12" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/></svg>, 'SMS-пузырь')}
+        <div ref={emojiRef} style={{ position: 'relative', display: 'inline-flex' }}>
+          {btn(emojiOpen, () => setEmojiOpen(o => !o), <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>☺</span>, 'Эмодзи')}
+          {emojiOpen && <EmojiDropdown onSelect={(emoji: string) => { editor.chain().focus().insertContent(emoji).run(); setEmojiOpen(false) }} />}
+        </div>
+        {/* Translator button hidden for now — translateContent() is available */}
         {onDiceClick && (
           <button
             type="button"
@@ -319,7 +428,9 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
         </div>
       )}
 
-      <EditorContent editor={editor} />
+      <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }

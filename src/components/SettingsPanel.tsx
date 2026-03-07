@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useSettings, type Settings, type GameLayout } from './SettingsContext'
 import type { TagPreset } from './SettingsContext'
-import { FONT_GROUPS } from '@/lib/fonts'
+import { FONT_GROUPS, ALL_FONTS } from '@/lib/fonts'
 
 function BtnGroup<T extends string>({ current, options, onSelect }: {
   current: T
@@ -10,16 +10,16 @@ function BtnGroup<T extends string>({ current, options, onSelect }: {
   onSelect: (v: T) => void
 }) {
   return (
-    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
       {options.map(o => (
         <button
           key={o.value}
           onClick={() => onSelect(o.value)}
           style={{
             fontFamily: 'var(--mono)',
-            fontSize: '0.68rem',
+            fontSize: '0.65rem',
             letterSpacing: '0.08em',
-            padding: '0.3rem 0.7rem',
+            padding: '0.25rem 0.6rem',
             border: `1px solid ${current === o.value ? 'var(--accent)' : 'var(--border)'}`,
             background: current === o.value ? 'var(--accent-dim)' : 'none',
             color: current === o.value ? 'var(--accent)' : 'var(--text-2)',
@@ -38,52 +38,96 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section>
       <p style={{
-        fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.22em',
-        textTransform: 'uppercase', color: 'var(--accent-2)', marginBottom: '1rem',
+        fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.22em',
+        textTransform: 'uppercase', color: 'var(--accent-2)', marginBottom: '0.5rem',
       }}>
-        § {title}
+        {title}
       </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
         {children}
       </div>
     </section>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, open, onToggle, children }: {
+  label: string; open: boolean; onToggle: () => void; children: React.ReactNode
+}) {
   return (
     <div>
-      <p style={{
-        fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.12em',
-        textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '0.45rem',
-      }}>
+      <div
+        onClick={onToggle}
+        style={{
+          fontFamily: 'var(--serif-body)', fontSize: '0.88rem', color: 'var(--text)',
+          cursor: 'pointer', padding: '0.3rem 0', userSelect: 'none',
+        }}
+      >
         {label}
-      </p>
-      {children}
+      </div>
+      {open && (
+        <div style={{ padding: '0.25rem 0 0.45rem' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Toggle({ label, value, onChange, title }: { label: string; value: boolean; onChange: (v: boolean) => void; title?: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }} title={title}>
+      <span style={{ fontFamily: 'var(--serif-body)', fontSize: '0.88rem', color: 'var(--text)' }}>{label}</span>
+      <button
+        onClick={() => onChange(!value)}
+        role="switch"
+        aria-checked={value}
+        style={{
+          width: '38px', height: '20px', borderRadius: '10px', border: 'none',
+          background: value ? 'var(--accent)' : 'var(--border)',
+          cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+          left: value ? '19px' : '3px',
+          width: '14px', height: '14px', borderRadius: '50%',
+          background: '#fff', transition: 'left 0.2s',
+        }} />
+      </button>
     </div>
   )
 }
 
 export default function SettingsPanel() {
-  const { panelOpen, closePanel, theme, fontSize, siteFont, gameFont, gameSpacing, gameLayout, emailNotifs, notesEnabled, set, tagPresets, setTagPreset } = useSettings()
-  const [editingPreset, setEditingPreset] = useState<number | null>(null)
+  const { panelOpen, closePanel, theme, fontSize, siteFont, gameSpacing, gameLayout, emailNotifs, notesEnabled, set, tagPresets, setTagPreset } = useSettings()
+  const [openField, setOpenField] = useState<string | null>(null)
+  const [expandedPreset, setExpandedPreset] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
   const [editTags, setEditTags] = useState('')
 
-  function startEdit(i: number) {
-    setEditingPreset(i)
-    setEditName(tagPresets[i].name)
-    setEditTags(tagPresets[i].tags)
+  function toggle(field: string) {
+    setOpenField(prev => prev === field ? null : field)
   }
 
-  function saveEdit() {
-    if (editingPreset === null) return
-    setTagPreset(editingPreset, { name: editName.trim(), tags: editTags.trim() })
-    setEditingPreset(null)
+  function togglePreset(i: number) {
+    if (expandedPreset === i) {
+      setExpandedPreset(null)
+    } else {
+      setExpandedPreset(i)
+      setEditName(tagPresets[i].name)
+      setEditTags(tagPresets[i].tags)
+    }
   }
 
-  function cancelEdit() {
-    setEditingPreset(null)
+  function savePreset() {
+    if (expandedPreset === null) return
+    setTagPreset(expandedPreset, { name: editName.trim(), tags: editTags.trim() })
+    setExpandedPreset(null)
+  }
+
+  function clearPreset(i: number) {
+    setTagPreset(i, { name: '', tags: '' })
+    if (expandedPreset === i) setExpandedPreset(null)
   }
 
   useEffect(() => {
@@ -96,7 +140,6 @@ export default function SettingsPanel() {
 
   return (
     <>
-      {/* Backdrop */}
       {panelOpen && (
         <div
           onClick={closePanel}
@@ -104,7 +147,6 @@ export default function SettingsPanel() {
         />
       )}
 
-      {/* Panel */}
       <div style={{
         position: 'fixed',
         top: '60px',
@@ -113,37 +155,29 @@ export default function SettingsPanel() {
         height: 'calc(100vh - 60px)',
         background: 'var(--bg)',
         borderLeft: '1px solid var(--border)',
+        borderTopLeftRadius: '8px',
         zIndex: 300,
         overflowY: 'auto',
         transform: panelOpen ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 0.25s ease',
-        padding: '1.5rem',
+        padding: '1.25rem 1.25rem 1.5rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.75rem',
+        gap: '1.25rem',
       }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <h2 style={{
-            fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300,
-            fontSize: '1.4rem', color: 'var(--text)',
-          }}>
+          <h2 style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '1.3rem', color: 'var(--text)' }}>
             Настройки
           </h2>
-          <button
-            onClick={closePanel}
-            style={{
-              background: 'none', border: 'none', color: 'var(--text-2)',
-              cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0.2rem',
-            }}
-          >
+          <button onClick={closePanel} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1, padding: '0.2rem' }}>
             ✕
           </button>
         </div>
 
-        {/* Внешний вид */}
-        <Section title="Внешний вид">
-          <Field label="Тема">
+        {/* === Вид сайта === */}
+        <Section title="Вид сайта">
+          <Row label="Тема" open={openField === 'theme'} onToggle={() => toggle('theme')}>
             <BtnGroup<Settings['theme']>
               current={theme}
               options={[
@@ -152,8 +186,9 @@ export default function SettingsPanel() {
               ]}
               onSelect={v => set('theme', v)}
             />
-          </Field>
-          <Field label="Размер текста">
+          </Row>
+
+          <Row label="Размер текста" open={openField === 'fontSize'} onToggle={() => toggle('fontSize')}>
             <BtnGroup<Settings['fontSize']>
               current={fontSize}
               options={[
@@ -163,52 +198,9 @@ export default function SettingsPanel() {
               ]}
               onSelect={v => set('fontSize', v)}
             />
-          </Field>
-          <Field label="Шрифт сайта">
-            <select
-              value={siteFont}
-              onChange={e => set('siteFont', e.target.value)}
-              style={{
-                fontFamily: 'var(--mono)', fontSize: '0.68rem',
-                background: 'var(--bg-2)', border: '1px solid var(--border)',
-                color: 'var(--text-2)', padding: '0.3rem 0.5rem',
-                cursor: 'pointer', width: '100%',
-              }}
-            >
-              {FONT_GROUPS.map(g => (
-                <optgroup key={g.label} label={g.label}>
-                  {g.fonts.map(f => (
-                    <option key={f.value} value={f.value}>{f.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <p style={{
-              fontFamily: 'var(--mono)', fontSize: '0.58rem',
-              letterSpacing: '0.06em', color: 'var(--text-2)',
-              marginTop: '0.4rem',
-            }}>
-              Применяется ко всему тексту сайта
-            </p>
-          </Field>
-        </Section>
+          </Row>
 
-        <div style={{ height: '1px', background: 'var(--border)' }} />
-
-        {/* Отображение игры */}
-        <Section title="Отображение игры">
-          <Field label="Шрифт диалога">
-            <BtnGroup<Settings['gameFont']>
-              current={gameFont}
-              options={[
-                { value: 'serif', label: 'Гарамон' },
-                { value: 'serif-body', label: 'ЕБ Гарамон' },
-                { value: 'mono', label: 'Курьер' },
-              ]}
-              onSelect={v => set('gameFont', v)}
-            />
-          </Field>
-          <Field label="Отступы между постами">
+          <Row label="Отступы между постами" open={openField === 'spacing'} onToggle={() => toggle('spacing')}>
             <BtnGroup<Settings['gameSpacing']>
               current={gameSpacing}
               options={[
@@ -218,8 +210,39 @@ export default function SettingsPanel() {
               ]}
               onSelect={v => set('gameSpacing', v)}
             />
-          </Field>
-          <Field label="Раскладка постов">
+          </Row>
+
+          <Row label="Шрифт" open={openField === 'font'} onToggle={() => toggle('font')}>
+            <select
+              value={siteFont}
+              onChange={e => set('siteFont', e.target.value)}
+              style={{
+                fontFamily: siteFont,
+                fontSize: '0.88rem',
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+                padding: '0.35rem 0.5rem',
+                cursor: 'pointer',
+                width: '100%',
+                outline: 'none',
+              }}
+            >
+              {FONT_GROUPS.flatMap((g, gi) => [
+                <option key={`g-${gi}`} disabled style={{ fontWeight: 'bold' }}>— {g.label} —</option>,
+                ...g.fonts.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                )),
+              ])}
+            </select>
+          </Row>
+        </Section>
+
+        <div style={{ height: '1px', background: 'var(--border)' }} />
+
+        {/* === Вид игры === */}
+        <Section title="Вид игры">
+          <Row label="Раскладка постов" open={openField === 'layout'} onToggle={() => toggle('layout')}>
             <BtnGroup<GameLayout>
               current={gameLayout}
               options={[
@@ -229,123 +252,60 @@ export default function SettingsPanel() {
               ]}
               onSelect={v => set('gameLayout', v)}
             />
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.06em', color: 'var(--text-2)', marginTop: '0.4rem' }}>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '0.55rem', letterSpacing: '0.06em', color: 'var(--text-2)', marginTop: '0.3rem' }}>
               {gameLayout === 'dialog' && 'Мой пост справа, чужой слева'}
               {gameLayout === 'feed' && 'Все посты подряд, аватарка слева'}
               {gameLayout === 'book' && 'Без аватарок, только имя и текст'}
             </p>
-          </Field>
+          </Row>
+
+          <Toggle label="Заметки" title="Личные заметки к каждой игре" value={notesEnabled} onChange={v => set('notesEnabled', v)} />
+          <Toggle label="Уведомления на e-mail" value={emailNotifs} onChange={v => set('emailNotifs', v)} />
         </Section>
 
         <div style={{ height: '1px', background: 'var(--border)' }} />
 
-        {/* Уведомления */}
-        <Section title="Уведомления">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: 'var(--serif-body)', fontSize: '0.95rem', color: 'var(--text)' }}>
-              Email о новых постах
-            </span>
-            <button
-              onClick={() => set('emailNotifs', !emailNotifs)}
-              role="switch"
-              aria-checked={emailNotifs}
-              style={{
-                width: '42px', height: '22px', borderRadius: '11px', border: 'none',
-                background: emailNotifs ? 'var(--accent)' : 'var(--border)',
-                cursor: 'pointer', position: 'relative', flexShrink: 0,
-                transition: 'background 0.2s',
-              }}
-            >
-              <span style={{
-                position: 'absolute', top: '3px',
-                left: emailNotifs ? '21px' : '3px',
-                width: '16px', height: '16px', borderRadius: '50%',
-                background: '#fff', transition: 'left 0.2s',
-              }} />
-            </button>
-          </div>
-        </Section>
-
-        <div style={{ height: '1px', background: 'var(--border)' }} />
-
-        {/* Заметки */}
-        <Section title="Заметки к играм">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontFamily: 'var(--serif-body)', fontSize: '0.95rem', color: 'var(--text)' }}>
-                Вкладка «Заметки»
-              </span>
-              <p style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.06em', color: 'var(--text-2)', marginTop: '0.15rem' }}>
-                Личные заметки к каждой игре
-              </p>
-            </div>
-            <button
-              onClick={() => set('notesEnabled', !notesEnabled)}
-              role="switch"
-              aria-checked={notesEnabled}
-              style={{
-                width: '42px', height: '22px', borderRadius: '11px', border: 'none',
-                background: notesEnabled ? 'var(--accent)' : 'var(--border)',
-                cursor: 'pointer', position: 'relative', flexShrink: 0,
-                transition: 'background 0.2s',
-              }}
-            >
-              <span style={{
-                position: 'absolute', top: '3px',
-                left: notesEnabled ? '21px' : '3px',
-                width: '16px', height: '16px', borderRadius: '50%',
-                background: '#fff', transition: 'left 0.2s',
-              }} />
-            </button>
-          </div>
-        </Section>
-
-        <div style={{ height: '1px', background: 'var(--border)' }} />
-
-        {/* Наборы тегов */}
+        {/* === Наборы тегов === */}
         <Section title="Наборы тегов">
-          <p style={{
-            fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.08em',
-            color: 'var(--text-2)', marginBottom: '0.25rem',
-          }}>
-            Сохраняйте теги из поиска в ленте
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {tagPresets.map((preset: TagPreset, i: number) => (
-              <div key={i} style={{ border: `1px solid ${editingPreset === i ? 'var(--accent)' : preset.tags ? 'var(--border)' : 'var(--bg-3)'}`, background: preset.tags || editingPreset === i ? 'var(--bg-2)' : 'transparent' }}>
-
-                {/* Preview row */}
-                {editingPreset !== i && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.45rem 0.65rem', minHeight: '38px' }}>
-                    {preset.tags ? (
-                      <>
-                        <div style={{ overflow: 'hidden', flex: 1 }}>
-                          <p style={{ fontFamily: 'var(--serif-body)', fontSize: '0.85rem', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.1rem' }}>
-                            {preset.name || `Набор ${i + 1}`}
-                          </p>
-                          <p style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.05em', color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {preset.tags}
-                          </p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.1rem', flexShrink: 0 }}>
-                          <button onClick={() => startEdit(i)} title="Редактировать" style={iconBtn}>✎</button>
-                          <button onClick={() => setTagPreset(i, { name: '', tags: '' })} title="Очистить" style={iconBtn}>✕</button>
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--border)' }}>
-                          Набор {i + 1} — пусто
-                        </span>
-                        <button onClick={() => startEdit(i)} title="Добавить теги" style={{ ...iconBtn, color: 'var(--accent-2)' }}>+ добавить</button>
-                      </div>
+          {tagPresets.map((preset: TagPreset, i: number) => {
+            const isOpen = expandedPreset === i
+            const hasContent = !!preset.tags
+            return (
+              <div key={i} style={{ border: `1px solid ${isOpen ? 'var(--accent)' : hasContent ? 'var(--border)' : 'var(--bg-3)'}`, background: hasContent || isOpen ? 'var(--bg-2)' : 'transparent', transition: 'border-color 0.15s' }}>
+                <div
+                  onClick={() => togglePreset(i)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', padding: '0.4rem 0.6rem', cursor: 'pointer', minHeight: '32px' }}
+                >
+                  <span style={{
+                    fontFamily: hasContent ? 'var(--serif-body)' : 'var(--mono)',
+                    fontSize: hasContent ? '0.82rem' : '0.58rem',
+                    letterSpacing: hasContent ? 'normal' : '0.1em',
+                    textTransform: hasContent ? 'none' : 'uppercase',
+                    color: hasContent ? 'var(--text)' : 'var(--border)',
+                    overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1,
+                  }}>
+                    {hasContent ? (preset.name || `Набор ${i + 1}`) : `Набор ${i + 1} — пусто`}
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.15rem', flexShrink: 0, alignItems: 'center' }}>
+                    {hasContent && !isOpen && (
+                      <button
+                        onClick={e => { e.stopPropagation(); clearPreset(i) }}
+                        title="Очистить"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: '0.7rem', padding: '0.1rem 0.2rem', lineHeight: 1, opacity: 0.5 }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}
+                      >
+                        ✕
+                      </button>
                     )}
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '0.55rem', color: 'var(--text-2)', transition: 'transform 0.15s', display: 'inline-block', transform: isOpen ? 'rotate(180deg)' : 'none' }}>
+                      ▾
+                    </span>
                   </div>
-                )}
+                </div>
 
-                {/* Edit form */}
-                {editingPreset === i && (
-                  <div style={{ padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {isOpen && (
+                  <div style={{ padding: '0 0.6rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <input
                       type="text"
                       placeholder={`Название набора ${i + 1}`}
@@ -354,40 +314,33 @@ export default function SettingsPanel() {
                       style={editInput}
                     />
                     <textarea
-                      placeholder="Теги через запятую: аниме, наруто, дружба"
+                      placeholder="Теги через запятую"
                       value={editTags}
                       onChange={e => setEditTags(e.target.value)}
                       rows={2}
                       style={{ ...editInput, resize: 'vertical', lineHeight: 1.5 }}
                     />
-                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                      <button onClick={cancelEdit} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-2)', fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.08em', padding: '0.3rem 0.6rem', cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                      <button onClick={() => setExpandedPreset(null)} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-2)', fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.08em', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
                         Отмена
                       </button>
-                      <button onClick={saveEdit} style={{ background: 'var(--accent)', color: '#fff', border: 'none', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.85rem', padding: '0.3rem 0.8rem', cursor: 'pointer' }}>
-                        Сохранить →
+                      <button onClick={savePreset} style={{ background: 'var(--accent)', color: '#fff', border: 'none', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.8rem', padding: '0.25rem 0.65rem', cursor: 'pointer' }}>
+                        Сохранить
                       </button>
                     </div>
                   </div>
                 )}
-
               </div>
-            ))}
-          </div>
+            )
+          })}
         </Section>
       </div>
     </>
   )
 }
 
-const iconBtn: React.CSSProperties = {
-  background: 'none', border: 'none', color: 'var(--text-2)',
-  cursor: 'pointer', fontSize: '0.78rem', padding: '0.1rem 0.25rem',
-  lineHeight: 1,
-}
-
 const editInput: React.CSSProperties = {
   background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)',
-  fontFamily: 'var(--serif-body)', fontSize: '0.85rem',
-  padding: '0.35rem 0.6rem', outline: 'none', width: '100%',
+  fontFamily: 'var(--serif-body)', fontSize: '0.82rem',
+  padding: '0.3rem 0.5rem', outline: 'none', width: '100%',
 }

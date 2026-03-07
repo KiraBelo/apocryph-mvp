@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const request = await queryOne<{
-    id: string; author_id: string; type: string; status: string
+    id: string; author_id: string; type: string; status: string; body: string | null; title: string; tags: string[]
   }>('SELECT * FROM requests WHERE id=$1', [requestId])
 
   if (!request || request.status !== 'active') {
@@ -42,11 +42,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     )
 
     // Добавляем автора заявки как участника
-    await query(
+    const authorParticipant = await queryOne<{ id: string }>(
       `INSERT INTO game_participants (game_id, user_id, nickname)
-       VALUES ($1, $2, 'Игрок') ON CONFLICT DO NOTHING`,
+       VALUES ($1, $2, 'Игрок') ON CONFLICT (game_id, user_id) DO UPDATE SET game_id=$1 RETURNING id`,
       [game!.id, request.author_id]
     )
+
+    // Первый пост — текст заявки (заголовок + теги + описание)
+    if (authorParticipant) {
+      const tagLine = request.tags?.length ? request.tags.map(t => `#${t}`).join(' ') : ''
+      const parts = [`<h3>${request.title}</h3>`]
+      if (tagLine) parts.push(`<p>${tagLine}</p>`)
+      if (request.body) parts.push(request.body)
+      const firstPostContent = parts.join('\n')
+
+      await query(
+        `INSERT INTO messages (game_id, participant_id, content, type)
+         VALUES ($1, $2, $3, 'ic')`,
+        [game!.id, authorParticipant.id, firstPostContent]
+      )
+    }
 
     // Для duo — снимаем из ленты
     if (request.type === 'duo') {

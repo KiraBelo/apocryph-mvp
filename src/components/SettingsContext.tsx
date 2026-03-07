@@ -63,7 +63,7 @@ const KEYS: Record<keyof Settings, string> = {
 const TAG_PRESETS_KEY = 'apocryph-tag-presets'
 
 const FONT_SIZES: Record<FontSize, string> = {
-  small: '16px', medium: '18px', large: '20px',
+  small: '16px', medium: '20px', large: '24px',
 }
 
 const GAME_FONTS: Record<GameFont, string> = {
@@ -83,6 +83,7 @@ function applyOne(key: keyof Settings, value: Settings[keyof Settings]) {
   if (key === 'siteFont') {
     h.style.setProperty('--site-font', value as string)
     h.style.setProperty('--serif-body', value as string)
+    h.style.setProperty('--game-font', value as string)
   }
   if (key === 'gameFont')    h.style.setProperty('--game-font', GAME_FONTS[value as GameFont])
   if (key === 'gameSpacing') h.style.setProperty('--game-gap', GAME_SPACINGS[value as GameSpacing])
@@ -92,7 +93,6 @@ function applyAllToDOM(s: Settings) {
   applyOne('theme', s.theme)
   applyOne('fontSize', s.fontSize)
   applyOne('siteFont', s.siteFont)
-  applyOne('gameFont', s.gameFont)
   applyOne('gameSpacing', s.gameSpacing)
 }
 

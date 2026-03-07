@@ -21,7 +21,7 @@ interface Props {
   existingGameId: string | null
 }
 
-const LEAVE_REASONS = ['Нет времени', 'Сменились интересы', 'Неподходящий партнёр', 'История завершена', 'Другое']
+const LEAVE_REASONS = ['Спасибо, всё было здорово', 'Сейчас нет времени продолжать', 'Формат игры не подошёл', 'Ожидания от игры не совпали', 'Сменились интересы']
 
 export default function RequestDetailClient({ request, user, isAuthor, isBookmarked: initBm, existingGameId }: Props) {
   const router = useRouter()
@@ -82,7 +82,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
   }
 
   return (
-    <div style={{ maxWidth: '760px', margin: '0 auto', padding: '3rem 1.75rem' }}>
+    <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '3rem 1.75rem' }}>
       {/* Back */}
       <Link href="/" style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.12em', color: 'var(--text-2)', textTransform: 'uppercase', display: 'inline-block', marginBottom: '2rem' }}>
         ← Лента
@@ -107,7 +107,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
         <span style={badge('fandom')}>{fandomTypeLabels[request.fandom_type]}</span>
         {request.pairing !== 'any' && <span style={badge('pairing')}>{pairingLabels[request.pairing]}</span>}
         <span style={badge('content')}>{contentLabels[request.content_level]}</span>
-        {request.tags.map(t => <span key={t} style={badge('tag')}>#{t}</span>)}
+        {request.tags.map(t => <span key={t} style={badge('tag')}>#{t.toLowerCase()}</span>)}
       </div>
 
       {/* Body */}

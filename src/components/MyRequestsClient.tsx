@@ -3,12 +3,28 @@ import { useState } from 'react'
 import Link from 'next/link'
 
 export interface MyRequest {
-  id: string; title: string; body: string | null; type: string; content_level: string; tags: string[]
+  id: string; title: string; body: string | null; type: string; content_level: string
+  fandom_type: string; pairing: string; tags: string[]
   status: string; is_public: boolean; created_at: string
 }
 
 const statusLabel: Record<string, string> = { draft: 'Черновики', active: 'В ленте', inactive: 'Неактивные' }
 const statusColor: Record<string, string> = { draft: 'var(--text-2)', active: 'var(--accent)', inactive: 'var(--border)' }
+
+const typeLabels: Record<string, string> = { duo: 'На двоих', multiplayer: 'Мультиплеер' }
+const fandomTypeLabels: Record<string, string> = { fandom: 'Фандом', original: 'Оридж' }
+const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: 'Любой пейринг', multi: 'Мульти', other: 'Другое' }
+const contentLabels: Record<string, string> = { none: 'без постельных сцен', rare: 'редко', often: 'часто', core: 'основа сюжета', flexible: 'по договорённости' }
+
+const badgeBase: React.CSSProperties = {
+  fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.08em',
+  textTransform: 'uppercase', padding: '0.15rem 0.5rem', border: '1px solid',
+  display: 'inline-flex', alignItems: 'center', lineHeight: 1.4,
+}
+const badgeType: React.CSSProperties = { ...badgeBase, color: 'var(--accent)', borderColor: 'var(--accent-dim)', background: 'transparent' }
+const badgeFandom: React.CSSProperties = { ...badgeBase, color: 'var(--accent-2)', borderColor: 'var(--accent-2)', background: 'transparent' }
+const badgeContent: React.CSSProperties = { ...badgeBase, color: 'var(--text-2)', borderColor: 'var(--border)', background: 'transparent' }
+const badgeTag: React.CSSProperties = { ...badgeBase, color: 'var(--text)', borderColor: 'rgba(180, 100, 120, 0.3)', background: 'rgba(180, 100, 120, 0.08)' }
 
 export default function MyRequestsClient({ requests: initial, initialTab = 'active' }: { requests: MyRequest[], initialTab?: 'all' | 'active' | 'draft' | 'inactive' }) {
   const [requests, setRequests] = useState(initial)
@@ -67,13 +83,13 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
         <p style={{ color: 'var(--text-2)', fontFamily: 'var(--serif)', fontStyle: 'italic' }}>Заявок нет.</p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--game-gap, 1rem)' }}>
         {filtered.map(r => {
           const plainText = (r.body ?? '').replace(/<[^>]+>/g, '')
           const isLong = plainText.length > 1000
           const exp = expanded.has(r.id)
           return (
-            <div key={r.id} style={{ background: 'var(--bg)', padding: '1.25rem 1.5rem', position: 'relative' }}>
+            <div key={r.id} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', padding: '1.25rem 1.5rem', position: 'relative' }}>
 
               {/* Иконки редактирования и удаления — правый верхний угол */}
               <div style={{ position: 'absolute', top: '0.7rem', right: '1rem', display: 'flex', gap: '0.1rem', alignItems: 'center' }}>
@@ -129,8 +145,12 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={badgeType}>{typeLabels[r.type] ?? r.type}</span>
+                    <span style={badgeFandom}>{fandomTypeLabels[r.fandom_type] ?? r.fandom_type}</span>
+                    {r.pairing !== 'any' && <span style={badgeFandom}>{pairingLabels[r.pairing] ?? r.pairing}</span>}
+                    <span style={badgeContent}>{contentLabels[r.content_level] ?? r.content_level}</span>
                     {r.tags.slice(0, 4).map(t => (
-                      <span key={t} style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', color: 'var(--text-2)' }}>#{t}</span>
+                      <span key={t} style={badgeTag}>#{t.toLowerCase()}</span>
                     ))}
                   </div>
                 </div>
@@ -150,7 +170,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
                         <div style={{ color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: 1.65, whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                           {plainText.slice(0, 1000)}
                         </div>
-                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '2.5rem', background: 'linear-gradient(to bottom, transparent, var(--bg))', pointerEvents: 'none' }} />
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '2.5rem', background: 'linear-gradient(to bottom, transparent, var(--bg-2))', pointerEvents: 'none' }} />
                       </>
                     )}
                   </div>

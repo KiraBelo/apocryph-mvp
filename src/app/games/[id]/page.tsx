@@ -14,7 +14,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   if (!game) notFound()
 
   const participants = await query<{
-    id: string; user_id: string; nickname: string; avatar_url: string | null; left_at: string | null; leave_reason: string | null
+    id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: string; left_at: string | null; leave_reason: string | null
   }>('SELECT * FROM game_participants WHERE game_id=$1 ORDER BY id', [gameId])
 
   const me = participants.find(p => p.user_id === user.id)

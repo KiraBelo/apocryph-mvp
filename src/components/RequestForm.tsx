@@ -35,15 +35,22 @@ export default function RequestForm({ initial }: Props) {
   const [contentLevel, setContentLevel] = useState(initial?.content_level ?? 'none')
   const [fandomType, setFandomType] = useState(initial?.fandom_type ?? 'original')
   const [pairing, setPairing] = useState(initial?.pairing ?? 'any')
-  const [tagsInput, setTagsInput] = useState(initial?.tags.join(', ') ?? '')
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? [])
+  const [tagInput, setTagInput] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  function addTag(raw: string) {
+    const tag = raw.trim().replace(/,+$/, '').trim().toLowerCase()
+    if (!tag || tags.includes(tag) || tags.length >= 20) { setTagInput(''); return }
+    setTags(prev => [...prev, tag])
+    setTagInput('')
+  }
+
   async function submit(statusArg: string) {
     if (!title.trim()) { setError('Укажите название заявки'); return }
+    if (statusArg === 'active' && tags.length < 3) { setError('Для публикации нужно минимум 3 тега'); return }
     setLoading(true); setError('')
-
-    const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean)
     const payload = { title, description: body, type, content_level: contentLevel, fandom_type: fandomType, pairing, tags, is_public: true, status: statusArg }
 
     const url  = initial ? `/api/requests/${initial.id}` : '/api/requests'
@@ -146,13 +153,37 @@ export default function RequestForm({ initial }: Props) {
       </Field>
 
       {/* Tags */}
-      <Field label="Теги (через запятую)">
-        <input
-          type="text" value={tagsInput} onChange={e => setTagsInput(e.target.value)}
-          placeholder="отель Хазбин, Валдасты..."
-          maxLength={1000}
-          style={inputStyle}
-        />
+      <Field label={`Теги (${tags.length}/20, мин. 3)`}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-2)', border: '1px solid var(--border)', padding: '0.5rem 0.7rem' }}>
+          <input
+            type="text"
+            value={tagInput}
+            placeholder={tags.length >= 20 ? 'Максимум тегов' : 'Введите тег...'}
+            disabled={tags.length >= 20}
+            onChange={e => {
+              const v = e.target.value
+              if (v.includes(',')) { addTag(v); return }
+              setTagInput(v)
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput) }
+              if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
+                setTags(prev => prev.slice(0, -1))
+              }
+            }}
+            style={{ ...inputStyle, border: 'none', background: 'none', padding: '0.2rem 0', flex: 1, minWidth: '120px' }}
+          />
+        </div>
+        {tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+            {tags.map(tag => (
+              <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-3)', border: '1px solid var(--border)', padding: '0.2rem 0.55rem', fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.06em', color: 'var(--text)' }}>
+                {tag}
+                <button type="button" onClick={() => setTags(prev => prev.filter(t => t !== tag))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: '0.75rem', padding: 0, lineHeight: 1 }}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
       </Field>
 
       {/* Body */}

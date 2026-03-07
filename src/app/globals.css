@@ -1,5 +1,5 @@
 /* ── Fonts ────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Merriweather:ital,wght@0,300;0,400;1,300;1,400&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=Caveat:wght@400;500&family=Raleway:ital,wght@0,300;0,400;1,300;1,400&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono:wght@400&family=Neucha&family=Marck+Script&family=Montserrat:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Merriweather:ital,wght@0,300;0,400;1,300;1,400&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=Caveat:wght@400;500&family=Raleway:ital,wght@0,300;0,400;1,300;1,400&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono:wght@400&family=Neucha&family=Marck+Script&family=Montserrat:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Open+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Nunito:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
 
 @import "tailwindcss";
 
@@ -18,8 +18,11 @@
   --site-font:  Georgia, serif;
   --serif-body: var(--site-font);
   --mono:       'Courier Prime', 'Courier New', monospace;
-  --sms-bg:          #c8daea;
-  --sms-border:      #9ab8cc;
+  --sms-bg:          #d9edf8;
+  --sms-border:      #b0ccdd;
+  --sms-mine-bg:     #dcf8c6;
+  --sms-mine-border: #b4d9a0;
+  --sms-shadow:      rgba(0, 0, 0, 0.06);
   --post-mine-bg:    #f0e9e0;
   --post-mine-stripe:#c4a0a0;
 }
@@ -34,8 +37,11 @@
   --accent-2:   #7c6dbf;
   --accent-dim: #2e2848;
   --border:     #222228;
-  --sms-bg:          #162333;
-  --sms-border:      #1e3a52;
+  --sms-bg:          #1a2e3d;
+  --sms-border:      #264358;
+  --sms-mine-bg:     #1a3325;
+  --sms-mine-border: #264a33;
+  --sms-shadow:      rgba(0, 0, 0, 0.25);
   --post-mine-bg:    #100f16;
   --post-mine-stripe:#4a3f6b;
 }
@@ -138,25 +144,40 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--mono);
   background: var(--sms-bg);
   border: 1px solid var(--sms-border);
-  border-radius: 18px;
-  border-bottom-left-radius: 4px; /* хвостик слева — чужой */
-  padding: 0.6rem 1rem;
-  margin: 0.6em 0;
+  border-radius: 18px 18px 18px 4px;
+  padding: 0.55rem 0.9rem;
+  margin: 0.35em 0;
   display: block;
-  max-width: 78%;
-  font-size: 0.82rem;
-  line-height: 1.55;
+  position: relative;
+  max-width: 82%;
+  width: fit-content;
+  font-size: 0.84rem;
+  line-height: 1.5;
   color: var(--text);
   overflow-wrap: break-word;
   word-break: break-word;
+  box-shadow: 0 1px 3px var(--sms-shadow);
 }
+/* Own message — green tint */
 .sms-right .sms-bubble {
   margin-left: auto;
-  border-bottom-left-radius: 18px;
-  border-bottom-right-radius: 4px; /* хвостик справа — свой */
+  background: var(--sms-mine-bg);
+  border-color: var(--sms-mine-border);
+  border-radius: 18px 18px 4px 18px;
 }
 .sms-bubble p { margin: 0; }
-.sms-bubble p + p { margin-top: 0.3em; }
+.sms-bubble p + p { margin-top: 0.25em; }
+/* SMS meta line (timestamp) inside bubble */
+.sms-meta {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  color: var(--text-2);
+  opacity: 0.7;
+  text-align: left;
+  margin: 0 0 0.25em;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
 
 /* ── Scrollbar ────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }

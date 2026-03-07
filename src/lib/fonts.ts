@@ -12,6 +12,8 @@ export const FONT_GROUPS: FontGroup[] = [
   {
     label: 'Серифные',
     fonts: [
+      { label: 'Georgia', value: 'Georgia, serif' },
+      { label: 'Times New Roman', value: 'Times New Roman, Times, serif' },
       { label: 'EB Garamond', value: 'EB Garamond, Georgia, serif' },
       { label: 'Cormorant', value: 'Cormorant Garamond, Georgia, serif' },
       { label: 'Lora', value: 'Lora, Georgia, serif' },
@@ -19,7 +21,19 @@ export const FONT_GROUPS: FontGroup[] = [
       { label: 'Merriweather', value: 'Merriweather, Georgia, serif' },
       { label: 'Crimson Pro', value: 'Crimson Pro, Georgia, serif' },
       { label: 'PT Serif', value: 'PT Serif, Georgia, serif' },
-      { label: 'Georgia', value: 'Georgia, serif' },
+    ],
+  },
+  {
+    label: 'Без засечек',
+    fonts: [
+      { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+      { label: 'Roboto', value: 'Roboto, Arial, sans-serif' },
+      { label: 'Calibri', value: 'Calibri, Candara, sans-serif' },
+      { label: 'Raleway', value: 'Raleway, sans-serif' },
+      { label: 'Montserrat', value: 'Montserrat, sans-serif' },
+      { label: 'PT Sans', value: 'PT Sans, sans-serif' },
+      { label: 'Open Sans', value: 'Open Sans, Arial, sans-serif' },
+      { label: 'Nunito', value: 'Nunito, sans-serif' },
     ],
   },
   {
@@ -31,17 +45,10 @@ export const FONT_GROUPS: FontGroup[] = [
     ],
   },
   {
-    label: 'Без засечек',
-    fonts: [
-      { label: 'Raleway', value: 'Raleway, sans-serif' },
-      { label: 'Montserrat', value: 'Montserrat, sans-serif' },
-      { label: 'PT Sans', value: 'PT Sans, sans-serif' },
-    ],
-  },
-  {
     label: 'Моноширинный',
     fonts: [
       { label: 'PT Mono', value: 'PT Mono, monospace' },
+      { label: 'Courier New', value: 'Courier New, Courier, monospace' },
     ],
   },
 ]

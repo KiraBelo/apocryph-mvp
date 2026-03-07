@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export interface Request {
   id: string
+  author_id?: string
   title: string
   body: string | null
   type: 'duo' | 'multiplayer'
@@ -50,16 +51,35 @@ interface Props {
   onTagSearch?: (tag: string) => void
   onTagSubscribe?: (tag: string) => void
   onTagBlacklist?: (tag: string) => void
+  isOwn?: boolean
 }
 
 export default function RequestCard({
   request, isBookmarked, onBookmark, showRespond = true,
-  onTagSearch, onTagSubscribe, onTagBlacklist,
+  onTagSearch, onTagSubscribe, onTagBlacklist, isOwn,
 }: Props) {
   const [bookmarked, setBookmarked] = useState(isBookmarked ?? false)
   const [loadingBm, setLoadingBm] = useState(false)
   const [menuTag, setMenuTag] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [inviteLoading, setInviteLoading] = useState(false)
+
+  const createInvite = useCallback(async () => {
+    setInviteLoading(true)
+    const res = await fetch('/api/invites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId: request.id }),
+    })
+    const data = await res.json()
+    if (data.token) {
+      const link = `${window.location.origin}/invite/${data.token}`
+      setInviteLink(link)
+      navigator.clipboard?.writeText(link)
+    }
+    setInviteLoading(false)
+  }, [request.id])
 
   const isLong = !!request.body && request.body.length > 1500
 
@@ -101,17 +121,40 @@ export default function RequestCard({
       onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
     >
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
         <Link href={`/requests/${request.id}`}>
           <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 400, color: 'var(--text)', lineHeight: 1.3, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
             {request.title}
           </h3>
         </Link>
-        <button onClick={toggleBookmark} disabled={loadingBm} title={bookmarked ? 'Убрать из закладок' : 'В закладки'}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: bookmarked ? 'var(--accent)' : 'var(--border)', flexShrink: 0, padding: 0, lineHeight: 1 }}
-        >
-          {bookmarked ? '★' : '☆'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          {isOwn && (
+            <>
+              <button
+                onClick={createInvite}
+                disabled={inviteLoading}
+                title="Скопировать инвайт-ссылку"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '0.72rem', color: inviteLink ? 'var(--accent)' : 'var(--text-2)', padding: '0.2rem 0.3rem', lineHeight: 1, opacity: inviteLink ? 1 : 0.5, transition: 'color 0.15s, opacity 0.15s' }}
+                onMouseEnter={e => { if (!inviteLink) (e.currentTarget.style.opacity = '1') }}
+                onMouseLeave={e => { if (!inviteLink) (e.currentTarget.style.opacity = '0.5') }}
+              >
+                {inviteLoading ? '...' : inviteLink ? '✓' : '🔗'}
+              </button>
+              <Link href={`/requests/${request.id}/edit`} title="Редактировать"
+                style={{ color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: 1, textDecoration: 'none', opacity: 0.5, display: 'inline-block', transform: 'scaleX(-1)' }}
+                onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '1')}
+                onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '0.5')}
+              >
+                ✎
+              </Link>
+            </>
+          )}
+          <button onClick={toggleBookmark} disabled={loadingBm} title={bookmarked ? 'Убрать из закладок' : 'В закладки'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: bookmarked ? 'var(--accent)' : 'var(--border)', padding: 0, lineHeight: 1 }}
+          >
+            {bookmarked ? '★' : '☆'}
+          </button>
+        </div>
       </div>
 
       {/* Tags row */}
@@ -131,7 +174,7 @@ export default function RequestCard({
                 ...(menuTag === tag ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}),
               }}
             >
-              #{tag}
+              #{tag.toLowerCase()}
             </span>
 
             {/* Dropdown menu */}
@@ -208,11 +251,17 @@ export default function RequestCard({
 
       {/* Footer */}
       {showRespond && (
-        <Link href={`/requests/${request.id}`}
-          style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent)', textDecoration: 'none' }}
-        >
-          Ответить →
-        </Link>
+        isOwn ? (
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-2)' }}>
+            Это ваша заявка
+          </span>
+        ) : (
+          <Link href={`/requests/${request.id}`}
+            style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent)', textDecoration: 'none' }}
+          >
+            Ответить →
+          </Link>
+        )
       )}
     </article>
   )
@@ -222,12 +271,13 @@ function badgeStyle(variant: 'type' | 'fandom' | 'pairing' | 'content' | 'tag'):
   const base: React.CSSProperties = {
     fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.08em',
     textTransform: 'uppercase', padding: '0.15rem 0.5rem', border: '1px solid',
+    display: 'inline-flex', alignItems: 'center', lineHeight: 1.4,
   }
   if (variant === 'type')    return { ...base, color: 'var(--accent)', borderColor: 'var(--accent-dim)', background: 'transparent' }
   if (variant === 'fandom')  return { ...base, color: 'var(--accent-2)', borderColor: 'var(--accent-2)', background: 'transparent' }
   if (variant === 'pairing') return { ...base, color: 'var(--accent-2)', borderColor: 'var(--accent-2)', background: 'transparent' }
   if (variant === 'content') return { ...base, color: 'var(--text-2)', borderColor: 'var(--border)', background: 'transparent' }
-  return { ...base, color: 'var(--text-2)', borderColor: 'transparent', background: 'var(--bg-3)' }
+  return { ...base, color: 'var(--text)', borderColor: 'rgba(180, 100, 120, 0.3)', background: 'rgba(180, 100, 120, 0.08)' }
 }
 
 const menuItem: React.CSSProperties = {

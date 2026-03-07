@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface GameRow {
   id: string
@@ -14,6 +15,9 @@ interface GameRow {
   last_message_user_id: string | null
   ic_unread: string
   ooc_unread: string
+  starred_at: string | null
+  hidden_at: string | null
+  last_message_at: string | null
 }
 
 interface Props {
@@ -21,48 +25,72 @@ interface Props {
   userId: string
 }
 
-export default function MyGamesClient({ games, userId }: Props) {
-  const [mainTab, setMainTab] = useState<'active' | 'finished'>('active')
+export default function MyGamesClient({ games: initialGames, userId }: Props) {
+  const router = useRouter()
+  const [games, setGames] = useState(initialGames)
+  const [mainTab, setMainTab] = useState<'active' | 'finished' | 'starred'>('active')
   const [subTab, setSubTab] = useState<'waiting-them' | 'waiting-me'>('waiting-me')
 
-  const active = games.filter(g => !g.left_at)
-  const finished = games.filter(g => g.left_at)
+  const visible = games.filter(g => !g.hidden_at)
+  const active = visible.filter(g => !g.left_at)
+  const finished = visible.filter(g => g.left_at)
+  const starred = visible.filter(g => g.starred_at).sort((a, b) => {
+    const aFinished = a.left_at ? 1 : 0
+    const bFinished = b.left_at ? 1 : 0
+    if (aFinished !== bFinished) return aFinished - bFinished
+    const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
+    const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
+    return bTime - aTime
+  })
 
-  // "Ждут мой пост" — соигрок написал последним (или сообщений нет), моя очередь
   const waitingMe = active.filter(g => g.last_message_user_id !== userId)
-  // "Жду пост соигрока" — я написал последним, жду их
   const waitingThem = active.filter(g => g.last_message_user_id === userId)
 
-  const tabStyle = (active: boolean) => ({
+  async function toggleStar(gameId: string) {
+    const g = games.find(x => x.id === gameId)
+    if (!g) return
+    const newVal = !g.starred_at
+    setGames(prev => prev.map(x => x.id === gameId ? { ...x, starred_at: newVal ? new Date().toISOString() : null } : x))
+    await fetch(`/api/games/${gameId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ starred: newVal }),
+    })
+  }
+
+  async function hideGame(gameId: string) {
+    setGames(prev => prev.map(x => x.id === gameId ? { ...x, hidden_at: new Date().toISOString() } : x))
+    await fetch(`/api/games/${gameId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hidden: true }),
+    })
+  }
+
+  const tabStyle = (isActive: boolean) => ({
     fontFamily: 'var(--mono)',
     fontSize: '0.7rem',
     letterSpacing: '0.12em',
     textTransform: 'uppercase' as const,
-    color: active ? 'var(--text)' : 'var(--text-2)',
+    color: isActive ? 'var(--text)' : 'var(--text-2)',
     padding: '0.6rem 0',
-    borderBottom: active ? '1px solid var(--text)' : '1px solid transparent',
     background: 'none',
     border: 'none',
-    borderBottomStyle: 'solid' as const,
-    borderBottomWidth: '1px',
-    borderBottomColor: active ? 'var(--text)' : 'transparent',
+    borderBottom: isActive ? '1px solid var(--text)' : '1px solid transparent',
     cursor: 'pointer',
     transition: 'color 0.15s',
   })
 
-  const subTabStyle = (active: boolean) => ({
+  const subTabStyle = (isActive: boolean) => ({
     fontFamily: 'var(--mono)',
     fontSize: '0.62rem',
     letterSpacing: '0.1em',
     textTransform: 'uppercase' as const,
-    color: active ? 'var(--accent)' : 'var(--text-2)',
+    color: isActive ? 'var(--accent)' : 'var(--text-2)',
     padding: '0.4rem 0',
-    borderBottom: active ? '1px solid var(--accent)' : '1px solid transparent',
     background: 'none',
     border: 'none',
-    borderBottomStyle: 'solid' as const,
-    borderBottomWidth: '1px',
-    borderBottomColor: active ? 'var(--accent)' : 'transparent',
+    borderBottom: isActive ? '1px solid var(--accent)' : '1px solid transparent',
     cursor: 'pointer',
     transition: 'color 0.15s',
   })
@@ -70,60 +98,55 @@ export default function MyGamesClient({ games, userId }: Props) {
   const currentGames =
     mainTab === 'finished'
       ? finished
+      : mainTab === 'starred'
+      ? starred
       : subTab === 'waiting-me'
       ? waitingMe
       : waitingThem
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 1.75rem' }}>
+    <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '3rem 1.75rem' }}>
       <p style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--accent-2)', marginBottom: '0.5rem' }}>§ Мои игры</p>
       <h1 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontStyle: 'italic', fontWeight: 300, color: 'var(--text)', marginBottom: '2.5rem' }}>Мои игры</h1>
 
-      {/* Основные вкладки */}
       <div style={{ display: 'flex', gap: '2rem', marginBottom: '0.25rem', borderBottom: '1px solid var(--border)' }}>
         <button onClick={() => setMainTab('active')} style={tabStyle(mainTab === 'active')}>
-          Активные{' '}
-          <span style={{ opacity: 0.6 }}>({active.length})</span>
+          Активные <span style={{ opacity: 0.6 }}>({active.length})</span>
+        </button>
+        <button onClick={() => setMainTab('starred')} style={tabStyle(mainTab === 'starred')}>
+          Избранные <span style={{ opacity: 0.6 }}>({starred.length})</span>
         </button>
         <button onClick={() => setMainTab('finished')} style={tabStyle(mainTab === 'finished')}>
-          Завершённые{' '}
-          <span style={{ opacity: 0.6 }}>({finished.length})</span>
+          Завершённые <span style={{ opacity: 0.6 }}>({finished.length})</span>
         </button>
       </div>
 
-      {/* Подвкладки для активных */}
       {mainTab === 'active' && (
         <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', marginTop: '1.25rem' }}>
           <button onClick={() => setSubTab('waiting-me')} style={subTabStyle(subTab === 'waiting-me')}>
-            Ждут мой пост{' '}
-            <span style={{ opacity: 0.6 }}>({waitingMe.length})</span>
+            Ждут мой пост <span style={{ opacity: 0.6 }}>({waitingMe.length})</span>
           </button>
           <button onClick={() => setSubTab('waiting-them')} style={subTabStyle(subTab === 'waiting-them')}>
-            Жду пост соигрока{' '}
-            <span style={{ opacity: 0.6 }}>({waitingThem.length})</span>
+            Жду пост соигрока <span style={{ opacity: 0.6 }}>({waitingThem.length})</span>
           </button>
         </div>
       )}
 
-      {mainTab === 'finished' && <div style={{ marginBottom: '2rem' }} />}
+      {mainTab !== 'active' && <div style={{ marginBottom: '2rem' }} />}
 
-      {/* Список игр */}
       {currentGames.length === 0 ? (
         <p style={{ color: 'var(--text-2)', fontFamily: 'var(--serif)', fontStyle: 'italic' }}>Пусто.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--game-gap, 1rem)' }}>
           {currentGames.map(g => (
-            <Link
+            <div
               key={g.id}
-              href={`/games/${g.id}`}
               style={{
                 background: 'var(--bg)',
-                padding: '1.25rem 1.5rem',
+                border: '1px solid var(--border)',
+                position: 'relative',
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: '1rem',
-                textDecoration: 'none',
                 opacity: mainTab === 'finished' ? 0.7 : 1,
                 borderLeft: parseInt(g.ic_unread) > 0
                   ? '3px solid var(--accent)'
@@ -132,23 +155,57 @@ export default function MyGamesClient({ games, userId }: Props) {
                   : '3px solid transparent',
               }}
             >
-              <div>
-                <p style={{ fontFamily: 'var(--serif)', fontSize: '1.05rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
-                  {g.request_title ?? 'Без названия'}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <p style={{ fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--text-2)' }}>
-                    Никнейм: {g.my_nickname} &nbsp;·&nbsp; {g.message_count} постов &nbsp;·&nbsp; {g.active_participants} активных
+              {/* Star */}
+              <button
+                onClick={() => toggleStar(g.id)}
+                title={g.starred_at ? 'Убрать из избранного' : 'В избранное'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.75rem 0 0.75rem 1rem', color: g.starred_at ? 'var(--accent)' : 'var(--border)', fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}
+              >
+                {g.starred_at ? '★' : '☆'}
+              </button>
+
+              {/* Game link */}
+              <Link
+                href={`/games/${g.id}`}
+                style={{
+                  flex: 1,
+                  padding: '1rem 1rem 1rem 0.75rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  textDecoration: 'none',
+                }}
+              >
+                <div>
+                  <p style={{ fontFamily: 'var(--serif)', fontSize: '1.05rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
+                    {g.request_title ?? 'Без названия'}
                   </p>
-                  {parseInt(g.ooc_unread) > 0 && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.06em', color: 'var(--bg)', background: 'var(--text-2)', padding: '0.05rem 0.35rem', borderRadius: '2px' }}>
-                      оффтоп
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--text-2)' }}>
+                      Никнейм: {g.my_nickname} &nbsp;·&nbsp; {g.message_count} постов &nbsp;·&nbsp; {g.active_participants} активных
+                    </p>
+                    {parseInt(g.ooc_unread) > 0 && (
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', letterSpacing: '0.06em', color: 'var(--bg)', background: 'var(--text-2)', padding: '0.05rem 0.35rem', borderRadius: '2px' }}>
+                        оффтоп
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '0.65rem', color: 'var(--accent)', letterSpacing: '0.1em' }}>Открыть →</span>
-            </Link>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '0.65rem', color: 'var(--accent)', letterSpacing: '0.1em', flexShrink: 0 }}>Открыть →</span>
+              </Link>
+
+              {/* Hide button */}
+              {g.left_at && (
+                <button
+                  onClick={() => hideGame(g.id)}
+                  title="Скрыть из списка"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.75rem 1rem 0.75rem 0', color: 'var(--text-2)', fontSize: '0.85rem', lineHeight: 1, flexShrink: 0, opacity: 0.5 }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
