@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Апокриф — анонимные текстовые ролевые игры</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── tokens: Бумага ─────────────────────────── */
+    :root {
+      --bg:        #f6f2e8;
+      --bg-2:      #efe8da;
+      --bg-3:      #e6decd;
+      --text:      #1c1813;
+      --text-2:    #4f4436;
+      --text-3:    #7a6f5f;
+      --accent:    #7a1e1e;
+      --accent-2:  #9b3a3a;
+      --accent-dim:#f1e3e3;
+      --border:    #d3c9b8;
+      --border-soft:#e2dbcd;
+      --shadow:    rgba(58,42,26,.07);
+      --serif:     'Cormorant Garamond', Georgia, serif;
+      --serif-body:'EB Garamond', Georgia, serif;
+      --mono:      'Courier Prime', 'Courier New', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--serif-body);
+      font-size: 22px;
+      line-height: 1.8;
+      overflow-x: hidden;
+      transition: background .35s, color .35s;
+    }
+
+    /* ── typography ──────────────────────────── */
+    h1, h2, h3 {
+      font-family: var(--serif);
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    h1 { font-size: clamp(2.8rem, 6.5vw, 4.8rem); font-weight: 300; }
+    h2 { font-size: clamp(1.9rem, 3.8vw, 2.8rem); font-weight: 400; }
+    h3 { font-size: 1.2rem; font-weight: 500; font-family: var(--serif); }
+
+    p {
+      color: var(--text-2);
+      font-size: 1rem;
+      line-height: 1.8;
+    }
+
+    em { font-style: italic; color: var(--accent); }
+
+    strong { font-weight: 600; color: var(--text); }
+
+    /* ── layout ──────────────────────────────── */
+    .container { max-width: 940px; margin: 0 auto; padding: 0 2rem; }
+
+    section {
+      padding: 6rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── nav ─────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 200;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      transition: background .35s, border-color .35s;
+    }
+
+    .logo {
+      font-family: var(--serif);
+      font-size: 1.3rem;
+      font-weight: 500;
+      letter-spacing: .08em;
+      color: var(--text);
+      font-style: italic;
+    }
+
+    .logo-accent { color: var(--accent); font-style: normal; }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    /* buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      font-family: var(--serif);
+      font-size: .95rem;
+      font-weight: 500;
+      font-style: italic;
+      padding: .6rem 1.6rem;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all .25s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-2); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-style: normal;
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── scroll reveal ───────────────────────── */
+    .r {
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity .65s ease, transform .65s ease;
+    }
+    .r.on { opacity: 1; transform: none; }
+    .d1 { transition-delay: .08s; }
+    .d2 { transition-delay: .16s; }
+    .d3 { transition-delay: .24s; }
+    .d4 { transition-delay: .32s; }
+
+    /* ── ornament divider ────────────────────── */
+    .ornament {
+      text-align: center;
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      color: var(--border);
+      letter-spacing: .5em;
+      padding: 1rem 0;
+      user-select: none;
+    }
+
+    /* ── chapter label ───────────────────────── */
+    .chapter {
+      font-family: var(--mono);
+      font-size: .68rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 1.5rem;
+      display: block;
+    }
+
+    /* ── hero ────────────────────────────────── */
+    #hero {
+      min-height: 100svh;
+      display: flex;
+      align-items: center;
+      padding-top: 7rem;
+      padding-bottom: 5rem;
+      position: relative;
+    }
+
+    /* paper grain */
+    #hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      opacity: .5;
+    }
+
+    .hero-inner { position: relative; z-index: 1; }
+
+    #hero h1 {
+      font-style: italic;
+      max-width: 18ch;
+      margin-bottom: 1.75rem;
+    }
+
+    #hero h1 strong {
+      font-style: normal;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .hero-oneliner {
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      font-style: italic;
+      color: var(--text-2);
+      max-width: 55ch;
+      margin-bottom: 2rem;
+      line-height: 1.7;
+    }
+
+    .hero-features {
+      list-style: none;
+      display: grid;
+      gap: .65rem;
+      margin-bottom: 2.75rem;
+      max-width: 52ch;
+    }
+
+    .hero-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: .85rem;
+      font-size: .97rem;
+      color: var(--text-2);
+      font-family: var(--serif-body);
+    }
+
+    .hero-features li::before {
+      content: '—';
+      color: var(--accent);
+      flex-shrink: 0;
+      font-family: var(--serif);
+    }
+
+    /* ── ticker ──────────────────────────────── */
+    .ticker {
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: .5rem 0;
+      background: var(--bg-2);
+    }
+
+    .ticker-track {
+      display: flex;
+      gap: 3rem;
+      animation: scroll 32s linear infinite;
+      white-space: nowrap;
+    }
+
+    .ticker-track span {
+      font-family: var(--mono);
+      font-size: .65rem;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+
+    @keyframes scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    /* ── aha ─────────────────────────────────── */
+    .aha-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 600px) { .aha-grid { grid-template-columns: 1fr; } }
+
+    .aha-item {
+      background: var(--bg-2);
+      padding: 2.5rem 2.25rem;
+      border-top: 3px solid var(--border);
+      transition: border-color .2s;
+    }
+
+    .aha-item:hover { border-color: var(--accent); }
+
+    .aha-num {
+      font-family: var(--serif);
+      font-size: 3rem;
+      font-weight: 300;
+      font-style: italic;
+      color: var(--accent-dim);
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+
+    .aha-item h3 { margin-bottom: .6rem; color: var(--text); font-size: 1.1rem; }
+    .aha-item p { font-size: .95rem; }
+
+    /* ── benefits ────────────────────────────── */
+    .benefits {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      outline: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 600px) { .benefits { grid-template-columns: 1fr; } }
+
+    .benefit {
+      background: var(--bg);
+      padding: 2.25rem 2rem;
+      border: 1px solid var(--border);
+      margin: -1px;
+    }
+
+    .benefit-mark {
+      font-family: var(--mono);
+      font-size: .68rem;
+      letter-spacing: .12em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .benefit h3 { margin-bottom: .6rem; color: var(--text); font-size: 1.1rem; }
+    .benefit p  { font-size: .93rem; }
+
+    /* ── recognition ─────────────────────────── */
+    #recognition { background: var(--bg-2); }
+
+    .triggers {
+      list-style: none;
+      display: grid;
+      gap: .4rem;
+      margin-top: 2.25rem;
+    }
+
+    .triggers li {
+      padding: 1rem 1.4rem;
+      border-left: 2px solid var(--border);
+      color: var(--text-2);
+      font-family: var(--serif-body);
+      font-size: 1rem;
+      transition: border-color .2s, background .2s, padding .15s;
+      cursor: default;
+    }
+
+    .triggers li:hover {
+      border-color: var(--accent);
+      background: var(--bg-3);
+      color: var(--text);
+      padding-left: 1.7rem;
+    }
+
+    .callout {
+      margin-top: 2.75rem;
+      padding: 2rem 2.25rem;
+      border-left: 3px solid var(--accent);
+      background: var(--bg-3);
+    }
+
+    .callout p {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 1.3rem;
+      color: var(--text);
+      line-height: 1.65;
+      max-width: none;
+    }
+
+    /* ── scenarios ───────────────────────────── */
+    #howto { background: var(--bg); }
+
+    .scenario {
+      border: 1px solid var(--border);
+      padding: 2.25rem 2.5rem;
+      background: var(--bg);
+      margin-top: 2rem;
+      transition: border-color .2s;
+    }
+
+    .scenario:hover { border-color: var(--accent); }
+
+    .scenario-header {
+      display: flex;
+      align-items: baseline;
+      gap: 1.25rem;
+      margin-bottom: 1.4rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+    }
+
+    .scenario-n {
+      font-family: var(--mono);
+      font-size: .7rem;
+      letter-spacing: .1em;
+      color: var(--accent);
+    }
+
+    .scenario h3 {
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      font-style: italic;
+      font-weight: 400;
+      color: var(--text);
+    }
+
+    .steps {
+      list-style: none;
+      display: grid;
+      gap: .7rem;
+    }
+
+    .steps li {
+      display: flex;
+      gap: .9rem;
+      font-family: var(--serif-body);
+      font-size: .97rem;
+      color: var(--text-2);
+      align-items: flex-start;
+    }
+
+    .step-n {
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: .7rem;
+      color: var(--accent);
+      min-width: 1.2rem;
+      margin-top: .3em;
+    }
+
+    /* ── destination ─────────────────────────── */
+    #destination { background: var(--bg-2); }
+
+    .dest-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      outline: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 600px) { .dest-grid { grid-template-columns: 1fr; } }
+
+    .dest-item {
+      background: var(--bg-2);
+      padding: 2rem 1.75rem;
+      border: 1px solid var(--border);
+      margin: -1px;
+    }
+
+    .dest-item .dest-num {
+      font-family: var(--serif);
+      font-size: 2.2rem;
+      font-weight: 300;
+      font-style: italic;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: .75rem;
+    }
+
+    .dest-item p { font-size: .95rem; }
+
+    /* ── doubts ──────────────────────────────── */
+    .doubts { display: grid; gap: 0; outline: 1px solid var(--border); margin-top: 3rem; }
+
+    .doubt {
+      background: var(--bg);
+      padding: 2rem 2.25rem;
+      border: 1px solid var(--border);
+      margin: -1px;
+    }
+
+    .doubt-q {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 1.2rem;
+      color: var(--text);
+      margin-bottom: .85rem;
+      display: flex;
+      align-items: baseline;
+      gap: .5rem;
+    }
+
+    .doubt-q::before {
+      content: '§';
+      color: var(--accent);
+      font-style: normal;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .doubt p { font-size: .95rem; }
+
+    /* ── competitors ─────────────────────────── */
+    #competitors { background: var(--bg-2); }
+
+    .comp-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      outline: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 720px) { .comp-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .comp-grid { grid-template-columns: 1fr; } }
+
+    .comp {
+      background: var(--bg-2);
+      padding: 1.75rem 1.5rem;
+      border: 1px solid var(--border);
+      margin: -1px;
+    }
+
+    .comp-name {
+      font-family: var(--mono);
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--text-2);
+      letter-spacing: .06em;
+      margin-bottom: .75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .comp-x {
+      color: var(--accent);
+      font-weight: 400;
+    }
+
+    .comp p { font-size: .88rem; }
+
+    /* ── final cta ───────────────────────────── */
+    #final-cta {
+      border-bottom: none;
+      text-align: center;
+      padding: 9rem 0;
+      background: var(--bg);
+    }
+
+    #final-cta h2 {
+      font-style: italic;
+      font-weight: 400;
+      margin-bottom: 1.5rem;
+    }
+
+    .cta-ornament {
+      font-family: var(--serif);
+      font-size: 2rem;
+      color: var(--accent);
+      letter-spacing: .3em;
+      display: block;
+      margin-bottom: 2rem;
+      opacity: .5;
+    }
+
+    #final-cta > .container > p {
+      margin: 0 auto 2.5rem;
+      max-width: 46ch;
+      text-align: center;
+      font-style: italic;
+      font-family: var(--serif);
+      font-size: 1.1rem;
+    }
+
+    /* ── footer ──────────────────────────────── */
+    footer {
+      padding: 1.75rem;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: .68rem;
+      letter-spacing: .1em;
+      color: var(--text-2);
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    /* ── responsive ──────────────────────────── */
+    @media (max-width: 600px) {
+      body { font-size: 20px; }
+      h1   { font-size: 2.6rem; }
+      .btn { font-size: .875rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- nav -->
+  <nav>
+    <div class="logo"><em>А</em><span class="logo-accent">покриф</span></div>
+    <div class="nav-right">
+      <a href="#final-cta" class="btn btn-outline">Начать игру →</a>
+    </div>
+  </nav>
+
+  <!-- hero -->
+  <section id="hero">
+    <div class="container">
+      <div class="hero-inner">
+        <span class="chapter r">Анонимные текстовые ролевые игры</span>
+
+        <h1 class="r d1">
+          Найди соигрока.<br>
+          <strong>Отыграй историю.</strong><br>
+          Оставь реал в офлайне.
+        </h1>
+
+        <p class="hero-oneliner r d2">
+          Без профиля, без онлайн-статуса, без лишних глаз — сыграй одну острую сцену сегодня вечером или веди совместную историю годами.
+        </p>
+
+        <ul class="hero-features r d3">
+          <li>Публикуй заявку с нужными тегами и уровнем контента и жди отклика</li>
+          <li>Откликайся на чужие заявки и начинай игру сразу</li>
+          <li>Оформляй посты как душе угодно — форматирование, аватар, баннер</li>
+          <li>Выходи, когда история закончена — партнёр узнает причину, но не тебя</li>
+        </ul>
+
+        <div class="r d4">
+          <a href="#" class="btn btn-primary">Отправить первую заявку →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ticker -->
+  <div class="ticker">
+    <div class="ticker-track">
+      <span>Анонимность</span><span>✦</span>
+      <span>Текстовые РП</span><span>✦</span>
+      <span>Фандом</span><span>✦</span>
+      <span>Свобода формата</span><span>✦</span>
+      <span>Приватность</span><span>✦</span>
+      <span>Творчество</span><span>✦</span>
+      <span>Анонимность</span><span>✦</span>
+      <span>Текстовые РП</span><span>✦</span>
+      <span>Фандом</span><span>✦</span>
+      <span>Свобода формата</span><span>✦</span>
+      <span>Приватность</span><span>✦</span>
+      <span>Творчество</span><span>✦</span>
+    </div>
+  </div>
+
+  <!-- aha -->
+  <section id="aha">
+    <div class="container">
+      <span class="chapter r">§ 1. Начало</span>
+      <h2 class="r d1">Попробуй прямо сейчас</h2>
+
+      <div class="aha-grid">
+        <div class="aha-item r d2">
+          <div class="aha-num">I.</div>
+          <h3>Создай заявку за две минуты</h3>
+          <p>Название, теги жанра, уровень контента — и публикуй. Не нужен профиль и биография. Первый отклик может прийти уже сегодня.</p>
+        </div>
+        <div class="aha-item r d3">
+          <div class="aha-num">II.</div>
+          <h3>Откликнись и войди в игру</h3>
+          <p>Нашла заявку в ленте — нажала «Ответить» — выбрала никнейм — написала первый пост. Никто снаружи не видит, что ты здесь.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- benefits -->
+  <section id="benefits">
+    <div class="container">
+      <span class="chapter r">§ 2. Возможности</span>
+      <h2 class="r d1">Что ты получишь</h2>
+
+      <div class="benefits">
+        <div class="benefit r d1">
+          <span class="benefit-mark">[ 01 ]</span>
+          <h3>Лента заявок с умным фильтром</h3>
+          <p>По тегам, жанру, типу игры и уровню контента. Найди именно то, что хочешь сыграть прямо сейчас.</p>
+        </div>
+        <div class="benefit r d2">
+          <span class="benefit-mark">[ 02 ]</span>
+          <h3>Текстовый редактор с оформлением</h3>
+          <p>Форматирование, баннер, аватар персонажа прямо внутри диалога. Пост выглядит как история, а не переписка в мессенджере.</p>
+        </div>
+        <div class="benefit r d3">
+          <span class="benefit-mark">[ 03 ]</span>
+          <h3>Анонимность по умолчанию</h3>
+          <p>Никнейм — только внутри этой игры. Никакого онлайн-статуса, никакой истории активности, никакой связи с реальным аккаунтом.</p>
+        </div>
+        <div class="benefit r d4">
+          <span class="benefit-mark">[ 04 ]</span>
+          <h3>Никакого гостинга</h3>
+          <p>Выйти из игры — только с причиной из списка. Ты всегда узнаешь, что произошло. Партнёр не уйдёт молча.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- recognition -->
+  <section id="recognition">
+    <div class="container">
+      <span class="chapter r">§ 3. Узнаёшь себя?</span>
+      <h2 class="r d1">Хочется пространство, где можно быть кем угодно — без оглядки на то, кто ты снаружи?</h2>
+
+      <ul class="triggers">
+        <li class="r d1">Есть шип или сцена, которую хочется отыграть — но ты не готова, чтобы это видел фандом или знакомые?</li>
+        <li class="r d2">Нашла идеального соигрока, а потом он просто перестал отвечать?</li>
+        <li class="r d3">Устала вести ролевые страницы и думать, как это выглядит со стороны?</li>
+        <li class="r d4">Хочется просто — найти человека, написать историю и уйти, когда она закончена?</li>
+        <li class="r d1">Раздражает, что в интернете всё на виду?</li>
+        <li class="r d2">Есть контент, который ты хочешь исследовать — но не готова рисковать тем, что кто-то узнает?</li>
+      </ul>
+
+      <div class="callout r d3">
+        <p>Здесь — лента заявок, анонимность по умолчанию и никнейм, который живёт только внутри одной истории.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- how-to -->
+  <section id="howto">
+    <div class="container">
+      <span class="chapter r">§ 4. Как это работает</span>
+      <h2 class="r d1">Как ты решишь свои задачи</h2>
+
+      <div class="scenario r d2">
+        <div class="scenario-header">
+          <span class="scenario-n">/ 01 /</span>
+          <h3>Когда хочется сыграть прямо сейчас</h3>
+        </div>
+        <ul class="steps">
+          <li><span class="step-n">—</span> Открываешь ленту, фильтруешь по нужным тегам, видишь подходящие заявки</li>
+          <li><span class="step-n">—</span> Нажимаешь «Ответить» — попадаешь в диалог, задаёшь никнейм, начинаешь писать. Меньше минуты.</li>
+          <li><span class="step-n">—</span> Хочешь конкретного человека — отправляешь инвайт-ссылку, и вы сразу в игре</li>
+        </ul>
+      </div>
+
+      <div class="scenario r d2">
+        <div class="scenario-header">
+          <span class="scenario-n">/ 02 /</span>
+          <h3>Когда ищешь долгую совместную историю</h3>
+        </div>
+        <ul class="steps">
+          <li><span class="step-n">—</span> Публикуешь заявку с подробным описанием — что хочешь играть, темп, уровень контента</li>
+          <li><span class="step-n">—</span> Добавляешь интересные заявки в закладки, пока ждёшь отклика на свою</li>
+          <li><span class="step-n">—</span> Когда история закончена — экспортируешь диалог и сохраняешь у себя</li>
+        </ul>
+      </div>
+
+      <div class="scenario r d3">
+        <div class="scenario-header">
+          <span class="scenario-n">/ 03 /</span>
+          <h3>Когда пишешь и хочешь красоты</h3>
+        </div>
+        <ul class="steps">
+          <li><span class="step-n">—</span> Форматирование в редакторе: курсив, жирный, шрифт, интервалы</li>
+          <li><span class="step-n">—</span> Аватар персонажа — виден только внутри этой игры, только тебе и соигроку</li>
+          <li><span class="step-n">—</span> Баннер внутри игры для атмосферы</li>
+        </ul>
+      </div>
+
+      <div class="scenario r d4">
+        <div class="scenario-header">
+          <span class="scenario-n">/ 04 /</span>
+          <h3>Когда что-то идёт не так</h3>
+        </div>
+        <ul class="steps">
+          <li><span class="step-n">—</span> Соигрок ведёт себя некомфортно — выходишь из игры с причиной из списка. Без объяснений, без конфликта.</li>
+          <li><span class="step-n">—</span> Если ситуация серьёзная — жалоба модераторам. Заявки пользователя, получившего много жалоб, скрываются из ленты.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- destination -->
+  <section id="destination">
+    <div class="container">
+      <span class="chapter r">§ 5. Результат</span>
+      <h2 class="r d1">К чему ты придёшь</h2>
+
+      <div class="dest-grid">
+        <div class="dest-item r d1">
+          <div class="dest-num">i.</div>
+          <p>Соигрок под конкретную историю — без долгого ожидания в пустом чате</p>
+        </div>
+        <div class="dest-item r d2">
+          <div class="dest-num">ii.</div>
+          <p>Твои игры — только твоё дело. Никто снаружи не узнает, что ты здесь была</p>
+        </div>
+        <div class="dest-item r d3">
+          <div class="dest-num">iii.</div>
+          <p>Пространство, где можно быть кем угодно — и это останется между тобой и соигроком</p>
+        </div>
+      </div>
+
+      <div class="dest-grid" style="margin-top: -1px">
+        <div class="dest-item r d1">
+          <div class="dest-num">iv.</div>
+          <p>Истории, которые до этого оставались только в голове — теперь написаны</p>
+        </div>
+        <div class="dest-item r d2">
+          <div class="dest-num">v.</div>
+          <p>Никакого гостинга — партнёр не уйдёт молча</p>
+        </div>
+        <div class="dest-item r d3">
+          <div class="dest-num">vi.</div>
+          <p>Быстрый вход — от регистрации до первой заявки меньше десяти минут</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- doubts -->
+  <section id="doubts">
+    <div class="container">
+      <span class="chapter r">§ 6. Вопросы</span>
+      <h2 class="r d1">Есть сомнения?</h2>
+
+      <div class="doubts">
+        <div class="doubt r d1">
+          <p class="doubt-q">«А вдруг меня вычислят?»</p>
+          <p>Никнейм существует только внутри одной игры — снаружи тебя не существует. Нет онлайн-статуса, нет истории активности, нет связи между разными играми. Ни соигроки, ни посторонние не видят, что ты здесь.</p>
+        </div>
+        <div class="doubt r d2">
+          <p class="doubt-q">«А вдруг партнёр снова исчезнет по-английски?»</p>
+          <p>Выйти из игры можно только выбрав причину из предустановленного списка. Тебя не бросят в пустоте — ты всегда узнаешь, что произошло.</p>
+        </div>
+        <div class="doubt r d3">
+          <p class="doubt-q">«А если в ленте никого не будет?»</p>
+          <p>Используй инвайт-ссылку — отправь заявку напрямую в фандомный чат или конкретному человеку. Заявка не обязана идти в ленту: можно играть только с теми, кого ты сама позовёшь.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- competitors -->
+  <section id="competitors">
+    <div class="container">
+      <span class="chapter r">§ 7. Сравнение</span>
+      <h2 class="r d1">Почему не Discord, ВКонтакте или Telegram</h2>
+
+      <div class="comp-grid">
+        <div class="comp r d1">
+          <p class="comp-name">Discord <span class="comp-x">✕</span></p>
+          <p>Твой сервер виден всем участникам сообщества. История сообщений, онлайн-статус, с кем ты играешь — всё доступно тем, кому ты не хочешь это показывать.</p>
+        </div>
+        <div class="comp r d2">
+          <p class="comp-name">ВКонтакте <span class="comp-x">✕</span></p>
+          <p>Аккаунт привязан к реальной личности. Группы публичны, переписки в сообществах видны подписчикам. Анонимность — только иллюзия.</p>
+        </div>
+        <div class="comp r d3">
+          <p class="comp-name">Telegram <span class="comp-x">✕</span></p>
+          <p>Личка не анонимна: другой человек знает твой номер или username. Нет ленты заявок, нет способа найти незнакомого соигрока.</p>
+        </div>
+        <div class="comp r d4">
+          <p class="comp-name">Форумы <span class="comp-x">✕</span></p>
+          <p>Много мороки с анкетами и кодами. Относительная публичность: профили видны всем, история активности не скрыта.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- final cta -->
+  <section id="final-cta">
+    <div class="container">
+      <span class="cta-ornament r">❧</span>
+      <h2 class="r d1">Твоя история ждёт соигрока.</h2>
+      <p class="r d2">Регистрация без подтверждения. Первая заявка — за две минуты.</p>
+      <div class="r d3">
+        <a href="#" class="btn btn-primary">Отправить первую заявку →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>© 2026 &nbsp;·&nbsp; <em>Апокриф</em> &nbsp;·&nbsp; Анонимные текстовые ролевые игры</footer>
+
+  <script>
+    // scroll reveal
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('on'); });
+    }, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' });
+    document.querySelectorAll('.r').forEach(el => io.observe(el));
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# Next.js (product-mvp)
+product-mvp/.next/
+product-mvp/out/
+product-mvp/build/
+
+# env
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# debug
+*.tsbuildinfo
+
+# deploy artifacts
+deploy.tar
+
+# Python venv
+.venv/
+
+# Cursor
+.cursor/
+
+# Claude internal
+.claude/
