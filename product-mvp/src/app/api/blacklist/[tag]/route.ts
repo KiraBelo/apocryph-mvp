@@ -8,7 +8,7 @@ export async function DELETE(
   { params }: { params: Promise<{ tag: string }> }
 ) {
   const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { tag } = await params
   await pool.query(

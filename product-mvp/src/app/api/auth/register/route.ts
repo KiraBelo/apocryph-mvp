@@ -6,10 +6,10 @@ export async function POST(req: NextRequest) {
   const { email, password } = await req.json()
 
   if (!email || !password || password.length < 6) {
-    return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 })
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
   }
   if (email.length > 255 || password.length > 128) {
-    return NextResponse.json({ error: 'Слишком длинные данные' }, { status: 400 })
+    return NextResponse.json({ error: 'dataTooLong' }, { status: 400 })
   }
 
   try {
@@ -17,9 +17,10 @@ export async function POST(req: NextRequest) {
     const session = await getSession()
     session.userId = user.id
     session.email = user.email
+    session.role = 'user'
     await session.save()
     return NextResponse.json({ ok: true })
   } catch {
-    return NextResponse.json({ error: 'Email уже занят' }, { status: 409 })
+    return NextResponse.json({ error: 'emailTaken' }, { status: 409 })
   }
 }

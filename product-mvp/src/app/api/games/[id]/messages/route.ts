@@ -1,35 +1,129 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
 
-// GET — история сообщений
-export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+const PAGE_SIZE = 30
+
+// GET — paginated messages + search
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: gameId } = await params
   const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  // Verify caller is a participant (moderators can read any game)
+  const isMod = user.role === 'moderator' || user.role === 'admin'
+  const participant = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
+  if (!participant && !isMod) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+
+  const sp = req.nextUrl.searchParams
+  const type = sp.get('type') || 'ic'
+  const search = (sp.get('search') || '').trim()
+  const limit = Math.min(parseInt(sp.get('limit') || String(PAGE_SIZE), 10) || PAGE_SIZE, 100)
+
+  // Type filter: ic = everything except ooc and dice; ooc = only ooc
+  const typeFilter = type === 'ooc' ? "m.type = 'ooc'" : "m.type NOT IN ('ooc', 'dice')"
+
+  // ── Search mode ──
+  if (search.length >= 2) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&')
+
+    // We need row_num to compute which page each result is on
+    // First get total count for this type to compute pages
+    const countRes = await queryOne<{ count: string }>(
+      `SELECT COUNT(*) as count FROM messages m WHERE m.game_id = $1 AND ${typeFilter}`,
+      [gameId]
+    )
+    const total = parseInt(countRes?.count || '0', 10)
+
+    const results = await query<{
+      id: string; content: string; created_at: string; nickname: string; global_row: number
+    }>(
+      `WITH numbered AS (
+        SELECT m.id, m.content, m.created_at, gp.nickname,
+               ROW_NUMBER() OVER (ORDER BY m.created_at ASC, m.id ASC) as global_row
+        FROM messages m
+        JOIN game_participants gp ON gp.id = m.participant_id
+        WHERE m.game_id = $1 AND ${typeFilter}
+      )
+      SELECT id, content, created_at, nickname, global_row
+      FROM numbered
+      WHERE content ILIKE '%' || $2 || '%'
+      ORDER BY created_at DESC
+      LIMIT 50`,
+      [gameId, escaped]
+    )
+
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+
+    return NextResponse.json({
+      results: results.map(r => ({
+        id: r.id,
+        snippet: htmlToSnippet(r.content, search),
+        created_at: r.created_at,
+        nickname: r.nickname,
+        page: Math.ceil(Number(r.global_row) / limit),
+      })),
+      totalPages,
+    })
+  }
+
+  // ── Pagination mode ──
+  const countRes = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM messages m WHERE m.game_id = $1 AND ${typeFilter}`,
+    [gameId]
+  )
+  const total = parseInt(countRes?.count || '0', 10)
+  const totalPages = Math.max(1, Math.ceil(total / limit))
+
+  // Default to last page
+  const pageParam = sp.get('page')
+  const page = pageParam ? Math.max(1, Math.min(parseInt(pageParam, 10) || totalPages, totalPages)) : totalPages
+  const offset = (page - 1) * limit
 
   const rows = await query(
     `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
      FROM messages m
      JOIN game_participants gp ON gp.id = m.participant_id
-     WHERE m.game_id = $1
-     ORDER BY m.created_at ASC`,
-    [gameId]
+     WHERE m.game_id = $1 AND ${typeFilter}
+     ORDER BY m.created_at ASC, m.id ASC
+     LIMIT $2 OFFSET $3`,
+    [gameId, limit, offset]
   )
-  return NextResponse.json(rows)
+
+  return NextResponse.json({ messages: rows, total, page, totalPages })
+}
+
+// Strip HTML tags for search snippet
+function htmlToSnippet(html: string, query: string): string {
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const lower = text.toLowerCase()
+  const idx = lower.indexOf(query.toLowerCase())
+  if (idx >= 0) {
+    const start = Math.max(0, idx - 40)
+    const end = Math.min(text.length, idx + query.length + 40)
+    return (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '')
+  }
+  return text.slice(0, 100) + (text.length > 100 ? '…' : '')
 }
 
 // POST — отправить сообщение
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: gameId } = await params
+
+  // Check if game is frozen by moderation
+  const game = await queryOne<{ moderation_status: string }>('SELECT moderation_status FROM games WHERE id=$1', [gameId])
+  if (game && game.moderation_status !== 'visible') {
+    return NextResponse.json({ error: 'gameFrozen' }, { status: 403 })
+  }
   const { content, type = 'ic' } = await req.json()
-  if (!content?.trim()) return NextResponse.json({ error: 'Пустое сообщение' }, { status: 400 })
-  if (content.length > 200_000) return NextResponse.json({ error: 'Сообщение слишком длинное' }, { status: 400 })
+  if (!content?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
+  if (content.length > 200_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
   const msgType = type === 'ooc' ? 'ooc' : 'ic'
 
   // Найти participant
@@ -38,7 +132,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     [gameId, user.id]
   )
   if (!participant || participant.left_at) {
-    return NextResponse.json({ error: 'Вы не участник этой игры' }, { status: 403 })
+    return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
   }
 
   const message = await queryOne(

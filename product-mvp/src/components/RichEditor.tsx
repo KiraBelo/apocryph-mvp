@@ -10,6 +10,7 @@ import FontFamily from '@tiptap/extension-font-family'
 import Underline from '@tiptap/extension-underline'
 import { useState, useEffect, useRef } from 'react'
 import { FONT_GROUPS } from '@/lib/fonts'
+import { useT } from './SettingsContext'
 
 // Custom TipTap node for SMS meta line (time + checkmarks)
 const SMSMeta = Node.create({
@@ -131,7 +132,9 @@ interface Props {
   diceActive?: boolean
 }
 
-export default function RichEditor({ content, onChange, placeholder = 'Начни писать...', minHeight = '180px', onDiceClick, diceActive }: Props) {
+export default function RichEditor({ content, onChange, placeholder, minHeight = '180px', onDiceClick, diceActive }: Props) {
+  const t = useT()
+  const ph = placeholder || (t('editor.placeholder') as string)
   const [musicOpen, setMusicOpen] = useState(false)
   const [embedInput, setEmbedInput] = useState('')
   const [embedError, setEmbedError] = useState('')
@@ -162,7 +165,7 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
       attributes: {
         class: 'tiptap-content',
         style: `min-height: ${minHeight}; padding: 1rem; outline: none;`,
-        'data-placeholder': placeholder,
+        'data-placeholder': ph,
       },
     },
   })
@@ -172,7 +175,8 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
     if (content !== editor.getHTML()) {
       editor.commands.setContent(content)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, content])
 
   // Close emoji picker on click outside
   useEffect(() => {
@@ -211,7 +215,7 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
     const iframe = doc.querySelector('iframe')
 
     if (!iframe) {
-      setEmbedError('Не найден iframe в коде')
+      setEmbedError(t('editor.embedNoIframe') as string)
       return
     }
 
@@ -221,7 +225,7 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
       src.startsWith('https://music.yandex.ru/iframe/')
 
     if (!allowed) {
-      setEmbedError('Разрешены только Spotify и Яндекс.Музыка')
+      setEmbedError(t('editor.embedNotAllowed') as string)
       return
     }
 
@@ -264,10 +268,10 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-[0.15rem] p-[0.45rem_0.65rem] border-b border-edge bg-surface-3">
         {/* Text style */}
-        {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), <strong>B</strong>, 'Жирный (Ctrl+B)')}
-        {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), <em>I</em>, 'Курсив (Ctrl+I)')}
-        {btn(editor.isActive('underline'), () => editor.chain().focus().toggleUnderline().run(), <span className="underline">U</span>, 'Подчёркнутый (Ctrl+U)')}
-        {btn(editor.isActive('strike'), () => editor.chain().focus().toggleStrike().run(), <span className="line-through">S</span>, 'Зачёркнутый (Ctrl+Shift+S)')}
+        {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), <strong>B</strong>, t('editor.boldCtrl') as string)}
+        {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), <em>I</em>, t('editor.italicCtrl') as string)}
+        {btn(editor.isActive('underline'), () => editor.chain().focus().toggleUnderline().run(), <span className="underline">U</span>, t('editor.underlineCtrl') as string)}
+        {btn(editor.isActive('strike'), () => editor.chain().focus().toggleStrike().run(), <span className="line-through">S</span>, t('editor.strikethroughCtrl') as string)}
         {btn(editor.isActive('spoiler'), () => editor.chain().focus().toggleMark('spoiler').run(),
           <span
             className="p-[0_3px] rounded-[2px] text-[0.6rem] tracking-[0.05em]"
@@ -275,7 +279,7 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
               background: editor.isActive('spoiler') ? 'var(--text)' : 'var(--border)',
               color: editor.isActive('spoiler') ? 'var(--text)' : 'var(--text-2)',
             }}
-          >SP</span>, 'Спойлер')}
+          >SP</span>, t('editor.spoiler') as string)}
 
         {sep()}
 
@@ -287,17 +291,17 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
         {sep()}
 
         {/* Lists */}
-        {btn(editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run(), '• —', 'Список')}
-        {btn(editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run(), '1.', 'Нумерованный')}
-        {btn(editor.isActive('blockquote'), () => editor.chain().focus().toggleBlockquote().run(), '❝', 'Цитата')}
+        {btn(editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run(), '• —', t('editor.list') as string)}
+        {btn(editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run(), '1.', t('editor.orderedList') as string)}
+        {btn(editor.isActive('blockquote'), () => editor.chain().focus().toggleBlockquote().run(), '❝', t('editor.quote') as string)}
 
         {sep()}
 
         {/* Alignment */}
-        {btn(editor.isActive({ textAlign: 'left' }), () => editor.chain().focus().setTextAlign('left').run(), '⇐', 'По левому краю')}
-        {btn(editor.isActive({ textAlign: 'center' }), () => editor.chain().focus().setTextAlign('center').run(), '⇔', 'По центру')}
-        {btn(editor.isActive({ textAlign: 'right' }), () => editor.chain().focus().setTextAlign('right').run(), '⇒', 'По правому краю')}
-        {btn(editor.isActive({ textAlign: 'justify' }), () => editor.chain().focus().setTextAlign('justify').run(), '≡', 'По ширине')}
+        {btn(editor.isActive({ textAlign: 'left' }), () => editor.chain().focus().setTextAlign('left').run(), '⇐', t('editor.alignLeft') as string)}
+        {btn(editor.isActive({ textAlign: 'center' }), () => editor.chain().focus().setTextAlign('center').run(), '⇔', t('editor.alignCenter') as string)}
+        {btn(editor.isActive({ textAlign: 'right' }), () => editor.chain().focus().setTextAlign('right').run(), '⇒', t('editor.alignRight') as string)}
+        {btn(editor.isActive({ textAlign: 'justify' }), () => editor.chain().focus().setTextAlign('justify').run(), '≡', t('editor.alignJustify') as string)}
 
         {sep()}
 
@@ -308,11 +312,11 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
             else editor.chain().focus().unsetFontFamily().run()
           }}
           className="select-base text-[0.68rem] p-[0.2rem_0.4rem] !w-auto"
-          title="Шрифт"
+          title={t('editor.font') as string}
         >
-          <option value="">По умолчанию</option>
-          {FONT_GROUPS.map(g => (
-            <optgroup key={g.label} label={g.label}>
+          <option value="">{t('editor.fontDefault') as string}</option>
+          {FONT_GROUPS.map((g, gi) => (
+            <optgroup key={gi} label={t(`editor.${g.key}`) as string}>
               {g.fonts.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
             </optgroup>
           ))}
@@ -342,20 +346,20 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
             onClick={() => editor.chain().focus().toggleHighlight({ color: c }).run()}
             className="w-[14px] h-[14px] border border-edge cursor-pointer rounded-[2px]"
             style={{ background: c }}
-            title={`Выделить: ${c}`}
+            title={`${t('editor.highlight') as string}: ${c}`}
           />
         ))}
 
         {sep()}
 
         {/* Horizontal rule (scene separator) */}
-        {btn(false, () => editor.chain().focus().setHorizontalRule().run(), '―', 'Разделитель сцен')}
+        {btn(false, () => editor.chain().focus().setHorizontalRule().run(), '―', t('editor.sceneSeparator') as string)}
 
         {sep()}
 
         {/* Clear + Music embed + SMS + Emoji */}
-        {btn(false, () => editor.chain().focus().unsetAllMarks().clearNodes().run(), '✕', 'Очистить форматирование')}
-        {btn(musicOpen, () => { setMusicOpen(m => !m); setEmbedError('') }, <span className="text-[1rem] leading-none">♫</span>, 'Встроить музыку')}
+        {btn(false, () => editor.chain().focus().unsetAllMarks().clearNodes().run(), '✕', t('editor.clearFormatting') as string)}
+        {btn(musicOpen, () => { setMusicOpen(m => !m); setEmbedError('') }, <span className="text-[1rem] leading-none">♫</span>, t('editor.embedMusic') as string)}
         {btn(editor.isActive('smsBlock'), () => {
           // Check if any content is already inside smsBlock
           let hasSms = false
@@ -383,9 +387,9 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
             editor.commands.setContent(patched)
             editor.commands.focus('end')
           }
-        }, <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="12" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/></svg>, 'SMS-пузырь')}
+        }, <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="12" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/></svg>, t('editor.smsBubble') as string)}
         <div ref={emojiRef} className="relative inline-flex">
-          {btn(emojiOpen, () => setEmojiOpen(o => !o), <span className="text-[0.9rem] leading-none">☺</span>, 'Эмодзи')}
+          {btn(emojiOpen, () => setEmojiOpen(o => !o), <span className="text-[0.9rem] leading-none">☺</span>, t('editor.emoji') as string)}
           {emojiOpen && <EmojiDropdown onSelect={(emoji: string) => { editor.chain().focus().insertContent(emoji).run(); setEmojiOpen(false) }} />}
         </div>
         {/* Translator button hidden for now — translateContent() is available */}
@@ -393,7 +397,7 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
           <button
             type="button"
             onClick={onDiceClick}
-            title="Бросить кубик"
+            title={t('editor.rollDice') as string}
             className={`border-none p-[0.25rem_0.45rem] cursor-pointer rounded-[2px] leading-none inline-flex items-center
               ${diceActive ? 'bg-accent-dim text-accent' : 'bg-transparent text-ink-2'}`}
           >
@@ -413,7 +417,7 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
       {musicOpen && (
         <div className="p-[0.75rem_0.9rem] border-b border-edge bg-surface-3 flex flex-col gap-2">
           <span className="section-label">
-            Вставьте embed-код со Spotify или Яндекс.Музыки
+            {t('editor.embedPrompt') as string}
           </span>
           <textarea
             value={embedInput}
@@ -431,12 +435,12 @@ export default function RichEditor({ content, onChange, placeholder = 'Начн�
             <button type="button" onClick={insertEmbed}
               className="btn-primary text-[0.7rem] tracking-[0.08em] py-[0.35rem] px-[0.9rem]"
             >
-              Вставить
+              {t('editor.embedInsert') as string}
             </button>
             <button type="button" onClick={() => { setMusicOpen(false); setEmbedInput(''); setEmbedError('') }}
               className="btn-ghost text-[0.7rem] tracking-[0.08em] py-[0.35rem] px-[0.9rem]"
             >
-              Отмена
+              {t('editor.embedCancel') as string}
             </button>
           </div>
         </div>

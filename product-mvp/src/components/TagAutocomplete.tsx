@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
+import { useT } from './SettingsContext'
 
 export interface TagItem {
   id?: number
@@ -23,18 +24,6 @@ interface Props {
   chipsOutside?: boolean
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  fandom: 'фандом',
-  genre: 'жанр',
-  trope: 'троп',
-  setting: 'сеттинг',
-  character_type: 'персонаж',
-  pairing: 'пейринг',
-  mood: 'настроение',
-  format: 'формат',
-  other: 'другое',
-}
-
 const CATEGORY_COLORS: Record<string, string> = {
   fandom: 'var(--accent)',
   genre: '#6a9fb5',
@@ -51,11 +40,14 @@ export default function TagAutocomplete({
   selectedTags,
   onTagsChange,
   maxTags = 20,
-  placeholder = 'Введите тег...',
+  placeholder,
   allowCreate = true,
   className = '',
   chipsOutside = false,
 }: Props) {
+  const t = useT()
+  const categoryLabels = t('tags.categories') as unknown as Record<string, string>
+
   const [input, setInput] = useState('')
   const [suggestions, setSuggestions] = useState<TagItem[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -65,6 +57,7 @@ export default function TagAutocomplete({
   const [pendingCategory, setPendingCategory] = useState<string | null>(null)
   const [fandomSuggestions, setFandomSuggestions] = useState<TagItem[]>([])
   const [fandomSearch, setFandomSearch] = useState('')
+  const [activeFandomIndex, setActiveFandomIndex] = useState(0)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -84,7 +77,6 @@ export default function TagAutocomplete({
       })
       if (!res.ok) return
       const data: TagItem[] = await res.json()
-      // Filter out already selected
       const selectedIds = new Set(selectedTags.map(t => t.id))
       const selectedSlugs = new Set(selectedTags.map(t => t.slug))
       const filtered = data.filter(
@@ -142,7 +134,6 @@ export default function TagAutocomplete({
     if (FANDOM_LINKED_CATEGORIES.includes(category)) {
       setPendingCategory(category)
       setFandomSearch('')
-      // Load popular fandoms
       try {
         const res = await fetch('/api/tags?category=fandom&limit=20')
         if (res.ok) setFandomSuggestions(await res.json())
@@ -154,8 +145,8 @@ export default function TagAutocomplete({
 
   const searchFandoms = async (q: string) => {
     setFandomSearch(q)
+    setActiveFandomIndex(0)
     if (q.trim().length < 2) {
-      // Show popular
       try {
         const res = await fetch('/api/tags?category=fandom&limit=20')
         if (res.ok) setFandomSuggestions(await res.json())
@@ -170,22 +161,21 @@ export default function TagAutocomplete({
 
   const createTag = async (slug: string, category: string, parentTagId: number | null) => {
     if (!allowCreate) return
-    setPendingTagSlug(null)
-    setPendingCategory(null)
-    setFandomSuggestions([])
+    let tag: TagItem = { slug, name: slug, category }
     try {
       const res = await fetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, category, parent_tag_id: parentTagId }),
       })
-      if (!res.ok) return
-      const tag: TagItem = await res.json()
-      addTag(tag)
-    } catch {
-      // fallback: add as text-only tag
-      addTag({ slug, name: slug, category })
-    }
+      if (res.ok) {
+        tag = await res.json()
+      }
+    } catch { /* network error — use fallback tag */ }
+    setPendingTagSlug(null)
+    setPendingCategory(null)
+    setFandomSuggestions([])
+    addTag(tag)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -201,8 +191,6 @@ export default function TagAutocomplete({
       e.preventDefault()
       if (activeIndex >= 0 && activeIndex < suggestions.length) {
         addTag(suggestions[activeIndex])
-      } else if (input.trim().length >= 2 && suggestions.length > 0) {
-        addTag(suggestions[0])
       } else if (input.trim().length >= 2 && allowCreate) {
         startCreateTag(input.trim().toLowerCase())
       }
@@ -219,7 +207,6 @@ export default function TagAutocomplete({
     }
   }
 
-  // Close dropdown on click outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (skipCloseRef.current) {
@@ -242,7 +229,6 @@ export default function TagAutocomplete({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // Scroll active item into view
   useEffect(() => {
     if (activeIndex >= 0 && dropdownRef.current) {
       const item = dropdownRef.current.children[activeIndex] as HTMLElement
@@ -264,7 +250,7 @@ export default function TagAutocomplete({
             onFocus={() => {
               if (input.trim().length >= 2) fetchSuggestions(input.trim())
             }}
-            placeholder={placeholder}
+            placeholder={placeholder || t('tags.defaultPlaceholder') as string}
             maxLength={50}
             className="filter-input w-full"
           />
@@ -307,10 +293,35 @@ export default function TagAutocomplete({
                 className="text-[0.6rem] font-mono uppercase tracking-wider opacity-60"
                 style={{ color: CATEGORY_COLORS[tag.category || 'other'] }}
               >
-                {CATEGORY_LABELS[tag.category || 'other']}
+                {categoryLabels[tag.category || 'other']}
               </span>
             </button>
           ))}
+          {allowCreate && !pendingTagSlug && input.trim().length >= 2 &&
+            !suggestions.some(s => s.slug === input.trim().toLowerCase() || s.name?.toLowerCase() === input.trim().toLowerCase()) && (
+            <button
+              type="button"
+              className="w-full text-left px-3 py-[0.4rem] font-mono text-[0.75rem] cursor-pointer transition-colors"
+              style={{
+                color: 'var(--accent)',
+                borderTop: suggestions.length > 0 ? '1px solid var(--border)' : 'none',
+                background: 'transparent',
+              }}
+              onMouseDown={e => {
+                e.preventDefault()
+                skipCloseRef.current = true
+                startCreateTag(input.trim().toLowerCase())
+              }}
+              onMouseEnter={e => {
+                (e.target as HTMLElement).style.background = 'var(--accent-dim)'
+              }}
+              onMouseLeave={e => {
+                (e.target as HTMLElement).style.background = 'transparent'
+              }}
+            >
+              {t('tags.create') as string} &laquo;{input.trim()}&raquo;
+            </button>
+          )}
           {pendingTagSlug && !pendingCategory && (
             <div
               style={{
@@ -319,10 +330,10 @@ export default function TagAutocomplete({
               }}
             >
               <div className="font-mono text-[0.65rem] opacity-60 mb-1.5" style={{ letterSpacing: '0.05em' }}>
-                Категория для &laquo;{pendingTagSlug}&raquo;:
+                {t('tags.categoryFor') as string} &laquo;{pendingTagSlug}&raquo;:
               </div>
               <div className="flex flex-wrap gap-1">
-                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                {Object.entries(categoryLabels).map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -360,42 +371,61 @@ export default function TagAutocomplete({
               }}
             >
               <div className="font-mono text-[0.65rem] opacity-60 mb-1.5" style={{ letterSpacing: '0.05em' }}>
-                Фандом для &laquo;{pendingTagSlug}&raquo;:
+                {t('tags.fandomFor') as string} &laquo;{pendingTagSlug}&raquo;:
               </div>
               <input
                 type="text"
                 value={fandomSearch}
                 onChange={e => searchFandoms(e.target.value)}
-                placeholder="Поиск фандома..."
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    if (fandomSuggestions.length > 0) {
+                      const idx = Math.min(activeFandomIndex, fandomSuggestions.length - 1)
+                      createTag(pendingTagSlug!, pendingCategory!, fandomSuggestions[idx].id!)
+                    } else {
+                      createTag(pendingTagSlug!, pendingCategory!, null)
+                    }
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setActiveFandomIndex(prev => Math.min(prev + 1, fandomSuggestions.length - 1))
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setActiveFandomIndex(prev => Math.max(prev - 1, 0))
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    setPendingCategory(null)
+                    setFandomSuggestions([])
+                  }
+                }}
+                placeholder={t('tags.searchFandom') as string}
                 className="filter-input w-full mb-1.5"
                 style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
                 autoFocus
                 onMouseDown={() => { skipCloseRef.current = true }}
               />
               <div className="flex flex-col max-h-[150px] overflow-y-auto">
-                {fandomSuggestions.map(f => (
+                {fandomSuggestions.map((f, i) => (
                   <button
                     key={f.id}
                     type="button"
                     className="text-left px-2 py-1 font-mono text-[0.7rem] cursor-pointer transition-colors rounded"
-                    style={{ color: 'var(--text)' }}
+                    style={{
+                      color: 'var(--text)',
+                      background: i === activeFandomIndex ? 'var(--accent-dim)' : 'transparent',
+                    }}
                     onMouseDown={e => {
                       e.preventDefault()
                       skipCloseRef.current = true
-                      createTag(pendingTagSlug, pendingCategory, f.id!)
+                      createTag(pendingTagSlug!, pendingCategory!, f.id!)
                     }}
-                    onMouseEnter={e => {
-                      (e.target as HTMLElement).style.background = 'var(--accent-dim)'
-                    }}
-                    onMouseLeave={e => {
-                      (e.target as HTMLElement).style.background = 'transparent'
-                    }}
+                    onMouseEnter={() => setActiveFandomIndex(i)}
                   >
                     {f.name || f.slug}
                   </button>
                 ))}
                 {fandomSuggestions.length === 0 && (
-                  <div className="text-[0.65rem] opacity-40 font-mono py-1 px-2">Нет результатов</div>
+                  <div className="text-[0.65rem] opacity-40 font-mono py-1 px-2">{t('tags.noResults') as string}</div>
                 )}
               </div>
               <button
@@ -407,7 +437,7 @@ export default function TagAutocomplete({
                   createTag(pendingTagSlug, pendingCategory, null)
                 }}
               >
-                Без привязки к фандому →
+                {t('tags.withoutFandom') as string}
               </button>
             </div>
           )}

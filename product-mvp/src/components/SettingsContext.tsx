@@ -1,5 +1,6 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { translate, type Lang } from '@/i18n'
 
 export type Theme = 'light' | 'sepia' | 'ink' | 'nocturne'
 export type FontSize = 'small' | 'medium' | 'large'
@@ -13,6 +14,7 @@ export interface TagPreset {
 }
 
 export interface Settings {
+  lang: Lang
   theme: Theme
   fontSize: FontSize
   siteFont: string
@@ -33,6 +35,7 @@ interface SettingsCtx extends Settings {
 }
 
 const DEFAULTS: Settings = {
+  lang: 'ru',
   theme: 'light',
   fontSize: 'medium',
   siteFont: 'Georgia, serif',
@@ -50,6 +53,7 @@ const DEFAULT_PRESETS: TagPreset[] = [
 ]
 
 const KEYS: Record<keyof Settings, string> = {
+  lang: 'apocryph-lang',
   theme: 'apocryph-theme',
   fontSize: 'apocryph-font-size',
   siteFont: 'apocryph-site-font',
@@ -78,6 +82,7 @@ const GAME_SPACINGS: Record<GameSpacing, string> = {
 
 function applyOne(key: keyof Settings, value: Settings[keyof Settings]) {
   const h = document.documentElement
+  if (key === 'lang')        h.lang = value as string
   if (key === 'theme')       h.setAttribute('data-theme', value as string)
   if (key === 'fontSize')    h.style.fontSize = FONT_SIZES[value as FontSize]
   if (key === 'siteFont') {
@@ -90,9 +95,11 @@ function applyOne(key: keyof Settings, value: Settings[keyof Settings]) {
 }
 
 function applyAllToDOM(s: Settings) {
+  applyOne('lang', s.lang)
   applyOne('theme', s.theme)
   applyOne('fontSize', s.fontSize)
   applyOne('siteFont', s.siteFont)
+  applyOne('gameFont', s.gameFont)
   applyOne('gameSpacing', s.gameSpacing)
 }
 
@@ -113,6 +120,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const loaded: Settings = {
+      lang: (() => {
+        const saved = localStorage.getItem(KEYS.lang)
+        if (saved === 'ru' || saved === 'en') return saved
+        return DEFAULTS.lang
+      })(),
       theme: (() => {
         const saved = localStorage.getItem(KEYS.theme)
         if (saved === 'light' || saved === 'sepia' || saved === 'ink' || saved === 'nocturne') return saved
@@ -166,3 +178,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useSettings = () => useContext(Ctx)
+
+/** Translation hook — returns t('section.key') function */
+export function useT() {
+  const { lang } = useContext(Ctx)
+  return useCallback(
+    (key: string): string | readonly string[] => translate(lang, key),
+    [lang]
+  )
+}

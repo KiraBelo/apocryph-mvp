@@ -42,9 +42,10 @@ ALTER TABLE requests ADD CONSTRAINT requests_pairing_check CHECK (pairing IN ('s
 -- ── GAMES (диалоги) ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS games (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  request_id UUID REFERENCES requests(id) ON DELETE SET NULL,
-  banner_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  request_id  UUID REFERENCES requests(id) ON DELETE SET NULL,
+  banner_url  TEXT,
+  ooc_enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── GAME PARTICIPANTS ────────────────────────────────────────────
@@ -54,8 +55,14 @@ CREATE TABLE IF NOT EXISTS game_participants (
   user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   nickname     TEXT NOT NULL DEFAULT 'Игрок',
   avatar_url   TEXT,
-  left_at      TIMESTAMPTZ,
-  leave_reason TEXT,
+  left_at          TIMESTAMPTZ,
+  leave_reason     TEXT,
+  banner_url       TEXT,
+  banner_pref      TEXT NOT NULL DEFAULT 'own',
+  starred_at       TIMESTAMPTZ,
+  hidden_at        TIMESTAMPTZ,
+  last_read_at     TIMESTAMPTZ,
+  last_read_ooc_at TIMESTAMPTZ,
   UNIQUE (game_id, user_id)
 );
 
@@ -65,6 +72,7 @@ CREATE TABLE IF NOT EXISTS messages (
   game_id        UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   participant_id UUID NOT NULL REFERENCES game_participants(id) ON DELETE CASCADE,
   content        TEXT NOT NULL,
+  type           TEXT NOT NULL DEFAULT 'ic',
   edited_at      TIMESTAMPTZ,
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
@@ -115,6 +123,8 @@ CREATE TABLE IF NOT EXISTS reports (
   reason      TEXT NOT NULL,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_game_reporter_pending
+  ON reports (game_id, reporter_id) WHERE status = 'pending';
 
 -- Migrations for banner preferences
 ALTER TABLE games ADD COLUMN IF NOT EXISTS ooc_enabled BOOLEAN NOT NULL DEFAULT false;
@@ -206,6 +216,20 @@ CREATE INDEX IF NOT EXISTS idx_requests_content ON requests(content_level);
 CREATE INDEX IF NOT EXISTS idx_messages_game    ON messages(game_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_gp_user         ON game_participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_gp_game         ON game_participants(game_id);
+
+-- ── MODERATION (Фаза 4) ─────────────────────────────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'
+  CHECK (role IN ('user','moderator','admin'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT;
+
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'
+  CHECK (status IN ('pending','resolved','dismissed'));
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+
+ALTER TABLE games ADD COLUMN IF NOT EXISTS moderation_status TEXT NOT NULL DEFAULT 'visible'
+  CHECK (moderation_status IN ('visible','hidden','under_review'));
 
 -- ================================================================
 -- SEED DATA — 16 заявок для холодного старта
@@ -307,3 +331,6 @@ INSERT INTO requests (author_id, title, body, type, content_level, fandom_type, 
  'multiplayer', 'rare', 'original', 'any', ARRAY['детектив','современность','мультиплеер','психология','оригинал'], true, 'active')
 
 ON CONFLICT DO NOTHING;
+
+-- Seed: luna = admin
+UPDATE users SET role = 'admin' WHERE email = 'luna@apocryph.test';

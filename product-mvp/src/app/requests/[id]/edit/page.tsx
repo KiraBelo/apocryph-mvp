@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
-import RequestForm from '@/components/RequestForm'
+import RequestFormWrapper from '@/components/RequestFormWrapper'
 
 export default async function EditRequestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -15,13 +15,5 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
 
   if (!request || request.author_id !== user.id) notFound()
 
-  return (
-    <div className="max-w-[1050px] mx-auto p-[3rem_1.75rem]">
-      <p className="section-label text-accent-2 mb-3">§ Редактирование</p>
-      <h3 className="font-heading text-[clamp(1.8rem,4vw,2.8rem)] italic font-light text-ink mb-10">
-        Изменить заявку
-      </h3>
-      <RequestForm initial={request} />
-    </div>
-  )
+  return <RequestFormWrapper mode="edit" initial={request} />
 }

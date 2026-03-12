@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
+import { useT } from './SettingsContext'
 
 export interface Request {
   id: string
@@ -14,33 +15,6 @@ export interface Request {
   tags: string[]
   status: string
   created_at: string
-}
-
-const contentLabels: Record<string, string> = {
-  none: 'без постельных сцен',
-  rare: 'редко',
-  often: 'часто',
-  core: 'основа сюжета',
-  flexible: 'по договорённости',
-}
-
-const typeLabels: Record<string, string> = {
-  duo: 'На двоих',
-  multiplayer: 'Мультиплеер',
-}
-
-const fandomTypeLabels: Record<string, string> = {
-  fandom: 'Фандом',
-  original: 'Оридж',
-}
-
-const pairingLabels: Record<string, string> = {
-  sl: 'M/M',
-  fm: 'F/F',
-  gt: 'M/F',
-  any: 'Любой пейринг',
-  multi: 'Мульти',
-  other: 'Другое',
 }
 
 interface Props {
@@ -58,6 +32,35 @@ export default function RequestCard({
   request, isBookmarked, onBookmark, showRespond = true,
   onTagSearch, onTagSubscribe, onTagBlacklist, isOwn,
 }: Props) {
+  const t = useT()
+
+  const contentLabels: Record<string, string> = {
+    none: t('filters.noNsfw') as string,
+    rare: t('filters.nsfwRare') as string,
+    often: t('filters.nsfwOften') as string,
+    core: t('filters.nsfwCore') as string,
+    flexible: t('filters.nsfwFlexible') as string,
+  }
+
+  const typeLabels: Record<string, string> = {
+    duo: t('filters.duo') as string,
+    multiplayer: t('filters.multiplayer') as string,
+  }
+
+  const fandomTypeLabels: Record<string, string> = {
+    fandom: t('filters.fandom') as string,
+    original: t('filters.original') as string,
+  }
+
+  const pairingLabels: Record<string, string> = {
+    sl: 'M/M',
+    fm: 'F/F',
+    gt: 'M/F',
+    any: t('filters.anyPairing') as string,
+    multi: t('filters.multi') as string,
+    other: t('filters.other') as string,
+  }
+
   const [bookmarked, setBookmarked] = useState(isBookmarked ?? false)
   const [loadingBm, setLoadingBm] = useState(false)
   const [menuTag, setMenuTag] = useState<string | null>(null)
@@ -126,20 +129,20 @@ export default function RequestCard({
             <button
               onClick={createInvite}
               disabled={inviteLoading}
-              title="Скопировать инвайт-ссылку"
+              title={t('card.copyInvite') as string}
               className={`bg-transparent border-none cursor-pointer p-0 leading-none flex items-center transition-[color,opacity] duration-150
                 ${inviteLink ? 'text-accent' : 'text-ink-2 opacity-65 hover:opacity-100'}`}
             >
               {inviteLoading ? '...' : inviteLink ? '✓' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
             </button>
-            <Link href={`/requests/${request.id}/edit`} title="Редактировать"
+            <Link href={`/requests/${request.id}/edit`} title={t('card.edit') as string}
               className="text-ink-2 text-[0.9rem] leading-none no-underline opacity-50 hover:opacity-100 inline-block scale-x-[-1]"
             >
               ✎
             </Link>
           </>
         )}
-        <button onClick={toggleBookmark} disabled={loadingBm} title={bookmarked ? 'Убрать из закладок' : 'В закладки'}
+        <button onClick={toggleBookmark} disabled={loadingBm} title={bookmarked ? t('card.removeBookmark') as string : t('card.addBookmark') as string}
           className={`bg-transparent border-none cursor-pointer text-[1.1rem] p-0 leading-none ${bookmarked ? 'text-accent' : 'text-ink-2'}`}
         >
           {bookmarked ? '★' : '☆'}
@@ -178,17 +181,17 @@ export default function RequestCard({
               >
                 {onTagSearch && (
                   <button onClick={e => runAction(e, () => onTagSearch(tag))} className="tag-menu-item">
-                    Поиск по тегу
+                    {t('card.searchByTag') as string}
                   </button>
                 )}
                 {onTagSubscribe && (
                   <button onClick={e => runAction(e, () => onTagSubscribe(tag))} className="tag-menu-item">
-                    Добавить к поиску
+                    {t('card.addToSearch') as string}
                   </button>
                 )}
                 {onTagBlacklist && (
                   <button onClick={e => runAction(e, () => onTagBlacklist(tag))} className="tag-menu-item border-t border-edge text-accent">
-                    Скрыть тег
+                    {t('card.hideTag') as string}
                   </button>
                 )}
               </div>
@@ -216,7 +219,7 @@ export default function RequestCard({
               onClick={e => { e.preventDefault(); setExpanded(x => !x) }}
               className="link-accent bg-transparent border-none cursor-pointer block pt-[0.3rem]"
             >
-              {expanded ? 'Свернуть ↑' : 'Читать дальше →'}
+              {expanded ? t('card.collapse') as string : t('card.readMore') as string}
             </button>
           )}
         </div>
@@ -233,11 +236,11 @@ export default function RequestCard({
       {showRespond && (
         isOwn ? (
           <span className="link-accent text-ink-2">
-            Это ваша заявка
+            {t('card.ownRequest') as string}
           </span>
         ) : (
           <Link href={`/requests/${request.id}`} className="link-accent no-underline">
-            Ответить →
+            {t('card.respond') as string}
           </Link>
         )
       )}

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 
-// GET /api/requests — лента с фильтрами
+const PAGE_SIZE = 30
+
+// GET /api/requests — лента с фильтрами + пагинация
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const type         = sp.get('type')         // duo | multiplayer
@@ -13,6 +15,7 @@ export async function GET(req: NextRequest) {
   const tags         = sp.get('tags')         // comma-separated
   const q            = sp.get('q')            // text search
   const mine         = sp.get('mine')         // 'true'
+  const page         = Math.max(1, parseInt(sp.get('page') || '1', 10) || 1)
 
   const user = await getUser()
 
@@ -55,37 +58,47 @@ export async function GET(req: NextRequest) {
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const rows = await query(
-    `SELECT r.*, u.email as author_email
-     FROM requests r
-     JOIN users u ON u.id = r.author_id
-     ${where}
-     ORDER BY COALESCE(r.updated_at, r.created_at) DESC`,
+
+  const countResult = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM requests r ${where}`,
     params
   )
-  return NextResponse.json(rows)
+  const total = parseInt(countResult?.count || '0', 10)
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const offset = (page - 1) * PAGE_SIZE
+
+  const rows = await query(
+    `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.tags, r.status, r.is_public, r.created_at, r.updated_at, r.author_id
+     FROM requests r
+     ${where}
+     ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+     LIMIT $${p++} OFFSET $${p++}`,
+    [...params, PAGE_SIZE, offset]
+  )
+  return NextResponse.json({ requests: rows, total, page, totalPages })
 }
 
 // POST /api/requests — создать заявку
 export async function POST(req: NextRequest) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const body = await req.json()
   const { title, description, type, content_level, fandom_type, pairing, tags, is_public, status } = body
 
   if (!title || !type || !content_level) {
-    return NextResponse.json({ error: 'Заполните обязательные поля' }, { status: 400 })
+    return NextResponse.json({ error: 'fillRequired' }, { status: 400 })
   }
   if (title.length > 200) {
-    return NextResponse.json({ error: 'Заголовок не может быть длиннее 200 символов' }, { status: 400 })
+    return NextResponse.json({ error: 'titleTooLong' }, { status: 400 })
   }
   if (description && description.length > 200_000) {
-    return NextResponse.json({ error: 'Текст заявки слишком длинный' }, { status: 400 })
+    return NextResponse.json({ error: 'bodyTooLong' }, { status: 400 })
   }
   const tagsArr: string[] = (tags || []).map((t: string) => t.trim().toLowerCase()).filter(Boolean)
   if (tagsArr.length > 20 || tagsArr.some((t: string) => t.length > 50)) {
-    return NextResponse.json({ error: 'Слишком много тегов или тег слишком длинный (макс. 50 симв.)' }, { status: 400 })
+    return NextResponse.json({ error: 'tooManyTags' }, { status: 400 })
   }
 
   const structuredTags: { id?: number; slug: string }[] = body.structured_tags || []

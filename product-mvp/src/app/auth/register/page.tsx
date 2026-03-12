@@ -2,10 +2,12 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useT } from '@/components/SettingsContext'
 
 export default function RegisterPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const t = useT()
   const next = searchParams.get('next') || '/feed'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -22,7 +24,7 @@ export default function RegisterPage() {
       body: JSON.stringify({ email, password }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error); setLoading(false); return }
+    if (!res.ok) { setError(t(`errors.${data.error}`) as string || data.error); setLoading(false); return }
     router.push(next)
     router.refresh()
   }
@@ -31,15 +33,15 @@ export default function RegisterPage() {
     <div className="flex items-center justify-center min-h-[80vh] p-8">
       <div className="w-full max-w-[420px]">
         <h1 className="font-heading text-[2.4rem] italic mb-2 text-ink">
-          Регистрация
+          {t('auth.registerTitle') as string}
         </h1>
         <p className="text-ink-2 mb-10 font-body">
-          Найди игру уже сегодня.
+          {t('auth.registerSubtitle') as string}
         </p>
 
         <form onSubmit={submit} className="flex flex-col gap-5">
           <label className="flex flex-col gap-[0.4rem]">
-            <span className="section-label">Email</span>
+            <span className="section-label">{t('auth.email') as string}</span>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={255}
               className="input-base text-[1rem] p-[0.65rem_0.9rem] w-full"
@@ -48,12 +50,12 @@ export default function RegisterPage() {
           </label>
 
           <div className="flex flex-col gap-[0.4rem]">
-            <span className="section-label">Пароль</span>
+            <span className="section-label">{t('auth.password') as string}</span>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={6} maxLength={128}
                 className="input-base text-[1rem] p-[0.65rem_0.9rem] pr-10 w-full"
-                placeholder="Минимум 6 символов"
+                placeholder={t('auth.passwordMinLength') as string}
               />
               <button type="button" onClick={() => setShowPassword(v => !v)}
                 className="absolute right-[0.6rem] top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-ink-2 p-[0.1rem] leading-none flex items-center">
@@ -76,14 +78,14 @@ export default function RegisterPage() {
           {error && <p className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
 
           <button type="submit" disabled={loading} className="btn-primary text-[1rem] p-[0.7rem_1.4rem] mt-1">
-            {loading ? '...' : 'Создать аккаунт →'}
+            {loading ? '...' : t('auth.registerButton') as string}
           </button>
         </form>
 
         <p className="mt-6 text-ink-2 font-body text-[0.95rem]">
-          Уже есть аккаунт?{' '}
+          {t('auth.hasAccount') as string}{' '}
           <Link href="/auth/login" className="text-accent border-b border-current">
-            Войти
+            {t('auth.loginLink') as string}
           </Link>
         </p>
       </div>

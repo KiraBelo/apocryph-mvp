@@ -4,13 +4,13 @@ export interface FontOption {
 }
 
 export interface FontGroup {
-  label: string
+  key: string // i18n key under 'editor' namespace
   fonts: FontOption[]
 }
 
 export const FONT_GROUPS: FontGroup[] = [
   {
-    label: 'Серифные',
+    key: 'fontSerif',
     fonts: [
       { label: 'Georgia', value: 'Georgia, serif' },
       { label: 'Times New Roman', value: 'Times New Roman, Times, serif' },
@@ -24,7 +24,7 @@ export const FONT_GROUPS: FontGroup[] = [
     ],
   },
   {
-    label: 'Без засечек',
+    key: 'fontSans',
     fonts: [
       { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
       { label: 'Roboto', value: 'Roboto, Arial, sans-serif' },
@@ -37,7 +37,7 @@ export const FONT_GROUPS: FontGroup[] = [
     ],
   },
   {
-    label: 'Рукописные',
+    key: 'fontHandwriting',
     fonts: [
       { label: 'Caveat', value: 'Caveat, cursive' },
       { label: 'Neucha', value: 'Neucha, cursive' },
@@ -45,7 +45,7 @@ export const FONT_GROUPS: FontGroup[] = [
     ],
   },
   {
-    label: 'Моноширинный',
+    key: 'fontMono',
     fonts: [
       { label: 'PT Mono', value: 'PT Mono, monospace' },
       { label: 'Courier New', value: 'Courier New, Courier, monospace' },

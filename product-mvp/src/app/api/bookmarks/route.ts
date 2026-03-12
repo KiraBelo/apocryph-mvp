@@ -4,7 +4,7 @@ import { getUser } from '@/lib/session'
 
 export async function GET() {
   const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const rows = await query(
     `SELECT r.*, b.created_at as bookmarked_at

@@ -10,7 +10,7 @@ export function sanitizeBody(html: string | null | undefined): string | null {
       'ul', 'ol', 'li',
       'blockquote', 'pre', 'code', 'hr',
       'span', 'a', 'div',
-      'iframe', 'mark',
+      'mark',
     ],
     allowedAttributes: {
       'a': ['href', 'target', 'rel'],
@@ -21,13 +21,11 @@ export function sanitizeBody(html: string | null | undefined): string | null {
       'h2': ['style'],
       'h3': ['style'],
       'mark': ['data-color', 'style'],
-      'iframe': ['src', 'width', 'height', 'frameborder', 'allow', 'allowtransparency', 'style'],
     },
     allowedStyles: {
       '*': {
-        'color': [/.*/],
-        'background-color': [/.*/],
-        'font-family': [/.*/],
+        'color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)$/],
+        'background-color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)$/],
         'text-align': [/^(left|right|center|justify)$/],
       },
     },
@@ -35,7 +33,6 @@ export function sanitizeBody(html: string | null | undefined): string | null {
     allowedSchemesByTag: {
       'a': ['https', 'http', 'mailto'],
     },
-    allowedIframeHostnames: ['open.spotify.com', 'music.yandex.ru'],
     allowedClasses: {
       'div': ['sms-bubble'],
       'p': ['sms-meta'],
@@ -50,14 +47,6 @@ export function sanitizeBody(html: string | null | undefined): string | null {
           target: '_blank',
         },
       }),
-      'iframe': (tagName, attribs) => {
-        const src = attribs.src ?? ''
-        const allowed =
-          src.startsWith('https://open.spotify.com/embed/') ||
-          src.startsWith('https://music.yandex.ru/iframe/')
-        if (!allowed) return { tagName: 'span', attribs: {} }
-        return { tagName, attribs }
-      },
     },
   })
 }

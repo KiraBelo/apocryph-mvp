@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, memo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import RichEditor from './RichEditor'
 import Link from 'next/link'
-import { useSettings } from './SettingsContext'
+import { useSettings, useT } from './SettingsContext'
 
 interface Message {
   id: string; participant_id: string; content: string; created_at: string;
@@ -19,18 +19,28 @@ interface NoteEntry {
   id: number; title: string; content: string; created_at: string; updated_at: string | null
 }
 
+interface SearchResult {
+  id: string; snippet: string; created_at: string; nickname: string; page: number
+}
+
 interface Props {
   gameId: string
-  game: { id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean }
+  game: { id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; moderation_status?: string }
   initialMessages: Message[]
+  initialPage: number
+  totalPages: number
   participants: Participant[]
   me: Participant
   userId: string
   requestTitle: string | null
 }
 
-const LEAVE_REASONS = ['Спасибо, всё было здорово', 'Сейчас нет времени продолжать', 'Формат игры не подошёл', 'Ожидания от игры не совпали', 'Сменились интересы']
+// LEAVE_REASONS moved to i18n: game.leaveReasons
 const NOTE_COLLAPSE_CHARS = 350
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
 
 const MsgContent = memo(function MsgContent({ html, className, style }: { html: string; className?: string; style?: React.CSSProperties }) {
   return <div className={className} style={style} dangerouslySetInnerHTML={{ __html: html }} />
@@ -51,11 +61,27 @@ function feedPostBg(userId: string): string {
   return FEED_BG_PALETTE[hash % FEED_BG_PALETTE.length]
 }
 
-export default function GameDialogClient({ gameId, game, initialMessages, participants, me, userId, requestTitle }: Props) {
+export default function GameDialogClient({ gameId, game, initialMessages, initialPage, totalPages: initTotalPages, participants, me, userId, requestTitle }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { notesEnabled, gameLayout, set } = useSettings()
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
+  const t = useT()
+  // IC pagination
+  const [icMessages, setIcMessages] = useState<Message[]>(initialMessages)
+  const [icPage, setIcPage] = useState(initialPage)
+  const [icTotalPages, setIcTotalPages] = useState(initTotalPages)
+  // OOC lazy loading + pagination
+  const [oocMessages, setOocMessages] = useState<Message[]>([])
+  const [oocPage, setOocPage] = useState(1)
+  const [oocTotalPages, setOocTotalPages] = useState(1)
+  const [oocLoaded, setOocLoaded] = useState(false)
+  const [pageLoading, setPageLoading] = useState(false)
+  // Search results from server
+  const [serverSearchResults, setServerSearchResults] = useState<SearchResult[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Pending scroll-to after page load
+  const [scrollToMsgId, setScrollToMsgId] = useState<string | null>(null)
   const initialTab = searchParams.get('tab') === 'ooc' ? 'ooc' as const : searchParams.get('tab') === 'notes' ? 'notes' as const : 'ic' as const
   const [activeTab, setActiveTab] = useState<'ic' | 'ooc' | 'notes'>(initialTab)
   const [content, setContent] = useState('')
@@ -78,6 +104,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   const [showExport, setShowExport] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [editorCollapsed, setEditorCollapsed] = useState(false)
+  const [editorPinned, setEditorPinned] = useState(false)
   // Search
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -104,9 +131,17 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isLeft = !!me.left_at
+  const isFrozen = game.moderation_status && game.moderation_status !== 'visible'
 
-  const icMessages = messages.filter(m => m.type !== 'ooc' && m.type !== 'dice')
-  const oocMessages = messages.filter(m => m.type === 'ooc')
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Cleanup scroll timers on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+      if (scrollStopRef.current) clearTimeout(scrollStopRef.current)
+    }
+  }, [])
 
   // Escape exits fullscreen
   useEffect(() => {
@@ -143,8 +178,9 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
       .then(d => {
         setNotes(d.notes ?? [])
         setNotesLoaded(true)
-        setNotesLoading(false)
       })
+      .catch(() => { /* network error */ })
+      .finally(() => setNotesLoading(false))
   }, [activeTab, gameId, notesEnabled, notesLoaded])
 
   // SSE
@@ -154,29 +190,50 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
     es.onmessage = e => {
       const data = JSON.parse(e.data)
       if (data._type === 'edit') {
-        setMessages(prev => prev.map(m => m.id === data.id ? { ...m, content: data.content, edited_at: data.edited_at } : m))
+        const updater = (prev: Message[]) => prev.map(m => m.id === data.id ? { ...m, content: data.content, edited_at: data.edited_at } : m)
+        setIcMessages(updater)
+        setOocMessages(updater)
       } else if (data.type === 'dice') {
         try {
           const parsed = JSON.parse(data.content)
           setDiceQueue(prev => [...prev, { sides: parsed.sides, result: parsed.result, roller: parsed.roller }])
         } catch {}
-        const { _type: _, ...msg } = data
-        setMessages(prev => [...prev, msg as Message])
       } else {
         const { _type: _, ...msg } = data
-        setMessages(prev => [...prev, msg as Message])
+        if (msg.type === 'ooc') {
+          setOocMessages(prev => [...prev, msg as Message])
+        } else {
+          setIcMessages(prev => [...prev, msg as Message])
+        }
       }
     }
     return () => es.close()
   }, [gameId, isLeft])
 
-  // Collapse editor on scroll, debounced
+  // Collapse editor on scroll, re-expand when scrolling stops
+  const scrollStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ignoreScrollRef = useRef(false)
   function handleMessagesScroll() {
-    if (editorCollapsed || editingId) return
-    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-    scrollTimerRef.current = setTimeout(() => {
-      setEditorCollapsed(true)
-    }, 150)
+    if (editingId || editorPinned) return
+    // Ignore scroll events triggered by editor collapse/expand layout shift
+    if (ignoreScrollRef.current) return
+    // Collapse on scroll start
+    if (!editorCollapsed) {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+      scrollTimerRef.current = setTimeout(() => {
+        ignoreScrollRef.current = true
+        setEditorCollapsed(true)
+        // Allow scroll events again after layout settles
+        setTimeout(() => { ignoreScrollRef.current = false }, 100)
+      }, 150)
+    }
+    // Re-expand when scrolling stops
+    if (scrollStopRef.current) clearTimeout(scrollStopRef.current)
+    scrollStopRef.current = setTimeout(() => {
+      ignoreScrollRef.current = true
+      setEditorCollapsed(false)
+      setTimeout(() => { ignoreScrollRef.current = false }, 100)
+    }, 2000)
   }
 
   // Scroll to bottom on new message in current tab
@@ -188,32 +245,38 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   async function submitNote() {
     if (!newNoteContent.trim() || newNoteContent === '<p></p>' || newNoteSending) return
     setNewNoteSending(true)
-    const res = await fetch(`/api/games/${gameId}/notes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newNoteTitle, content: newNoteContent }),
-    })
-    const d = await res.json()
-    if (d.note) setNotes(prev => [d.note, ...prev])
-    setNewNoteTitle('')
-    setNewNoteContent('')
-    setNewNoteKey(k => k + 1)
-    setNewNoteSending(false)
+    try {
+      const res = await fetch(`/api/games/${gameId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newNoteTitle, content: newNoteContent }),
+      })
+      if (!res.ok) { alert(t('errors.savingNote') as string); return }
+      const d = await res.json()
+      if (d.note) setNotes(prev => [d.note, ...prev])
+      setNewNoteTitle('')
+      setNewNoteContent('')
+      setNewNoteKey(k => k + 1)
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setNewNoteSending(false) }
   }
 
   // Save note edit
   async function saveNoteEdit(noteId: number) {
     if (noteEditSaving) return
     setNoteEditSaving(true)
-    const res = await fetch(`/api/games/${gameId}/notes/${noteId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: noteEditTitle, content: noteEditContent }),
-    })
-    const d = await res.json()
-    if (d.note) setNotes(prev => prev.map(n => n.id === noteId ? d.note : n))
-    setNoteEditingId(null)
-    setNoteEditSaving(false)
+    try {
+      const res = await fetch(`/api/games/${gameId}/notes/${noteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: noteEditTitle, content: noteEditContent }),
+      })
+      if (!res.ok) { alert(t('errors.savingNote') as string); return }
+      const d = await res.json()
+      if (d.note) setNotes(prev => prev.map(n => n.id === noteId ? d.note : n))
+      setNoteEditingId(null)
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setNoteEditSaving(false) }
   }
 
   // Delete note
@@ -243,7 +306,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
       text = (div.textContent ?? div.innerText ?? '').trim()
     }
     const date = new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    const quoteHtml = `<blockquote><p>${text}</p><p><em>— ${msg.nickname}, ${date}</em></p></blockquote><p></p>`
+    const quoteHtml = `<blockquote><p>${escapeHtml(text)}</p><p><em>— ${escapeHtml(msg.nickname)}, ${date}</em></p></blockquote><p></p>`
     setNewNoteContent(quoteHtml)
     setNewNoteKey(k => k + 1)
     setActiveTab('notes')
@@ -265,20 +328,23 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
 
   async function send() {
     const text = activeTab === 'ooc' ? oocContent : content
-    if (!text.trim() || sending) return
+    if (!text.trim() || text.replace(/<[^>]*>/g, '').trim() === '' || sending) return
     setSending(true)
-    await fetch(`/api/games/${gameId}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text, type: activeTab }),
-    })
-    if (activeTab === 'ooc') { setOocContent(''); setOocSendKey(k => k + 1) }
-    else { setContent(''); setSendKey(k => k + 1) }
-    setSending(false)
+    try {
+      const res = await fetch(`/api/games/${gameId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text, type: activeTab }),
+      })
+      if (!res.ok) { alert(t('errors.sendingMessage') as string); return }
+      if (activeTab === 'ooc') { setOocContent(''); setOocSendKey(k => k + 1) }
+      else { setContent(''); setSendKey(k => k + 1) }
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setSending(false) }
   }
 
   async function leave() {
-    if (!leaveReason) { alert('Выберите причину выхода'); return }
+    if (!leaveReason) { alert(t('errors.selectLeaveReason') as string); return }
     await fetch(`/api/games/${gameId}/leave`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -294,7 +360,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
       body: JSON.stringify({ reason: reportReason }),
     })
     setShowReport(false)
-    alert('Жалоба отправлена модераторам')
+    alert(t('game.reportSent') as string)
   }
 
   function isSMSOnly(html: string): boolean {
@@ -317,11 +383,11 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   }
 
   function exportTxt() {
-    const title = requestTitle ?? 'История'
+    const title = requestTitle ?? t('game.historyFallback') as string
     const lines = [`${title}\n${'='.repeat(title.length)}\n`]
     for (const msg of icMessages) {
       const date = new Date(msg.created_at).toLocaleString('ru')
-      lines.push(`[${date}] ${msg.nickname}${msg.edited_at ? ' (ред.)' : ''}`)
+      lines.push(`[${date}] ${msg.nickname}${msg.edited_at ? ` (${t('game.editedShort') as string})` : ''}`)
       lines.push(htmlToText(msg.content))
       lines.push('')
     }
@@ -330,16 +396,16 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   }
 
   function exportHtml() {
-    const title = requestTitle ?? 'История'
+    const title = requestTitle ?? t('game.historyFallback') as string
     const rows = icMessages.map(msg => {
       const date = new Date(msg.created_at).toLocaleString('ru')
       return `<div class="msg">
-  <div class="meta">${msg.nickname}${msg.edited_at ? ' <span class="edited">(ред.)</span>' : ''} · <span class="date">${date}</span></div>
+  <div class="meta">${escapeHtml(msg.nickname)}${msg.edited_at ? ` <span class="edited">(${t('game.editedShort') as string})</span>` : ''} · <span class="date">${date}</span></div>
   <div class="body">${msg.content}</div>
 </div>`
     }).join('\n')
     const html = `<!DOCTYPE html>
-<html lang="ru"><head><meta charset="utf-8"><title>${title}</title>
+<html lang="ru"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
 <style>
   body { font-family: 'Georgia', serif; max-width: 800px; margin: 3rem auto; padding: 0 1.5rem; color: #1c1813; background: #f7f3eb; line-height: 1.7; }
   h1 { font-size: 2rem; font-style: italic; font-weight: 300; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; margin-bottom: 2rem; }
@@ -347,17 +413,17 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   .meta { font-family: monospace; font-size: 0.75rem; letter-spacing: 0.05em; color: #666; margin-bottom: 0.4rem; }
   .body { background: #fff; border: 1px solid #ddd; padding: 1rem 1.25rem; }
   p { margin: 0 0 0.75em; } p:last-child { margin-bottom: 0; }
-</style></head><body><h1>${title}</h1>${rows}</body></html>`
+</style></head><body><h1>${escapeHtml(title)}</h1>${rows}</body></html>`
     downloadFile(html, `${title}.html`, 'text/html;charset=utf-8')
     setShowExport(false)
   }
 
   function exportMd() {
-    const title = requestTitle ?? 'История'
+    const title = requestTitle ?? t('game.historyFallback') as string
     const lines = [`# ${title}\n`]
     for (const msg of icMessages) {
       const date = new Date(msg.created_at).toLocaleString('ru')
-      lines.push(`### ${msg.nickname}${msg.edited_at ? ' *(ред.)*' : ''} — ${date}\n`)
+      lines.push(`### ${msg.nickname}${msg.edited_at ? ` *(${t('game.editedShort') as string})*` : ''} — ${date}\n`)
       lines.push(htmlToText(msg.content))
       lines.push('\n---\n')
     }
@@ -366,16 +432,16 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   }
 
   function exportPdf() {
-    const title = requestTitle ?? 'История'
+    const title = requestTitle ?? t('game.historyFallback') as string
     const rows = icMessages.map(msg => {
       const date = new Date(msg.created_at).toLocaleString('ru')
       return `<div class="msg">
-  <div class="meta">${msg.nickname}${msg.edited_at ? ' <span class="edited">(ред.)</span>' : ''} · <span class="date">${date}</span></div>
+  <div class="meta">${escapeHtml(msg.nickname)}${msg.edited_at ? ` <span class="edited">(${t('game.editedShort') as string})</span>` : ''} · <span class="date">${date}</span></div>
   <div class="body">${msg.content}</div>
 </div>`
     }).join('\n')
     const html = `<!DOCTYPE html>
-<html lang="ru"><head><meta charset="utf-8"><title>${title}</title>
+<html lang="ru"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
 <style>
   body { font-family: 'Georgia', serif; max-width: 800px; margin: 3rem auto; padding: 0 1.5rem; color: #1c1813; background: #fff; line-height: 1.7; }
   h1 { font-size: 2rem; font-style: italic; font-weight: 300; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; margin-bottom: 2rem; }
@@ -384,7 +450,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   .body { padding: 0.5rem 0; }
   p { margin: 0 0 0.75em; } p:last-child { margin-bottom: 0; }
   @media print { body { margin: 0; } }
-</style></head><body><h1>${title}</h1>${rows}</body></html>`
+</style></head><body><h1>${escapeHtml(title)}</h1>${rows}</body></html>`
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const printWindow = window.open(url, '_blank')
@@ -398,7 +464,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   }
 
   function exportNotesTxt() {
-    const title = `Заметки — ${requestTitle ?? 'игра'}`
+    const title = `${t('game.notesFallback') as string} — ${requestTitle ?? t('game.gameFallback') as string}`
     const lines = notes.map(n => {
       const date = new Date(n.created_at).toLocaleString('ru')
       return `[${date}]\n${htmlToText(n.content)}`
@@ -408,7 +474,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   }
 
   function exportNotesHtml() {
-    const title = `Заметки — ${requestTitle ?? 'игра'}`
+    const title = `${t('game.notesFallback') as string} — ${requestTitle ?? t('game.gameFallback') as string}`
     const entries = notes.map(n => {
       const date = new Date(n.created_at).toLocaleString('ru')
       return `<div class="note"><div class="meta">${date}</div><div class="body">${n.content}</div></div>`
@@ -449,7 +515,9 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
     })
     if (res.ok) {
       const updated = await res.json()
-      setMessages(prev => prev.map(m => m.id === editingId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m))
+      const updater = (prev: Message[]) => prev.map(m => m.id === editingId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m)
+      setIcMessages(updater)
+      setOocMessages(updater)
       cancelEdit()
     }
     setEditSaving(false)
@@ -462,11 +530,13 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
       body: JSON.stringify({ banner_url: bannerUrl, banner_pref: bannerPref, nickname, avatar_url: avatarUrl, ooc_enabled: oocEnabled }),
     })
     // Update avatar and nickname on all own messages locally
-    setMessages(prev => prev.map(m =>
+    const updater = (prev: Message[]) => prev.map(m =>
       m.user_id === userId
         ? { ...m, avatar_url: avatarUrl || null, nickname }
         : m
-    ))
+    )
+    setIcMessages(updater)
+    setOocMessages(updater)
     setShowSettings(false)
     router.refresh()
   }
@@ -476,13 +546,91 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
     if (el.classList.contains('ooc-spoiler')) el.classList.toggle('ooc-spoiler-open')
   }
 
-  // Search filtering
+  // Go to a specific page (IC or OOC)
+  async function goToPage(type: 'ic' | 'ooc', page: number) {
+    setPageLoading(true)
+    try {
+      const pageLimit = type === 'ooc' ? 100 : 30
+      const res = await fetch(`/api/games/${gameId}/messages?type=${type}&page=${page}&limit=${pageLimit}`)
+      const data = await res.json()
+      if (type === 'ic') {
+        setIcMessages(data.messages)
+        setIcPage(data.page)
+        setIcTotalPages(data.totalPages)
+      } else {
+        setOocMessages(data.messages)
+        setOocPage(data.page)
+        setOocTotalPages(data.totalPages)
+      }
+      scrollRef.current?.scrollTo({ top: 0 })
+    } finally {
+      setPageLoading(false)
+    }
+  }
+
+  // Lazy load OOC when tab first opened
+  useEffect(() => {
+    if (activeTab !== 'ooc' || oocLoaded) return
+    setPageLoading(true)
+    fetch(`/api/games/${gameId}/messages?type=ooc&limit=100`)
+      .then(r => r.json())
+      .then(data => {
+        setOocMessages(data.messages)
+        setOocPage(data.page)
+        setOocTotalPages(data.totalPages)
+        setOocLoaded(true)
+      })
+      .finally(() => setPageLoading(false))
+  }, [activeTab, gameId, oocLoaded])
+
+  // Server-side search with debounce + AbortController
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    if (!searchOpen || searchScope === 'notes') {
+      setServerSearchResults([])
+      setSearchLoading(false)
+      return
+    }
+    const q = searchQuery.trim()
+    if (q.length < 2) {
+      setServerSearchResults([])
+      setSearchLoading(false)
+      return
+    }
+    setSearchLoading(true)
+    const abort = new AbortController()
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/games/${gameId}/messages?type=${searchScope}&search=${encodeURIComponent(q)}`, { signal: abort.signal })
+        const data = await res.json()
+        setServerSearchResults(data.results ?? [])
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') setServerSearchResults([])
+      }
+      setSearchLoading(false)
+    }, 300)
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); abort.abort() }
+  }, [searchQuery, searchScope, searchOpen, gameId])
+
+  // Scroll to message after page load
+  useEffect(() => {
+    if (!scrollToMsgId) return
+    const timer = setTimeout(() => {
+      const el = document.querySelector(`[data-msg-id="${scrollToMsgId}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        ;(el as HTMLElement).style.outline = '2px solid var(--accent)'
+        setTimeout(() => { (el as HTMLElement).style.outline = '' }, 2500)
+      }
+      setScrollToMsgId(null)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [scrollToMsgId, icMessages, oocMessages])
+
+  // Search filtering (notes only client-side, IC/OOC server-side)
   const searchLower = searchQuery.toLowerCase().trim()
   const noteSearchResults = searchLower && searchScope === 'notes'
     ? notes.filter(n => htmlToText(n.content).toLowerCase().includes(searchLower))
-    : []
-  const msgSearchResults = searchLower && searchScope !== 'notes'
-    ? (searchScope === 'ooc' ? oocMessages : icMessages).filter(m => htmlToText(m.content).toLowerCase().includes(searchLower))
     : []
 
   const isOoc = activeTab === 'ooc'
@@ -522,16 +670,16 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
             {requestTitle && !effectiveBanner && <span className="w-px h-4 bg-ink-3 shrink-0" />}
             <div className="flex items-center gap-0 shrink-0">
               <button onClick={() => setActiveTab('ic')} className={tabBtnCls(activeTab === 'ic', 'ic')}>
-                История
+                {t('game.history') as string}
               </button>
               {oocEnabled && (
                 <button onClick={() => setActiveTab('ooc')} className={tabBtnCls(activeTab === 'ooc', 'ooc')}>
-                  Оффтоп
+                  {t('game.offtop') as string}
                 </button>
               )}
               {notesEnabled && (
                 <button onClick={() => setActiveTab('notes')} className={tabBtnCls(activeTab === 'notes', 'notes')}>
-                  Заметки {notes.length > 0 && <span className="ml-[0.3em] opacity-60">{notes.length}</span>}
+                  {t('game.notes') as string} {notes.length > 0 && <span className="ml-[0.3em] opacity-60">{notes.length}</span>}
                 </button>
               )}
             </div>
@@ -559,14 +707,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
             onClick={() => { setSearchOpen(s => !s); setSearchQuery(''); setSearchScope(activeTab === 'notes' ? 'notes' : activeTab === 'ooc' ? 'ooc' : 'ic') }}
             className="bg-transparent border-none p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center"
             style={{ color: 'var(--text-2)' }}
-            title="Поиск"
+            title={t('game.search') as string}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               <circle cx="5.5" cy="5.5" r="4" />
               <line x1="8.8" y1="8.8" x2="13" y2="13" />
             </svg>
           </button>
-          <button onClick={() => setShowExport(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title="Экспорт">
+          <button onClick={() => setShowExport(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title={t('game.export') as string}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <line x1="7" y1="1" x2="7" y2="9" />
               <polyline points="4,6 7,9 10,6" />
@@ -575,19 +723,19 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
           </button>
           {!isLeft && (
             <>
-              <button onClick={() => setShowSettings(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title="Настройки">
+              <button onClick={() => setShowSettings(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title={t('game.settings') as string}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </button>
-              <button onClick={() => setShowReport(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title="Пожаловаться">
+              <button onClick={() => setShowReport(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title={t('game.report') as string}>
                 <svg width="13" height="14" viewBox="0 0 14 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 1v14M2 1h9l-2.5 3.5L11 8H2"/>
                 </svg>
               </button>
               <span className="w-px h-4 bg-edge" />
-              <button onClick={() => setShowLeave(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title="Выйти из игры">
+              <button onClick={() => setShowLeave(true)} className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center" title={t('game.leaveGame') as string}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/>
                   <path d="M17 8l4 4-4 4"/>
@@ -600,7 +748,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
           <span className="w-px h-4 bg-edge" />
           <button
             onClick={() => setFullscreen(f => { const next = !f; if (next) setEditorCollapsed(true); else setEditorCollapsed(false); return next; })}
-            title={fullscreen ? 'Выйти из полного экрана' : 'На весь экран'}
+            title={fullscreen ? t('game.exitFullscreen') as string : t('game.fullscreen') as string}
             className="bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center"
           >
             {fullscreen ? (
@@ -625,7 +773,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
             autoFocus
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Поиск..."
+            placeholder={t('game.searchPlaceholder') as string}
             className="flex-1 font-mono text-[0.8rem] bg-surface border border-edge text-ink p-[0.3rem_0.55rem] outline-none"
           />
           <div className="flex gap-1">
@@ -644,7 +792,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
         <div className="max-h-60 overflow-y-auto bg-surface-2 border-b border-edge shrink-0">
           {searchScope === 'notes' ? (
             noteSearchResults.length === 0 ? (
-              <p className="px-6 py-3 font-mono text-[0.75rem] text-edge">Не найдено</p>
+              <p className="px-6 py-3 font-mono text-[0.75rem] text-edge">{t('game.notFound') as string}</p>
             ) : (
               noteSearchResults.map(note => {
                 const plain = htmlToText(note.content)
@@ -666,28 +814,33 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                 )
               })
             )
-          ) : msgSearchResults.length === 0 ? (
-            <p className="px-6 py-3 font-mono text-[0.75rem] text-edge">Не найдено</p>
+          ) : searchLoading ? (
+            <p className="px-6 py-3 font-mono text-[0.75rem] text-ink-2">{t('game.searching') as string}</p>
+          ) : serverSearchResults.length === 0 ? (
+            <p className="px-6 py-3 font-mono text-[0.75rem] text-edge">{t('game.notFound') as string}</p>
           ) : (
-            msgSearchResults.map(msg => {
-              const plain = htmlToText(msg.content)
-              const idx = plain.toLowerCase().indexOf(searchLower)
-              const snippet = idx >= 0 ? '…' + plain.slice(Math.max(0, idx - 30), idx + 60) + '…' : plain.slice(0, 80)
-              return (
-                <div key={msg.id} className="px-6 py-[0.65rem] border-b border-edge cursor-pointer hover:bg-surface-3 transition-colors"
-                  onClick={() => {
-                    setActiveTab(searchScope)
-                    setTimeout(() => {
-                      const el = document.querySelector(`[data-msg-id="${msg.id}"]`)
-                      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).style.outline = '2px solid var(--accent)'; setTimeout(() => { (el as HTMLElement).style.outline = '' }, 2000) }
-                    }, 100)
-                  }}>
-                  <span className="font-mono text-[0.58rem] text-ink-2 mr-2">{msg.nickname}</span>
-                  <span className="font-mono text-[0.78rem] text-ink">{snippet}</span>
-                </div>
-              )
-            })
+            serverSearchResults.map(r => (
+              <div key={r.id} className="px-6 py-[0.65rem] border-b border-edge cursor-pointer hover:bg-surface-3 transition-colors"
+                onClick={async () => {
+                  setActiveTab(searchScope === 'ooc' ? 'ooc' : 'ic')
+                  await goToPage(searchScope === 'ooc' ? 'ooc' : 'ic', r.page)
+                  setScrollToMsgId(r.id)
+                }}>
+                <span className="font-mono text-[0.58rem] text-ink-2 mr-2">{r.nickname}</span>
+                <span className="font-mono text-[0.55rem] text-edge mr-2">{t('game.page') as string} {r.page}</span>
+                <span className="font-mono text-[0.78rem] text-ink">{r.snippet}</span>
+              </div>
+            ))
           )}
+        </div>
+      )}
+
+      {/* Moderation banner */}
+      {isFrozen && (
+        <div className="px-6 py-2 text-center bg-[#c0392b22] border-b border-[#c0392b44] font-mono text-[0.75rem] text-[#c0392b] tracking-wide">
+          {game.moderation_status === 'hidden'
+            ? t('admin.gameHiddenBanner') as string
+            : t('admin.gameResolvedBanner') as string}
         </div>
       )}
 
@@ -697,11 +850,11 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
           {/* Notes list */}
           <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col" style={{ gap: 'var(--game-gap, 1.5rem)' }}>
             {notesLoading && (
-              <p className="font-mono text-[0.75rem] text-ink-2 text-center mt-8">Загрузка...</p>
+              <p className="font-mono text-[0.75rem] text-ink-2 text-center mt-8">{t('game.loading') as string}</p>
             )}
             {!notesLoading && notes.length === 0 && (
               <p className="font-heading italic text-ink-2 text-center mt-8 text-[1rem]">
-                Нет записей. Напишите первую заметку.
+                {t('game.noNotes') as string}
               </p>
             )}
             {notes.map(note => {
@@ -727,28 +880,28 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                       )}
                       <span className="font-mono text-[0.58rem] text-ink-2 tracking-[0.06em]">
                         {dateStr}
-                        {wasEdited && <span className="ml-[0.5em] opacity-55">· изм.</span>}
+                        {wasEdited && <span className="ml-[0.5em] opacity-55">· {t('game.edited') as string}</span>}
                       </span>
                     </div>
                     {!isEditing && !isDeleteConfirm && (
                       <div className="flex gap-[0.1rem]">
                         <button
                           onClick={() => { setNoteEditingId(note.id); setNoteEditTitle(note.title); setNoteEditContent(note.content) }}
-                          title="Редактировать"
+                          title={t('game.editNote') as string}
                           className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.78rem] p-[0.1rem_0.25rem] leading-none"
                         >✎</button>
                         <button
                           onClick={() => setDeleteConfirmId(note.id)}
-                          title="Удалить"
+                          title={t('game.deleteNote') as string}
                           className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.78rem] p-[0.1rem_0.25rem] leading-none"
                         >✕</button>
                       </div>
                     )}
                     {isDeleteConfirm && (
                       <div className="flex gap-[0.4rem] items-center">
-                        <span className="font-mono text-[0.6rem] text-ink-2">Удалить?</span>
-                        <button onClick={() => deleteNote(note.id)} className="bg-[#c0392b] text-white border-none font-mono text-[0.6rem] p-[0.2rem_0.5rem] cursor-pointer">Да</button>
-                        <button onClick={() => setDeleteConfirmId(null)} className="bg-transparent border border-edge text-ink-2 font-mono text-[0.6rem] p-[0.2rem_0.5rem] cursor-pointer">Нет</button>
+                        <span className="font-mono text-[0.6rem] text-ink-2">{t('game.deleteConfirm') as string}</span>
+                        <button onClick={() => deleteNote(note.id)} className="bg-[#c0392b] text-white border-none font-mono text-[0.6rem] p-[0.2rem_0.5rem] cursor-pointer">{t('myRequests.yes') as string}</button>
+                        <button onClick={() => setDeleteConfirmId(null)} className="bg-transparent border border-edge text-ink-2 font-mono text-[0.6rem] p-[0.2rem_0.5rem] cursor-pointer">{t('myRequests.no') as string}</button>
                       </div>
                     )}
                   </div>
@@ -760,16 +913,16 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                         type="text"
                         value={noteEditTitle}
                         onChange={e => setNoteEditTitle(e.target.value)}
-                        placeholder="Заголовок (необязательно)"
+                        placeholder={t('game.noteTitlePlaceholder') as string}
                         className="block w-full box-border px-3 py-2 border-none border-b border-edge bg-surface-2 text-ink font-heading italic text-[0.9rem] outline-none"
                       />
                       <RichEditor content={noteEditContent} onChange={setNoteEditContent} minHeight="100px" />
                       <div className="flex gap-2 justify-end px-3 py-[0.4rem] border-t border-edge">
                         <button onClick={() => setNoteEditingId(null)} className="btn-ghost text-[0.7rem] p-[0.3rem_0.7rem]">
-                          Отмена
+                          {t('game.cancel') as string}
                         </button>
                         <button onClick={() => saveNoteEdit(note.id)} disabled={noteEditSaving} className="bg-accent-2 text-white font-heading italic text-[0.85rem] border-none p-[0.3rem_0.9rem] cursor-pointer">
-                          {noteEditSaving ? '...' : 'Сохранить'}
+                          {noteEditSaving ? '...' : t('game.save') as string}
                         </button>
                       </div>
                     </div>
@@ -788,7 +941,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                           onClick={() => toggleNoteExpand(note.id)}
                           className="block w-full text-center font-mono text-[0.6rem] tracking-[0.08em] text-accent-2 bg-transparent border-none border-t border-edge p-[0.35rem] cursor-pointer"
                         >
-                          {isExpanded ? '↑ свернуть' : '↓ читать дальше'}
+                          {isExpanded ? t('game.noteCollapse') as string : t('game.noteExpand') as string}
                         </button>
                       )}
                     </div>
@@ -801,15 +954,15 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
           {/* New note editor */}
           {isLeft && (
             <div className="px-6 py-4 text-center bg-surface-2 border-t border-edge font-heading italic text-ink-2 shrink-0">
-              Вы вышли из этой игры
+              {t('game.youLeft') as string}
             </div>
           )}
-          {!isLeft && <div className="border-t border-edge bg-surface-2 shrink-0">
+          {!isLeft && !isFrozen && <div className="border-t border-edge bg-surface-2 shrink-0">
             {editorCollapsed ? (
               <button
                 onClick={() => setEditorCollapsed(false)}
                 className="w-full bg-transparent border-none p-[0.55rem_1.25rem] cursor-pointer flex items-center justify-center text-ink-2 opacity-50"
-                title="Добавить заметку"
+                title={t('game.addNote') as string}
               >
                 <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="1" y="1" width="18" height="12" rx="2"/>
@@ -826,14 +979,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                 type="text"
                 value={newNoteTitle}
                 onChange={e => setNewNoteTitle(e.target.value)}
-                placeholder="Заголовок (необязательно)"
+                placeholder={t('game.noteTitlePlaceholder') as string}
                 className="block w-full box-border px-3 py-2 border-none border-b border-edge bg-surface-2 text-ink font-heading italic text-[0.9rem] outline-none"
               />
-              <RichEditor key={newNoteKey} content={newNoteContent} onChange={setNewNoteContent} placeholder="Новая заметка..." minHeight="80px" />
+              <RichEditor key={newNoteKey} content={newNoteContent} onChange={setNewNoteContent} placeholder={t('game.newNotePlaceholder') as string} minHeight="80px" />
               <div className="flex justify-end items-center gap-2 px-3 py-2">
                 {fullscreen && (
-                  <button onClick={() => setEditorCollapsed(true)} title="Свернуть" className="bg-transparent border-none text-ink-2 cursor-pointer font-mono text-[0.75rem] p-[0.2rem_0.5rem]">
-                    ↓ свернуть
+                  <button onClick={() => setEditorCollapsed(true)} title={t('game.collapseEditor') as string} className="bg-transparent border-none text-ink-2 cursor-pointer font-mono text-[0.75rem] p-[0.2rem_0.5rem]">
+                    {t('game.collapseEditor') as string}
                   </button>
                 )}
                 <button
@@ -842,7 +995,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                   className="bg-accent-2 text-white font-heading italic text-[0.95rem] border-none p-[0.55rem_1.5rem] cursor-pointer"
                   style={{ opacity: (newNoteSending || !newNoteContent.trim() || newNoteContent === '<p></p>') ? 0.6 : 1 }}
                 >
-                  {newNoteSending ? '...' : 'Добавить →'}
+                  {newNoteSending ? '...' : t('game.addNoteButton') as string}
                 </button>
               </div>
               </>
@@ -853,19 +1006,25 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
         <>
           {/* Messages area */}
           <div
+            ref={scrollRef}
             onClick={handleSpoilerClick}
             onScroll={handleMessagesScroll}
             className={`flex-1 overflow-y-auto flex flex-col ${isOoc ? 'bg-surface-3 gap-3' : 'bg-surface'}`}
             style={{ ...(!isOoc ? { gap: 'var(--game-gap, 1.5rem)' } : {}), padding: fullscreen ? '1.5rem 6rem' : (!isOoc && gameLayout === 'dialog') ? '1.5rem 4rem' : '1.5rem' }}
           >
+            {pageLoading && (
+              <div className="flex items-center justify-center py-8">
+                <span className="font-mono text-[0.75rem] text-ink-2">{t('game.loading') as string}</span>
+              </div>
+            )}
             {isOoc && (
               <p className="font-mono text-[0.6rem] tracking-[0.12em] uppercase text-ink-2 text-center p-2 border-b border-edge mb-2">
-                — оффтоп · вне истории —
+                {t('game.offtopLabel') as string}
               </p>
             )}
             {visibleMessages.length === 0 && (
               <p className="font-heading italic text-ink-2 text-center mt-8">
-                {isOoc ? 'Оффтоп пока пуст.' : 'История пока пуста. Напишите первый пост.'}
+                {isOoc ? t('game.emptyOoc') as string : t('game.emptyIc') as string}
               </p>
             )}
             <div className={!isOoc && gameLayout === 'feed' ? 'max-w-[1050px] mx-auto w-full flex flex-col' : 'contents'} style={!isOoc && gameLayout === 'feed' ? { gap: 'var(--game-gap, 1.5rem)' } : undefined}>
@@ -888,7 +1047,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                       </span>
                       <span className="font-mono text-[0.55rem] text-edge tracking-[0.04em]">
                         {new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        {msg.edited_at && ' (ред.)'}
+                        {msg.edited_at && ` (${t('game.editedShort') as string})`}
                       </span>
                       <MsgContent
                         className="tiptap-content"
@@ -907,14 +1066,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                         <span className="ml-[0.6em] not-italic font-mono text-[0.6rem] opacity-40 tracking-[0.04em]">
                           {new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        {msg.edited_at && <span className="ml-[0.4em] opacity-50 text-[0.75rem] not-italic font-mono">(ред.)</span>}
+                        {msg.edited_at && <span className="ml-[0.4em] opacity-50 text-[0.75rem] not-italic font-mono">({t('game.editedShort') as string})</span>}
                       </span>
                       <span className="inline-flex gap-[0.3rem] shrink-0">
                         {notesEnabled && (
                           <button onClick={() => quotePost(msg)} className="bg-transparent border-none text-ink-2 cursor-pointer font-heading text-[0.85rem] p-0 leading-none">«…»</button>
                         )}
                         {isMine && !isLeft && (
-                          <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? 'Отменить' : 'Редактировать'} className="bg-transparent border-none cursor-pointer p-0 leading-none align-middle" style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}>
+                          <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? t('game.cancel') as string : t('game.editNote') as string} className="bg-transparent border-none cursor-pointer p-0 leading-none align-middle" style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}>
                             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z"/></svg>
                           </button>
                         )}
@@ -931,7 +1090,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                   <div key={msg.id} data-msg-id={msg.id} className="flex gap-[0.85rem] items-start" style={{
                     flexDirection: (gameLayout === 'dialog' || gameLayout === 'feed') ? (isMine ? 'row-reverse' : 'row') : 'row',
                     ...(smsOnly && gameLayout !== 'feed' ? { maxWidth: '860px', marginLeft: 'auto', marginRight: 'auto', width: '100%' } : {}),
-                    ...(gameLayout === 'feed' ? { background: feedPostBg(msg.user_id), padding: '0.75rem 1rem' } : {}),
+                    ...(gameLayout === 'feed' ? { padding: '0.75rem 1rem' } : {}),
                   }}>
                     {/* Avatar */}
                     <div className="w-10 h-10 rounded-full shrink-0 bg-surface-3 overflow-hidden flex items-center justify-center" style={{ border: `2px solid ${isMine ? 'var(--accent)' : 'var(--border)'}` }}>
@@ -943,14 +1102,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                           <p className="font-mono text-[0.58rem] tracking-[0.08em] mb-[0.2rem] font-semibold" style={{ color: isMine ? 'var(--accent)' : 'var(--text-2)', textAlign: (gameLayout === 'dialog' || gameLayout === 'feed') && isMine ? 'right' : 'left' }}>
                             {msg.nickname}
                             {isMine && !isLeft && (
-                              <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? 'Отменить' : 'Редактировать'} className="ml-[0.5em] bg-transparent border-none cursor-pointer p-0 leading-none align-middle" style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}>
+                              <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? t('game.cancel') as string : t('game.editNote') as string} className="ml-[0.5em] bg-transparent border-none cursor-pointer p-0 leading-none align-middle" style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}>
                                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z"/></svg>
                                 </button>
                             )}
                           </p>
                           <p className="sms-meta" style={{ textAlign: (gameLayout === 'dialog' || gameLayout === 'feed') && isMine ? 'right' : 'left', marginBottom: '0.25em', marginTop: 0 }}>
                             {new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            {msg.edited_at && ' (ред.)'}
+                            {msg.edited_at && ` (${t('game.editedShort') as string})`}
                           </p>
                           <MsgContent
                             className={`tiptap-content${isMine && gameLayout === 'dialog' ? ' sms-right' : ''}`}
@@ -965,12 +1124,12 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                             <span className="ml-[0.5em] opacity-40 tracking-[0.04em]">
                               {new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {msg.edited_at && <span className="ml-[0.4em] opacity-60">(ред.)</span>}
+                            {msg.edited_at && <span className="ml-[0.4em] opacity-60">({t('game.editedShort') as string})</span>}
                             {notesEnabled && (
                               <button onClick={() => quotePost(msg)} className="ml-[0.5em] bg-transparent border-none text-ink-2 cursor-pointer font-heading text-[0.85rem] p-0 leading-none">«…»</button>
                             )}
                             {isMine && !isLeft && (
-                              <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? 'Отменить' : 'Редактировать'} className="ml-[0.5em] bg-transparent border-none cursor-pointer p-0 leading-none align-middle" style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}>
+                              <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? t('game.cancel') as string : t('game.editNote') as string} className="ml-[0.5em] bg-transparent border-none cursor-pointer p-0 leading-none align-middle" style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}>
                                   <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z"/></svg>
                                 </button>
                             )}
@@ -980,7 +1139,9 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                             style={{
                               overflowWrap: 'break-word', wordBreak: 'break-word', minWidth: 0,
                               ...(gameLayout === 'feed' ? {
-                                background: 'transparent', border: 'none', padding: '0',
+                                background: 'transparent', borderTop: 'none', borderBottom: 'none', padding: '0',
+                                borderLeft: !isMine ? `3px solid ${feedPostBg(msg.user_id).replace('0.10', '0.35')}` : 'none',
+                                borderRight: isMine ? `3px solid ${feedPostBg(msg.user_id).replace('0.10', '0.35')}` : 'none',
                               } : {
                                 background: isMine ? 'var(--post-mine-bg)' : 'transparent',
                                 borderTop: 'none', borderBottom: 'none',
@@ -1001,8 +1162,57 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
             <div ref={bottomRef} />
           </div>
 
+          {/* Pagination */}
+          {(() => {
+            const currentPage = isOoc ? oocPage : icPage
+            const total = isOoc ? oocTotalPages : icTotalPages
+            if (total <= 1) return null
+            return (
+              <div className="flex items-center justify-center gap-1 py-2 px-4 border-t border-edge bg-surface-2 shrink-0">
+                <button
+                  onClick={() => goToPage(isOoc ? 'ooc' : 'ic', 1)}
+                  disabled={currentPage === 1 || pageLoading}
+                  className="font-mono text-[0.65rem] bg-transparent border border-edge text-ink-2 p-[0.2rem_0.45rem] cursor-pointer disabled:opacity-30"
+                >«</button>
+                <button
+                  onClick={() => goToPage(isOoc ? 'ooc' : 'ic', currentPage - 1)}
+                  disabled={currentPage === 1 || pageLoading}
+                  className="font-mono text-[0.65rem] bg-transparent border border-edge text-ink-2 p-[0.2rem_0.45rem] cursor-pointer disabled:opacity-30"
+                >‹</button>
+                {paginationRange(currentPage, total).map((p, i) =>
+                  p === '...' ? (
+                    <span key={`dot-${i}`} className="font-mono text-[0.6rem] text-ink-2 px-1">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => goToPage(isOoc ? 'ooc' : 'ic', p as number)}
+                      disabled={pageLoading}
+                      className="font-mono text-[0.65rem] border p-[0.2rem_0.45rem] cursor-pointer min-w-[1.6rem] text-center"
+                      style={{
+                        background: p === currentPage ? 'var(--accent-dim)' : 'transparent',
+                        borderColor: p === currentPage ? 'var(--accent)' : 'var(--border)',
+                        color: p === currentPage ? 'var(--accent)' : 'var(--text-2)',
+                        fontWeight: p === currentPage ? 600 : 400,
+                      }}
+                    >{p}</button>
+                  )
+                )}
+                <button
+                  onClick={() => goToPage(isOoc ? 'ooc' : 'ic', currentPage + 1)}
+                  disabled={currentPage === total || pageLoading}
+                  className="font-mono text-[0.65rem] bg-transparent border border-edge text-ink-2 p-[0.2rem_0.45rem] cursor-pointer disabled:opacity-30"
+                >›</button>
+                <button
+                  onClick={() => goToPage(isOoc ? 'ooc' : 'ic', total)}
+                  disabled={currentPage === total || pageLoading}
+                  className="font-mono text-[0.65rem] bg-transparent border border-edge text-ink-2 p-[0.2rem_0.45rem] cursor-pointer disabled:opacity-30"
+                >»</button>
+              </div>
+            )
+          })()}
+
           {/* Input */}
-          {!isLeft && (
+          {!isLeft && !isFrozen && (
             <div className="shrink-0" onMouseEnter={() => editorCollapsed && setEditorCollapsed(false)} style={{
               borderTop: `1px solid ${editingId && !isOoc ? 'var(--accent)' : isOoc ? 'var(--text-2)' : 'var(--border)'}`,
               background: isOoc ? 'var(--bg-3)' : 'var(--bg-2)',
@@ -1011,7 +1221,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
               <button
                 onClick={() => setEditorCollapsed(false)}
                 className="w-full bg-transparent border-none p-[0.55rem_1.25rem] cursor-pointer flex items-center justify-center text-ink-2 opacity-50"
-                title="Написать пост"
+                title={t('game.writePost') as string}
               >
                 <svg width="20" height="14" viewBox="0 0 20 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="1" y="1" width="18" height="12" rx="2"/>
@@ -1022,20 +1232,20 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                 </svg>
               </button>
             ) : (
-              <>
+              <div style={{ animation: 'fadeInUp 0.3s ease' }}>
               {editingId && !isOoc && (
                 <div className="flex items-center justify-between px-3 py-1 bg-accent-dim border-b border-accent">
                   <span className="font-mono text-[0.62rem] text-ink-2 tracking-[0.06em]">
-                    редактирование поста
+                    {t('game.editingPost') as string}
                   </span>
                   <button onClick={cancelEdit} className="bg-transparent border-none text-ink-2 cursor-pointer font-mono text-[0.62rem] p-0">
-                    отмена
+                    {t('game.cancelEdit') as string}
                   </button>
                 </div>
               )}
               {isOoc
-                ? <RichEditor key={oocSendKey} content={oocContent} onChange={setOocContent} placeholder="Написать в оффтоп..." minHeight="80px" />
-                : <RichEditor key={sendKey} content={content} onChange={setContent} placeholder="Напиши свой пост..." minHeight="100px" onDiceClick={!editingId ? () => setShowDicePanel(v => !v) : undefined} diceActive={showDicePanel} />
+                ? <RichEditor key={oocSendKey} content={oocContent} onChange={setOocContent} placeholder={t('game.oocPlaceholder') as string} minHeight="80px" />
+                : <RichEditor key={sendKey} content={content} onChange={setContent} placeholder={t('game.icPlaceholder') as string} minHeight="100px" onDiceClick={!editingId ? () => setShowDicePanel(v => !v) : undefined} diceActive={showDicePanel} />
               }
               {showDicePanel && !editingId && (
                 <div className="flex items-center gap-2 px-3 py-[0.4rem] bg-surface-2 border-t border-edge">
@@ -1052,16 +1262,38 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                     className="bg-accent text-white font-heading italic text-[0.85rem] border-none p-[0.25rem_0.9rem] cursor-pointer"
                     style={{ opacity: (diceRolling || isNaN(parseInt(diceSides)) || parseInt(diceSides) < 2 || parseInt(diceSides) > 100) ? 0.4 : 1 }}
                   >
-                    {diceRolling ? '...' : 'Бросить'}
+                    {diceRolling ? '...' : t('game.roll') as string}
                   </button>
                 </div>
               )}
-              <div className={`flex items-center gap-2 px-3 py-2 ${fullscreen && !editingId ? 'justify-between' : 'justify-end'}`}>
-                {fullscreen && !editingId && (
-                  <button onClick={() => setEditorCollapsed(true)} title="Свернуть редактор" className="bg-transparent border-none text-ink-2 cursor-pointer font-mono text-[0.75rem] p-[0.2rem_0.5rem] leading-none">
-                    ↓ свернуть
-                  </button>
-                )}
+              <div className={`flex items-center gap-2 px-3 py-2 ${!editingId ? 'justify-between' : 'justify-end'}`}>
+                <div className="flex items-center gap-2">
+                  {!editingId && (
+                    <button
+                      onClick={() => setEditorPinned(p => !p)}
+                      title={editorPinned ? t('game.unpinEditor') as string : t('game.pinEditor') as string}
+                      className="bg-transparent border-none cursor-pointer p-[0.2rem_0.4rem] leading-none flex items-center"
+                      style={{ color: editorPinned ? 'var(--accent)' : 'var(--text-2)', opacity: editorPinned ? 1 : 0.5 }}
+                    >
+                      {editorPinned ? (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                      ) : (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                          <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                        </svg>
+                      )}
+                    </button>
+                  )}
+                  {fullscreen && !editingId && (
+                    <button onClick={() => setEditorCollapsed(true)} title={t('game.collapseEditor') as string} className="bg-transparent border-none text-ink-2 cursor-pointer font-mono text-[0.75rem] p-[0.2rem_0.5rem] leading-none">
+                      {t('game.collapseEditorBtn') as string}
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={editingId && !isOoc ? saveEdit : send}
                   disabled={editSaving || sending || !(isOoc ? oocContent : content).trim()}
@@ -1071,16 +1303,16 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
                     opacity: (!(isOoc ? oocContent : content).trim() || sending || editSaving) ? 0.6 : 1,
                   }}
                 >
-                  {(sending || editSaving) ? '...' : editingId && !isOoc ? 'Сохранить' : isOoc ? 'Отправить' : 'Отправить →'}
+                  {(sending || editSaving) ? '...' : editingId && !isOoc ? t('game.sendSave') as string : isOoc ? t('game.sendOoc') as string : t('game.sendIc') as string}
                 </button>
               </div>
-              </>
+              </div>
             )}
             </div>
           )}
           {isLeft && (
             <div className="px-6 py-4 text-center bg-surface-2 border-t border-edge font-heading italic text-ink-2">
-              Вы вышли из этой игры
+              {t('game.youLeft') as string}
             </div>
           )}
         </>
@@ -1089,7 +1321,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
       {/* Quote toast */}
       {quoteToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ink text-surface font-mono text-[0.7rem] tracking-[0.08em] px-[1.1rem] py-2 z-[600] pointer-events-none">
-          Добавлено в заметки
+          {t('game.quotedToNotes') as string}
         </div>
       )}
 
@@ -1116,7 +1348,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
               onClick={() => setDiceQueue(q => q.slice(1))}
               className="btn-ghost text-[0.65rem] tracking-[0.1em] p-[0.35rem_1.25rem]"
             >
-              {diceQueue.length > 1 ? 'следующий' : 'закрыть'}
+              {diceQueue.length > 1 ? t('game.diceNext') as string : t('game.diceClose') as string}
             </button>
           </div>
         </div>
@@ -1124,9 +1356,9 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
 
       {/* Export modal */}
       {showExport && (
-        <Modal onClose={() => setShowExport(false)} title="Экспорт">
+        <Modal onClose={() => setShowExport(false)} title={t('game.exportTitle') as string}>
           <p className="text-ink-2 font-body mb-4 text-[0.9rem]">
-            История игры
+            {t('game.exportGameHistory') as string}
           </p>
           <div className="flex gap-3 mb-6 flex-wrap">
             <button onClick={exportTxt} className="flex-1 min-w-[100px] bg-surface-2 border border-edge text-ink font-heading italic text-[1rem] p-3 cursor-pointer text-center">
@@ -1145,7 +1377,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
           {notesEnabled && notes.length > 0 && (
             <>
               <p className="text-ink-2 font-body mb-4 text-[0.9rem]">
-                Мои заметки
+                {t('game.exportMyNotes') as string}
               </p>
               <div className="flex gap-3">
                 <button onClick={exportNotesTxt} className="flex-1 bg-surface-2 border border-edge text-ink font-heading italic text-[1rem] p-3 cursor-pointer text-center">
@@ -1162,12 +1394,12 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
 
       {/* Leave modal */}
       {showLeave && (
-        <Modal onClose={() => setShowLeave(false)} title="Выйти из игры">
+        <Modal onClose={() => setShowLeave(false)} title={t('game.leaveTitle') as string}>
           <p className="text-ink-2 font-body mb-5">
-            Выберите причину выхода. Соигрок увидит её.
+            {t('game.leavePrompt') as string}
           </p>
           <div className="flex flex-col gap-2 mb-5">
-            {LEAVE_REASONS.map(r => (
+            {(t('game.leaveReasons') as readonly string[]).map((r: string) => (
               <label key={r} className="flex items-center gap-[0.6rem] cursor-pointer font-body" style={{ color: leaveReason === r ? 'var(--accent)' : 'var(--text)' }}>
                 <input type="radio" value={r} checked={leaveReason === r} onChange={() => setLeaveReason(r)} style={{ accentColor: 'var(--accent)' }} />
                 {r}
@@ -1175,99 +1407,111 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
             ))}
           </div>
           <button onClick={leave} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">
-            Выйти →
+            {t('game.leaveButton') as string}
           </button>
         </Modal>
       )}
 
       {/* Report modal */}
       {showReport && (
-        <Modal onClose={() => setShowReport(false)} title="Пожаловаться">
+        <Modal onClose={() => setShowReport(false)} title={t('game.reportTitle') as string}>
           <textarea
             value={reportReason}
             onChange={e => setReportReason(e.target.value)}
-            placeholder="Опишите ситуацию..."
+            placeholder={t('game.reportPlaceholder') as string}
             rows={4}
             className="w-full font-body text-[1rem] bg-surface border border-edge text-ink p-[0.65rem] outline-none resize-y mb-4"
           />
           <button onClick={report} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">
-            Отправить жалобу
+            {t('game.reportButton') as string}
           </button>
         </Modal>
       )}
 
       {/* Settings modal */}
       {showSettings && (
-        <Modal onClose={() => setShowSettings(false)} title="Настройки игры">
+        <Modal onClose={() => setShowSettings(false)} title={t('game.settingsTitle') as string}>
           <div className="flex flex-col gap-5">
-            {/* ── Персонаж ── */}
+            {/* ── Character ── */}
             <div className="flex flex-col gap-3">
-              <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">Персонаж</span>
+              <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">{t('game.characterSection') as string}</span>
               <label className="flex flex-col gap-[0.3rem]">
-                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">Никнейм</span>
+                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.nicknameLabel') as string}</span>
                 <input value={nickname} onChange={e => setNickname(e.target.value)} className="bg-surface-2 border border-edge text-ink font-body text-[0.95rem] p-[0.45rem_0.7rem] outline-none" maxLength={50} />
               </label>
               <label className="flex flex-col gap-[0.3rem]">
-                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">Аватар (URL)</span>
+                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.avatarLabel') as string}</span>
                 <input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} className="bg-surface-2 border border-edge text-ink font-body text-[0.95rem] p-[0.45rem_0.7rem] outline-none" placeholder="https://..." maxLength={512} />
               </label>
             </div>
 
-            {/* ── Оформление ── */}
+            {/* ── Appearance ── */}
             <div className="flex flex-col gap-3">
-              <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">Оформление</span>
+              <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">{t('game.decorSection') as string}</span>
               <div className="flex flex-col gap-[0.3rem]">
-                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">Раскладка постов</span>
+                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.layoutLabel') as string}</span>
                 <div className="flex gap-2">
-                  {([['dialog', 'Диалог'], ['feed', 'Лента'], ['book', 'Книга']] as const).map(([val, label]) => (
-                    <button key={val} onClick={() => set('gameLayout', val)} className="flex-1 font-heading italic text-[0.85rem] border p-[0.35rem_0.5rem] cursor-pointer" style={{ background: gameLayout === val ? 'var(--accent-dim)' : 'var(--bg-2)', borderColor: gameLayout === val ? 'var(--accent)' : 'var(--border)', color: gameLayout === val ? 'var(--accent)' : 'var(--text)' }}>
+                  {([['dialog', t('game.layoutDialog') as string], ['feed', t('game.layoutFeed') as string], ['book', t('game.layoutBook') as string]] as const).map(([val, label]) => (
+                    <button key={val} onClick={() => set('gameLayout', val as 'dialog' | 'feed' | 'book')} className="flex-1 font-heading italic text-[0.85rem] border p-[0.35rem_0.5rem] cursor-pointer" style={{ background: gameLayout === val ? 'var(--accent-dim)' : 'var(--bg-2)', borderColor: gameLayout === val ? 'var(--accent)' : 'var(--border)', color: gameLayout === val ? 'var(--accent)' : 'var(--text)' }}>
                       {label}
                     </button>
                   ))}
                 </div>
                 <p className="font-mono text-[0.5rem] tracking-[0.04em] text-ink-2">
-                  {gameLayout === 'dialog' && 'Мой пост справа, чужой слева'}
-                  {gameLayout === 'feed' && 'Посты чередуются, аватарки по разным сторонам'}
-                  {gameLayout === 'book' && 'Без аватарок, только имя и текст'}
+                  {gameLayout === 'dialog' && t('game.layoutDialogDesc') as string}
+                  {gameLayout === 'feed' && t('game.layoutFeedDesc') as string}
+                  {gameLayout === 'book' && t('game.layoutBookDesc') as string}
                 </p>
               </div>
               <label className="flex flex-col gap-[0.3rem]">
-                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">Баннер (URL)</span>
+                <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.bannerLabel') as string}</span>
                 <input value={bannerUrl} onChange={e => setBannerUrl(e.target.value)} className="bg-surface-2 border border-edge text-ink font-body text-[0.95rem] p-[0.45rem_0.7rem] outline-none" placeholder="https://..." maxLength={512} />
               </label>
               <div className="flex gap-3">
-                {([['own', 'Мой'], ['partner', 'Соигрока'], ['none', 'Без баннера']] as const).map(([val, label]) => (
+                {([['own', t('game.bannerOwn') as string], ['partner', t('game.bannerPartner') as string], ['none', t('game.bannerNone') as string]] as const).map(([val, label]) => (
                   <label key={val} className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="radio" name="banner_pref" checked={bannerPref === val} onChange={() => setBannerPref(val)} className="w-[13px] h-[13px] shrink-0" style={{ accentColor: 'var(--text-2)' }} />
+                    <input type="radio" name="banner_pref" checked={bannerPref === val} onChange={() => setBannerPref(val as 'own' | 'partner' | 'none')} className="w-[13px] h-[13px] shrink-0" style={{ accentColor: 'var(--text-2)' }} />
                     <span className="font-mono text-[0.7rem] text-ink">{label}</span>
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* ── Вкладки ── */}
+            {/* ── Tabs ── */}
             <div className="flex flex-col gap-2">
-              <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">Вкладки</span>
+              <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">{t('game.tabsSection') as string}</span>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={oocEnabled} onChange={e => setOocEnabled(e.target.checked)} className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }} />
-                <span className="font-mono text-[0.7rem] text-ink">Оффтоп</span>
-                <span className="font-mono text-[0.55rem] text-ink-2">— обсуждение вне истории</span>
+                <span className="font-mono text-[0.7rem] text-ink">{t('game.oocTab') as string}</span>
+                <span className="font-mono text-[0.55rem] text-ink-2">{t('game.oocDesc') as string}</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={notesEnabled} onChange={e => set('notesEnabled', e.target.checked)} className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }} />
-                <span className="font-mono text-[0.7rem] text-ink">Заметки</span>
-                <span className="font-mono text-[0.55rem] text-ink-2">— личные записи к игре</span>
+                <span className="font-mono text-[0.7rem] text-ink">{t('game.notesTab') as string}</span>
+                <span className="font-mono text-[0.55rem] text-ink-2">{t('game.notesDesc') as string}</span>
               </label>
             </div>
 
             <button onClick={saveSettings} className="btn-primary p-[0.5rem_1.2rem] text-[0.95rem] self-start">
-              Сохранить →
+              {t('game.saveSettings') as string}
             </button>
           </div>
         </Modal>
       )}
     </div>
   )
+}
+
+function paginationRange(current: number, total: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages: (number | '...')[] = [1]
+  const left = Math.max(2, current - 1)
+  const right = Math.min(total - 1, current + 1)
+  if (left > 2) pages.push('...')
+  for (let i = left; i <= right; i++) pages.push(i)
+  if (right < total - 1) pages.push('...')
+  pages.push(total)
+  return pages
 }
 
 function tabBtnCls(isActive: boolean, tab: 'ic' | 'ooc' | 'notes'): string {

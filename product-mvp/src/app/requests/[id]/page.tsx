@@ -14,6 +14,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
 
   const request = await queryOne<Request>('SELECT * FROM requests WHERE id=$1', [id])
   if (!request) notFound()
+  if (!request.is_public && user?.id !== request.author_id) notFound()
 
   const isAuthor = user?.id === request.author_id
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useT } from './SettingsContext'
 
 interface GameRow {
   id: string
@@ -26,28 +27,27 @@ interface GameRow {
   request_content_level: string | null
 }
 
-const typeLabels: Record<string, string> = { duo: 'На двоих', multiplayer: 'Мультиплеер' }
-const fandomTypeLabels: Record<string, string> = { fandom: 'Фандом', original: 'Оридж' }
-const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: 'Любой пейринг', multi: 'Мульти', other: 'Другое' }
-const contentLabels: Record<string, string> = { none: 'без постельных сцен', rare: 'редко', often: 'часто', core: 'основа сюжета', flexible: 'по договорённости' }
-
-function pluralActive(n: number): string {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return `${n} активный`
-  return `${n} активных`
-}
-
 interface Props {
   games: GameRow[]
   userId: string
 }
 
 export default function MyGamesClient({ games: initialGames, userId }: Props) {
+  const t = useT()
   const [games, setGames] = useState(initialGames)
   const [mainTab, setMainTab] = useState<'active' | 'finished' | 'starred'>('active')
   const [subTab, setSubTab] = useState<'waiting-them' | 'waiting-me'>('waiting-me')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const typeLabels: Record<string, string> = { duo: t('filters.duo') as string, multiplayer: t('filters.multiplayer') as string }
+  const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
+  const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string }
+  const contentLabels: Record<string, string> = { none: t('filters.noNsfw') as string, rare: t('filters.nsfwRare') as string, often: t('filters.nsfwOften') as string, core: t('filters.nsfwCore') as string, flexible: t('filters.nsfwFlexible') as string }
+
+  function pluralActive(n: number): string {
+    if (n === 1) return `${n} ${t('myGames.activeParticipant') as string}`
+    return `${n} ${t('myGames.activeParticipants') as string}`
+  }
 
   const visible = games.filter(g => !g.hidden_at)
   const active = visible.filter(g => !g.left_at)
@@ -104,28 +104,28 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
 
   return (
     <div className="max-w-[1050px] mx-auto px-7 py-12">
-      <p className="section-label mb-2">§ Мои игры</p>
-      <h1 className="page-title mb-10">Мои игры</h1>
+      <p className="section-label mb-2">{t('myGames.sectionLabel') as string}</p>
+      <h1 className="page-title mb-10">{t('myGames.title') as string}</h1>
 
       <div className="flex gap-8 mb-1 border-b border-edge">
         <button onClick={() => setMainTab('active')} className={tabCls(mainTab === 'active')}>
-          Активные <span className="opacity-60">({active.length})</span>
+          {t('myGames.active') as string} <span className="opacity-60">({active.length})</span>
         </button>
         <button onClick={() => setMainTab('starred')} className={tabCls(mainTab === 'starred')}>
-          Избранные <span className="opacity-60">({starred.length})</span>
+          {t('myGames.starred') as string} <span className="opacity-60">({starred.length})</span>
         </button>
         <button onClick={() => setMainTab('finished')} className={tabCls(mainTab === 'finished')}>
-          Завершённые <span className="opacity-60">({finished.length})</span>
+          {t('myGames.finished') as string} <span className="opacity-60">({finished.length})</span>
         </button>
       </div>
 
       {mainTab === 'active' && (
         <div className="flex gap-8 mb-8 mt-5">
           <button onClick={() => setSubTab('waiting-me')} className={subTabCls(subTab === 'waiting-me')}>
-            Ждут мой пост <span className="opacity-60">({waitingMe.length})</span>
+            {t('myGames.waitingMyPost') as string} <span className="opacity-60">({waitingMe.length})</span>
           </button>
           <button onClick={() => setSubTab('waiting-them')} className={subTabCls(subTab === 'waiting-them')}>
-            Жду пост соигрока <span className="opacity-60">({waitingThem.length})</span>
+            {t('myGames.waitingTheirPost') as string} <span className="opacity-60">({waitingThem.length})</span>
           </button>
         </div>
       )}
@@ -133,7 +133,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
       {mainTab !== 'active' && <div className="mb-8" />}
 
       {currentGames.length === 0 ? (
-        <p className="text-ink-2 font-heading italic">Пусто.</p>
+        <p className="text-ink-2 font-heading italic">{t('myGames.empty') as string}</p>
       ) : (
         <div className="flex flex-col gap-[var(--game-gap,1rem)]">
           {currentGames.map(g => {
@@ -157,14 +157,14 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                 <div className="flex items-center justify-between gap-4 mb-3">
                   <Link href={`/games/${g.id}`}>
                     <h3 className="font-heading text-[1.2rem] font-normal text-ink leading-tight break-words">
-                      {g.request_title ?? 'Без названия'}
+                      {g.request_title ?? t('nav.untitled') as string}
                     </h3>
                   </Link>
                   <div className="flex items-center gap-2 shrink-0">
                     {g.left_at && (
                       <button
                         onClick={() => hideGame(g.id)}
-                        title="Скрыть из списка"
+                        title={t('myGames.hideFromList') as string}
                         className="bg-transparent border-none cursor-pointer text-ink-2 text-[0.85rem] leading-none opacity-50 hover:opacity-100 hover:text-accent p-[0.2rem_0.3rem]"
                       >
                         ✕
@@ -172,7 +172,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                     )}
                     <button
                       onClick={() => toggleStar(g.id)}
-                      title={g.starred_at ? 'Убрать из избранного' : 'В избранное'}
+                      title={g.starred_at ? t('myGames.removeFromStarred') as string : t('myGames.addToStarred') as string}
                       className={`bg-transparent border-none cursor-pointer text-[1.1rem] p-0 leading-none ${g.starred_at ? 'text-accent' : 'text-ink-2'}`}
                     >
                       {g.starred_at ? '★' : '☆'}
@@ -186,15 +186,15 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                   {g.request_fandom_type && <span className="badge badge-fandom">{fandomTypeLabels[g.request_fandom_type] ?? g.request_fandom_type}</span>}
                   {g.request_pairing && g.request_pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[g.request_pairing] ?? g.request_pairing}</span>}
                   {g.request_content_level && <span className="badge badge-content">{contentLabels[g.request_content_level] ?? g.request_content_level}</span>}
-                  {tags.map(t => (
-                    <span key={t} className="badge badge-tag">#{t.toLowerCase()}</span>
+                  {tags.map(tg => (
+                    <span key={tg} className="badge badge-tag">#{tg.toLowerCase()}</span>
                   ))}
                 </div>
 
                 {/* Meta line */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="meta-text">
-                    Никнейм: {g.my_nickname} &nbsp;·&nbsp; {g.message_count} постов &nbsp;·&nbsp; {pluralActive(activeCount)}
+                    {t('myGames.nickname') as string} {g.my_nickname} &nbsp;·&nbsp; {g.message_count} {t('myGames.posts') as string} &nbsp;·&nbsp; {pluralActive(activeCount)}
                   </p>
                   {g.ooc_enabled && (
                     <Link
@@ -204,12 +204,12 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                       ${parseInt(g.ooc_unread) > 0
                         ? 'text-white bg-accent border-none'
                         : 'text-ink-2 bg-transparent border border-edge'}`}>
-                      оффтоп
+                      {t('game.offtop') as string}
                     </Link>
                   )}
                   {parseInt(g.ic_unread) > 0 && (
                     <span className="font-mono text-[0.58rem] tracking-[0.06em] text-white bg-accent py-[0.05rem] px-1.5 rounded-sm">
-                      новые посты
+                      {t('myGames.newPostsBadge') as string}
                     </span>
                   )}
                 </div>
@@ -217,7 +217,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                 {/* Footer */}
                 <div className="mt-5">
                   <Link href={`/games/${g.id}`} className="link-accent no-underline">
-                    Открыть →
+                    {t('myGames.open') as string}
                   </Link>
                 </div>
               </article>

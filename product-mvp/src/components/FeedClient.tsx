@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import RequestCard, { Request } from './RequestCard'
 import Link from 'next/link'
-import { useSettings } from './SettingsContext'
+import { useSettings, useT } from './SettingsContext'
 import TagAutocomplete, { type TagItem } from './TagAutocomplete'
 
 function FilterSelect({ value, onChange, options }: {
@@ -62,21 +62,22 @@ function FilterSelect({ value, onChange, options }: {
   )
 }
 
-const CONTENT_LEVELS = [
-  { value: '', label: 'Любой NSFW' },
-  { value: 'none', label: 'Без постельных сцен' },
-  { value: 'rare', label: 'NSFW редко' },
-  { value: 'often', label: 'NSFW часто' },
-  { value: 'core', label: 'NSFW основа сюжета' },
-  { value: 'flexible', label: 'NSFW по договорённости' },
-]
-
 interface Props {
   user: { id: string; email: string } | null
 }
 
 export default function FeedClient({ user }: Props) {
   const { tagPresets, setTagPreset } = useSettings()
+  const t = useT()
+
+  const CONTENT_LEVELS = [
+    { value: '', label: t('filters.anyNsfw') as string },
+    { value: 'none', label: t('filters.noNsfw') as string },
+    { value: 'rare', label: t('filters.nsfwRare') as string },
+    { value: 'often', label: t('filters.nsfwOften') as string },
+    { value: 'core', label: t('filters.nsfwCore') as string },
+    { value: 'flexible', label: t('filters.nsfwFlexible') as string },
+  ]
 
   const [requests, setRequests] = useState<Request[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,6 +91,8 @@ export default function FeedClient({ user }: Props) {
   const [blacklist, setBlacklist] = useState<string[]>([])
   const [blacklistInput, setBlacklistInput] = useState('')
   const [isBlacklistOpen, setIsBlacklistOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   const [showSavePreset, setShowSavePreset] = useState(false)
   const [presetName, setPresetName] = useState('')
@@ -99,19 +102,30 @@ export default function FeedClient({ user }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams()
-    if (q)          params.set('q', q)
-    if (type)       params.set('type', type)
-    if (fandomType) params.set('fandom_type', fandomType)
-    if (pairing)    params.set('pairing', pairing)
-    if (content)    params.set('content', content)
-    if (tagsString) params.set('tags', tagsString)
-    const res = await fetch(`/api/requests?${params}`)
-    setRequests(await res.json())
-    setLoading(false)
-  }, [q, type, fandomType, pairing, content, tagsString])
+    try {
+      const params = new URLSearchParams()
+      if (q)          params.set('q', q)
+      if (type)       params.set('type', type)
+      if (fandomType) params.set('fandom_type', fandomType)
+      if (pairing)    params.set('pairing', pairing)
+      if (content)    params.set('content', content)
+      if (tagsString) params.set('tags', tagsString)
+      params.set('page', String(page))
+      const res = await fetch(`/api/requests?${params}`)
+      const data = await res.json()
+      setRequests(data.requests ?? [])
+      setTotalPages(data.totalPages ?? 1)
+    } catch {
+      setRequests([])
+    } finally {
+      setLoading(false)
+    }
+  }, [q, type, fandomType, pairing, content, tagsString, page])
 
   useEffect(() => { load() }, [load])
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1) }, [q, type, fandomType, pairing, content, tagsString])
 
   useEffect(() => {
     if (!user) return
@@ -180,7 +194,7 @@ export default function FeedClient({ user }: Props) {
 
   function savePreset() {
     setTagPreset(presetSlot, {
-      name: presetName.trim() || `Набор ${presetSlot + 1}`,
+      name: presetName.trim() || `${t('settings.presetName') as string} ${presetSlot + 1}`,
       tags: tagsString,
     })
     setShowSavePreset(false)
@@ -194,14 +208,14 @@ export default function FeedClient({ user }: Props) {
       {/* Header */}
       <div className="flex items-baseline justify-between mb-10 gap-4">
         <div>
-          <p className="section-label mb-2">§ Лента заявок</p>
+          <p className="section-label mb-2">{t('feed.sectionLabel') as string}</p>
           <h1 className="page-title text-[clamp(2rem,5vw,3rem)]">
-            Найди соигрока
+            {t('feed.title') as string}
           </h1>
         </div>
         {user && (
           <Link href="/requests/new" className="btn-primary text-[0.95rem] py-2 px-5 shrink-0">
-            + Создать заявку
+            {t('feed.createRequest') as string}
           </Link>
         )}
       </div>
@@ -210,7 +224,7 @@ export default function FeedClient({ user }: Props) {
       <div className={`flex flex-wrap gap-3 p-[1.25rem_1.5rem] bg-surface-2 border border-edge ${showPresetPanel || user ? '' : 'mb-8'}`}>
         <input
           type="search"
-          placeholder="Поиск по тексту..."
+          placeholder={t('feed.searchPlaceholder') as string}
           value={q}
           onChange={e => setQ(e.target.value)}
           className="filter-input flex-[1_1_200px]"
@@ -219,31 +233,31 @@ export default function FeedClient({ user }: Props) {
           value={type}
           onChange={setType}
           options={[
-            { value: '', label: 'Любой тип' },
-            { value: 'duo', label: 'На двоих' },
-            { value: 'multiplayer', label: 'Мультиплеер' },
+            { value: '', label: t('filters.anyType') as string },
+            { value: 'duo', label: t('filters.duo') as string },
+            { value: 'multiplayer', label: t('filters.multiplayer') as string },
           ]}
         />
         <FilterSelect
           value={fandomType}
           onChange={setFandomType}
           options={[
-            { value: '', label: 'Фандом и оридж' },
-            { value: 'fandom', label: 'Фандом' },
-            { value: 'original', label: 'Оридж' },
+            { value: '', label: t('filters.fandomAndOriginal') as string },
+            { value: 'fandom', label: t('filters.fandom') as string },
+            { value: 'original', label: t('filters.original') as string },
           ]}
         />
         <FilterSelect
           value={pairing}
           onChange={setPairing}
           options={[
-            { value: '', label: 'Любой пейринг' },
+            { value: '', label: t('filters.anyPairing') as string },
             { value: 'sl', label: 'M/M' },
             { value: 'fm', label: 'F/F' },
             { value: 'gt', label: 'M/F' },
-            { value: 'multi', label: 'Мульти' },
-            { value: 'other', label: 'Другое' },
-            { value: 'any', label: 'Не важно' },
+            { value: 'multi', label: t('filters.multi') as string },
+            { value: 'other', label: t('filters.other') as string },
+            { value: 'any', label: t('filters.notImportant') as string },
           ]}
         />
         <FilterSelect
@@ -257,14 +271,14 @@ export default function FeedClient({ user }: Props) {
             onTagsChange={setFilterTags}
             maxTags={10}
             allowCreate={false}
-            placeholder="Фильтр по тегам..."
+            placeholder={t('feed.filterTagsPlaceholder') as string}
             className="flex-1 min-w-0"
             chipsOutside
           />
           <button
             onClick={openSavePreset}
             disabled={!tagsString}
-            title={tagsString ? 'Сохранить как набор тегов' : 'Введите теги для сохранения'}
+            title={tagsString ? t('feed.saveAsPreset') as string : t('feed.enterTagsToSave') as string}
             className="btn-ghost text-[0.85rem] tracking-normal py-1.5 px-2.5 shrink-0 leading-none"
             style={{ opacity: tagsString ? 1 : 0.35, cursor: tagsString ? 'pointer' : 'default' }}
           >
@@ -272,7 +286,7 @@ export default function FeedClient({ user }: Props) {
           </button>
         </div>
         <button onClick={load} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
-          Найти
+          {t('feed.find') as string}
         </button>
       </div>
       {/* Filter tag chips — full width */}
@@ -306,7 +320,7 @@ export default function FeedClient({ user }: Props) {
           {hasPresets && (
             <div className={`px-6 py-2 flex items-center gap-2 flex-wrap ${showSavePreset ? 'border-b border-edge' : ''}`}>
               <span className="font-mono text-[0.6rem] tracking-[0.18em] uppercase text-accent-2 shrink-0">
-                § Наборы
+                {t('feed.presets') as string}
               </span>
               {tagPresets.map((p, i) => p.tags && (
                 <button
@@ -317,7 +331,7 @@ export default function FeedClient({ user }: Props) {
                   }}
                   className="preset-chip"
                 >
-                  {p.name || `Набор ${i + 1}`}
+                  {p.name || `${t('settings.presetName') as string} ${i + 1}`}
                 </button>
               ))}
             </div>
@@ -326,12 +340,12 @@ export default function FeedClient({ user }: Props) {
           {showSavePreset && (
             <div className="px-6 py-3">
               <p className="font-mono text-[0.6rem] tracking-[0.12em] uppercase text-ink-2 mb-2.5">
-                Сохранить набор: <span className="text-accent">{tagsString}</span>
+                {t('feed.savePreset') as string} <span className="text-accent">{tagsString}</span>
               </p>
               <div className="flex gap-2 items-center flex-wrap">
                 <input
                   type="text"
-                  placeholder="Название набора..."
+                  placeholder={t('feed.presetNamePlaceholder') as string}
                   value={presetName}
                   onChange={e => setPresetName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') savePreset() }}
@@ -339,7 +353,7 @@ export default function FeedClient({ user }: Props) {
                   autoFocus
                 />
                 <div className="flex gap-[0.3rem] items-center shrink-0">
-                  <span className="font-mono text-[0.6rem] tracking-[0.1em] text-ink-2 mr-0.5">СЛОТ</span>
+                  <span className="font-mono text-[0.6rem] tracking-[0.1em] text-ink-2 mr-0.5">{t('feed.slot') as string}</span>
                   {[0, 1, 2].map(i => (
                     <button
                       key={i}
@@ -354,7 +368,7 @@ export default function FeedClient({ user }: Props) {
                   ))}
                 </div>
                 <button onClick={savePreset} className="btn-primary text-[0.9rem] py-[0.3rem] px-3.5 shrink-0">
-                  Сохранить →
+                  {t('feed.saveButton') as string}
                 </button>
                 <button
                   onClick={() => setShowSavePreset(false)}
@@ -376,7 +390,7 @@ export default function FeedClient({ user }: Props) {
               onClick={() => setIsBlacklistOpen(o => !o)}
               className="flex items-center gap-2 bg-transparent border-none cursor-pointer font-mono text-[0.65rem] tracking-[0.15em] uppercase text-ink-2 p-0"
             >
-              <span>Скрытые теги{blacklist.length > 0 ? ` (${blacklist.length})` : ''}</span>
+              <span>{t('feed.hiddenTags') as string}{blacklist.length > 0 ? ` (${blacklist.length})` : ''}</span>
               <span className="text-[0.55rem] opacity-50">{isBlacklistOpen ? '▲' : '▼'}</span>
             </button>
             {isBlacklistOpen && blacklist.length > 0 && (
@@ -388,7 +402,7 @@ export default function FeedClient({ user }: Props) {
                 }}
                 className="bg-transparent border-none cursor-pointer font-mono text-[0.6rem] tracking-[0.1em] uppercase text-ink-2 p-0 opacity-50 hover:opacity-100"
               >
-                Очистить
+                {t('feed.clearBlacklist') as string}
               </button>
             )}
           </div>
@@ -397,7 +411,7 @@ export default function FeedClient({ user }: Props) {
             <div className="px-6 py-3 pb-4 border-t border-edge flex flex-col gap-2">
               <input
                 type="text"
-                placeholder="Теги через запятую или Enter"
+                placeholder={t('feed.blacklistPlaceholder') as string}
                 value={blacklistInput}
                 onChange={e => {
                   const v = e.target.value
@@ -415,7 +429,7 @@ export default function FeedClient({ user }: Props) {
                       {tag}
                       <button
                         onClick={() => removeFromBlacklist(tag)}
-                        title="Убрать из чёрного списка"
+                        title={t('feed.removeFromBlacklist') as string}
                         className="bg-transparent border-none cursor-pointer text-accent text-[0.8rem] leading-none p-0"
                       >×</button>
                     </span>
@@ -429,40 +443,85 @@ export default function FeedClient({ user }: Props) {
 
       {/* Results */}
       {loading ? (
-        <p className="text-ink-2 italic font-heading">Загрузка...</p>
+        <p className="text-ink-2 italic font-heading">{t('feed.loading') as string}</p>
       ) : requests.length === 0 ? (
         <p className="text-ink-2 italic font-heading text-[1.1rem]">
-          Заявок не найдено. Попробуй изменить фильтры или создай свою.
+          {t('feed.noResults') as string}
         </p>
       ) : (
-        <div className="grid gap-[var(--game-gap,1rem)]">
-          {requests.map(r => (
-            <RequestCard
-              key={r.id}
-              request={r}
-              isBookmarked={bookmarked.has(r.id)}
-              showRespond={!!user}
-              isOwn={!!user && r.author_id === user.id}
-              onBookmark={(id, state) => {
-                const next = new Set(bookmarked)
-                state ? next.add(id) : next.delete(id)
-                setBookmarked(next)
-              }}
-              onTagSearch={user ? handleTagSearch : undefined}
-              onTagSubscribe={user ? handleTagSubscribe : undefined}
-              onTagBlacklist={user ? handleTagBlacklist : undefined}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-[var(--game-gap,1rem)]">
+            {requests.map(r => (
+              <RequestCard
+                key={r.id}
+                request={r}
+                isBookmarked={bookmarked.has(r.id)}
+                showRespond={!!user}
+                isOwn={!!user && r.author_id === user.id}
+                onBookmark={(id, state) => {
+                  const next = new Set(bookmarked)
+                  state ? next.add(id) : next.delete(id)
+                  setBookmarked(next)
+                }}
+                onTagSearch={user ? handleTagSearch : undefined}
+                onTagSubscribe={user ? handleTagSubscribe : undefined}
+                onTagBlacklist={user ? handleTagBlacklist : undefined}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <button
+                onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                disabled={page <= 1}
+                className="btn-ghost text-[0.8rem] py-1.5 px-3 disabled:opacity-30 disabled:cursor-default"
+              >
+                {t('feed.prevPage') as string}
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                .reduce<(number | 'dots')[]>((acc, p, i, arr) => {
+                  if (i > 0 && p - (arr[i - 1]) > 1) acc.push('dots')
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((item, i) =>
+                  item === 'dots' ? (
+                    <span key={`dots-${i}`} className="text-ink-2 text-[0.8rem] px-1">...</span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => { setPage(item); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                      className={`font-mono text-[0.8rem] w-[32px] h-[32px] flex items-center justify-center cursor-pointer border
+                        ${page === item
+                          ? 'border-accent bg-accent-dim text-accent'
+                          : 'border-edge bg-transparent text-ink-2 hover:border-accent hover:text-accent'}`}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                disabled={page >= totalPages}
+                className="btn-ghost text-[0.8rem] py-1.5 px-3 disabled:opacity-30 disabled:cursor-default"
+              >
+                {t('feed.nextPage') as string}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {!user && (
         <div className="mt-12 p-8 border border-edge text-center">
           <p className="font-heading text-[1.1rem] italic text-ink mb-4">
-            Войди, чтобы отвечать на заявки и создавать свои
+            {t('feed.loginPrompt') as string}
           </p>
           <Link href="/auth/register" className="btn-primary text-[0.95rem] py-2.5 px-6 inline-block">
-            Зарегистрироваться →
+            {t('feed.registerPrompt') as string}
           </Link>
         </div>
       )}

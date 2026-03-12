@@ -5,14 +5,14 @@ import { notifyGame } from '@/lib/sse'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { id: gameId } = await params
   const { sides } = await req.json()
 
   const s = parseInt(sides)
   if (!s || s < 2 || s > 100) {
-    return NextResponse.json({ error: 'Количество граней: от 2 до 100' }, { status: 400 })
+    return NextResponse.json({ error: 'invalidDice' }, { status: 400 })
   }
 
   const participant = await queryOne<{ id: string; nickname: string; left_at: string | null }>(
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     [gameId, user.id]
   )
   if (!participant || participant.left_at) {
-    return NextResponse.json({ error: 'Вы не участник этой игры' }, { status: 403 })
+    return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
   }
 
   const result = Math.floor(Math.random() * s) + 1

@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useT } from './SettingsContext'
 
 export interface MyRequest {
   id: string; title: string; body: string | null; type: string; content_level: string
@@ -8,38 +9,40 @@ export interface MyRequest {
   status: string; is_public: boolean; created_at: string
 }
 
-const statusLabel: Record<string, string> = { draft: 'Черновики', active: 'В ленте', inactive: 'Неактивные' }
-const statusColor: Record<string, string> = { draft: 'var(--text-2)', active: 'var(--accent)', inactive: 'var(--text-2)' }
-
-const typeLabels: Record<string, string> = { duo: 'На двоих', multiplayer: 'Мультиплеер' }
-const fandomTypeLabels: Record<string, string> = { fandom: 'Фандом', original: 'Оридж' }
-const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: 'Любой пейринг', multi: 'Мульти', other: 'Другое' }
-const contentLabels: Record<string, string> = { none: 'без постельных сцен', rare: 'редко', often: 'часто', core: 'основа сюжета', flexible: 'по договорённости' }
-
 export default function MyRequestsClient({ requests: initial, initialTab = 'active' }: { requests: MyRequest[], initialTab?: 'all' | 'active' | 'draft' | 'inactive' }) {
+  const t = useT()
   const [requests, setRequests] = useState(initial)
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'inactive'>(initialTab)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [copied, setCopied] = useState<string | null>(null)
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [inviteUrlFor, setInviteUrlFor] = useState<{ id: string; url: string } | null>(null)
+
+  const statusLabel: Record<string, string> = { draft: t('myRequests.drafts') as string, active: t('myRequests.inFeed') as string, inactive: t('myRequests.inactive') as string }
+  const statusColor: Record<string, string> = { draft: 'var(--text-2)', active: 'var(--accent)', inactive: 'var(--text-2)' }
+  const typeLabels: Record<string, string> = { duo: t('filters.duo') as string, multiplayer: t('filters.multiplayer') as string }
+  const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
+  const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string }
+  const contentLabels: Record<string, string> = { none: t('filters.noNsfw') as string, rare: t('filters.nsfwRare') as string, often: t('filters.nsfwOften') as string, core: t('filters.nsfwCore') as string, flexible: t('filters.nsfwFlexible') as string }
 
   async function copyInvite(id: string) {
-    const res = await fetch('/api/invites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId: id }),
-    })
-    const { token } = await res.json()
-    const url = `${window.location.origin}/invite/${token}`
     try {
-      await navigator.clipboard.writeText(url)
-      setCopied(id)
-      setTimeout(() => setCopied(null), 2000)
-    } catch {
-      // Clipboard unavailable on HTTP — show URL inline
-      setInviteUrl(url)
-    }
+      const res = await fetch('/api/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id }),
+      })
+      if (!res.ok) { alert(t('errors.generic') as string); return }
+      const { token } = await res.json()
+      const url = `${window.location.origin}/invite/${token}`
+      try {
+        await navigator.clipboard.writeText(url)
+        setCopied(id)
+        setTimeout(() => setCopied(null), 2000)
+      } catch {
+        setInviteUrlFor({ id, url })
+      }
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   const filtered: MyRequest[] = filter === 'all' ? requests : requests.filter(r => r.status === filter)
@@ -69,7 +72,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
             <button key={f} onClick={() => setFilter(f)}
               className={`font-mono text-[0.68rem] tracking-[0.1em] uppercase bg-transparent border-none cursor-pointer py-2.5 px-4 -mb-px
                 ${filter === f ? 'text-accent border-b-2 border-accent' : 'text-ink-2 border-b-2 border-transparent'}`}>
-              {f === 'all' ? 'Все заявки' : statusLabel[f]}
+              {f === 'all' ? t('myRequests.allRequests') as string : statusLabel[f]}
               {' '}
               <span className="opacity-60">({count})</span>
             </button>
@@ -78,7 +81,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
       </div>
 
       {filtered.length === 0 && (
-        <p className="text-ink-2 font-heading italic">Заявок нет.</p>
+        <p className="text-ink-2 font-heading italic">{t('myRequests.noRequests') as string}</p>
       )}
 
       <div className="flex flex-col gap-[var(--game-gap,1rem)]">
@@ -90,10 +93,10 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
             <div key={r.id} className="bg-surface-2 border border-edge p-[1.25rem_1.5rem]">
 
               {/* Invite URL (shown when clipboard unavailable) */}
-              {inviteUrl && (
+              {inviteUrlFor?.id === r.id && (
                 <div className="mb-2 p-2.5 bg-surface-3 border border-edge flex items-center gap-2">
-                  <code className="font-mono text-[0.75rem] text-accent break-all select-all flex-1">{inviteUrl}</code>
-                  <button onClick={() => setInviteUrl(null)} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.7rem] shrink-0">✕</button>
+                  <code className="font-mono text-[0.75rem] text-accent break-all select-all flex-1">{inviteUrlFor.url}</code>
+                  <button onClick={() => setInviteUrlFor(null)} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.7rem] shrink-0">✕</button>
                 </div>
               )}
 
@@ -102,26 +105,26 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
                 <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase mr-1" style={{ color: statusColor[r.status] }}>
                   {statusLabel[r.status]}
                 </span>
-                <button onClick={() => copyInvite(r.id)} title="Скопировать инвайт-ссылку"
+                <button onClick={() => copyInvite(r.id)} title={t('card.copyInvite') as string}
                   className={`bg-transparent border-none p-0 leading-none cursor-pointer flex items-center transition-[color,opacity] duration-150
                     ${copied === r.id ? 'text-accent' : 'text-ink-2 icon-dim'}`}
                 >{copied === r.id ? '✓' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}</button>
-                <Link href={`/requests/${r.id}/edit`} title="Редактировать"
+                <Link href={`/requests/${r.id}/edit`} title={t('card.edit') as string}
                   className="font-mono text-[0.9rem] text-ink-2 p-[0.2rem_0.3rem] leading-none icon-dim no-underline inline-block scale-x-[-1]"
                 >✎</Link>
-                <button onClick={() => setConfirmDelete(r.id)} title="Удалить"
+                <button onClick={() => setConfirmDelete(r.id)} title={t('detail.deleteButton') as string}
                   className="bg-transparent border-none font-mono text-[0.75rem] text-ink-2 p-[0.2rem_0.3rem] leading-none cursor-pointer opacity-50 hover:opacity-100 hover:text-accent"
                 >✕</button>
 
                 {/* Delete confirmation */}
                 {confirmDelete === r.id && (
                   <div className="absolute top-full right-0 z-10 bg-surface border border-accent p-[0.6rem_0.9rem] flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.12)]">
-                    <span className="meta-text text-ink">Удалить заявку?</span>
+                    <span className="meta-text text-ink">{t('myRequests.deleteConfirm') as string}</span>
                     <button onClick={() => deleteRequest(r.id)} className="meta-text bg-accent text-white border-none py-1 px-2.5 cursor-pointer">
-                      Да
+                      {t('myRequests.yes') as string}
                     </button>
                     <button onClick={() => setConfirmDelete(null)} className="btn-ghost py-1 px-2.5">
-                      Нет
+                      {t('myRequests.no') as string}
                     </button>
                   </div>
                 )}
@@ -130,8 +133,8 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
               {/* Title + tags row */}
               <div className="flex items-start gap-3">
                 {r.status === 'active'
-                  ? <button onClick={() => changeStatus(r.id, 'inactive')} title="Снять с ленты" className="icon-action-btn">⏸</button>
-                  : <button onClick={() => changeStatus(r.id, 'active')} title="Опубликовать в ленту" className="icon-action-btn text-accent border-accent-dim hover:border-accent">▶</button>
+                  ? <button onClick={() => changeStatus(r.id, 'inactive')} title={t('myRequests.unpublish') as string} className="icon-action-btn">⏸</button>
+                  : <button onClick={() => changeStatus(r.id, 'active')} title={t('myRequests.publishToFeed') as string} className="icon-action-btn text-accent border-accent-dim hover:border-accent">▶</button>
                 }
                 <div className="flex-1">
                   <div className="mb-1">
@@ -144,8 +147,8 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
                     <span className="badge badge-fandom">{fandomTypeLabels[r.fandom_type] ?? r.fandom_type}</span>
                     {r.pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[r.pairing] ?? r.pairing}</span>}
                     <span className="badge badge-content">{contentLabels[r.content_level] ?? r.content_level}</span>
-                    {r.tags.slice(0, 4).map(t => (
-                      <span key={t} className="badge badge-tag">{t.toLowerCase()}</span>
+                    {r.tags.slice(0, 4).map(tg => (
+                      <span key={tg} className="badge badge-tag">{tg.toLowerCase()}</span>
                     ))}
                   </div>
                 </div>
@@ -178,7 +181,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
                       })}
                       className="link-accent bg-transparent border-none cursor-pointer block pt-[0.2rem] text-[0.62rem]"
                     >
-                      {exp ? 'Свернуть ↑' : 'Читать дальше →'}
+                      {exp ? t('card.collapse') as string : t('card.readMore') as string}
                     </button>
                   )}
                 </div>

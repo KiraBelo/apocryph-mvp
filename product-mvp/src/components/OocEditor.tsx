@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import { Mark, mergeAttributes } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { useEffect } from 'react'
+import { useT } from './SettingsContext'
 
 // Custom mark for spoiler text
 const SpoilerMark = Mark.create({
@@ -21,7 +22,9 @@ interface Props {
   placeholder?: string
 }
 
-export default function OocEditor({ content, onChange, placeholder = 'Напиши сообщение...' }: Props) {
+export default function OocEditor({ content, onChange, placeholder }: Props) {
+  const t = useT()
+  const ph = placeholder || (t('editor.oocPlaceholder') as string)
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -36,7 +39,7 @@ export default function OocEditor({ content, onChange, placeholder = 'Напиш
       attributes: {
         class: 'tiptap-content',
         style: `min-height: 80px; padding: 0.65rem 0.85rem; outline: none; font-family: var(--mono); font-size: 0.88rem; line-height: 1.65;`,
-        'data-placeholder': placeholder,
+        'data-placeholder': ph,
       },
     },
   })
@@ -44,7 +47,8 @@ export default function OocEditor({ content, onChange, placeholder = 'Напиш
   useEffect(() => {
     if (!editor) return
     if (content !== editor.getHTML()) editor.commands.setContent(content)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, content])
 
   if (!editor) return null
 
@@ -70,10 +74,10 @@ export default function OocEditor({ content, onChange, placeholder = 'Напиш
     <div className="border border-edge bg-surface-3">
       {/* Minimal toolbar */}
       <div className="flex items-center gap-[0.1rem] p-[0.3rem_0.5rem] border-b border-edge bg-surface-3">
-        {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), <strong>B</strong>, 'Жирный')}
-        {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), <em>I</em>, 'Курсив')}
+        {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), <strong>B</strong>, t('editor.bold') as string)}
+        {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), <em>I</em>, t('editor.italic') as string)}
         {btn(editor.isActive('strike'), () => editor.chain().focus().toggleStrike().run(),
-          <span className="line-through">S</span>, 'Зачёркнутый')}
+          <span className="line-through">S</span>, t('editor.strikethrough') as string)}
         {sep()}
         {btn(isSpoilerActive, () => editor.chain().focus().toggleMark('spoiler').run(),
           <span
@@ -82,11 +86,11 @@ export default function OocEditor({ content, onChange, placeholder = 'Напиш
               background: isSpoilerActive ? 'var(--text)' : 'var(--border)',
               color: isSpoilerActive ? 'var(--text)' : 'var(--text-2)',
             }}
-          >СПОЙЛЕР</span>,
-          'Скрыть текст спойлером'
+          >{t('editor.spoilerLabel') as string}</span>,
+          t('editor.spoilerTitle') as string
         )}
         {sep()}
-        {btn(false, () => editor.chain().focus().unsetAllMarks().run(), '✕', 'Очистить форматирование')}
+        {btn(false, () => editor.chain().focus().unsetAllMarks().run(), '✕', t('editor.clearFormatting') as string)}
       </div>
       <EditorContent editor={editor} />
     </div>

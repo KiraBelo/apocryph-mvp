@@ -2,11 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-
-const contentLabels: Record<string, string> = { none: 'без постельных сцен', rare: 'редко', often: 'часто', core: 'основа сюжета', flexible: 'по договорённости' }
-const typeLabels: Record<string, string> = { duo: 'На двоих', multiplayer: 'Мультиплеер' }
-const fandomTypeLabels: Record<string, string> = { fandom: 'Фандом', original: 'Оридж' }
-const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: 'Любой пейринг', multi: 'Мульти', other: 'Другое' }
+import { useT } from './SettingsContext'
 
 interface Request {
   id: string; title: string; body: string | null; type: string; content_level: string
@@ -21,23 +17,36 @@ interface Props {
   existingGameId: string | null
 }
 
-const LEAVE_REASONS = ['Спасибо, всё было здорово', 'Сейчас нет времени продолжать', 'Формат игры не подошёл', 'Ожидания от игры не совпали', 'Сменились интересы']
+const LEAVE_REASONS_KEYS = ['game.leaveReasons'] as const
 
 export default function RequestDetailClient({ request, user, isAuthor, isBookmarked: initBm, existingGameId }: Props) {
   const router = useRouter()
+  const t = useT()
   const [bookmarked, setBookmarked] = useState(initBm)
-  const [nickname, setNickname] = useState('Игрок')
+  const [nickname, setNickname] = useState(t('detail.nicknamePlaceholder') as string)
   const [respondLoading, setRespondLoading] = useState(false)
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
   const [showNicknameModal, setShowNicknameModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
 
+  const contentLabels: Record<string, string> = {
+    none: t('filters.noNsfw') as string, rare: t('filters.nsfwRare') as string,
+    often: t('filters.nsfwOften') as string, core: t('filters.nsfwCore') as string,
+    flexible: t('filters.nsfwFlexible') as string,
+  }
+  const typeLabels: Record<string, string> = { duo: t('filters.duo') as string, multiplayer: t('filters.multiplayer') as string }
+  const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
+  const pairingLabels: Record<string, string> = {
+    sl: 'M/M', fm: 'F/F', gt: 'M/F',
+    any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string,
+  }
+
   async function toggleBookmark() {
     const method = bookmarked ? 'DELETE' : 'POST'
     const res = await fetch(`/api/bookmarks/${request.id}`, { method })
     if (res.ok) setBookmarked(b => !b)
-    else { const d = await res.json(); alert(d.error) }
+    else { const d = await res.json(); alert(t(`errors.${d.error}`) as string || d.error) }
   }
 
   async function respond() {
@@ -49,7 +58,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     })
     const d = await res.json()
     if (res.ok) router.push(`/games/${d.gameId}`)
-    else { alert(d.error); setRespondLoading(false) }
+    else { alert(t(`errors.${d.error}`) as string || d.error); setRespondLoading(false) }
   }
 
   async function createInvite() {
@@ -60,7 +69,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     })
     const d = await res.json()
     if (res.ok) setInviteUrl(`${window.location.origin}/invite/${d.token}`)
-    else alert(d.error)
+    else alert(t(`errors.${d.error}`) as string || d.error)
   }
 
   async function changeStatus(status: string) {
@@ -68,14 +77,14 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     await fetch(`/api/requests/${request.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...request, status }),
+      body: JSON.stringify({ status }),
     })
     router.refresh()
     setStatusLoading(false)
   }
 
   async function deleteRequest() {
-    if (!confirm('Удалить заявку? Это действие необратимо.')) return
+    if (!confirm(t('detail.confirmDelete') as string)) return
     setDeleteLoading(true)
     await fetch(`/api/requests/${request.id}`, { method: 'DELETE' })
     router.push('/my/requests')
@@ -85,7 +94,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     <div className="max-w-[1050px] mx-auto px-7 py-12">
       {/* Back */}
       <Link href="/" className="link-accent text-ink-2 inline-block mb-8">
-        ← Лента
+        {t('detail.backToFeed') as string}
       </Link>
 
       {/* Header */}
@@ -94,7 +103,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
           {request.title}
         </h3>
         {user && (
-          <button onClick={toggleBookmark} title={bookmarked ? 'Убрать из закладок' : 'В закладки'}
+          <button onClick={toggleBookmark} title={bookmarked ? t('card.removeBookmark') as string : t('card.addBookmark') as string}
             className={`text-[1.4rem] bg-transparent border-none cursor-pointer shrink-0 ${bookmarked ? 'text-accent' : 'text-edge'}`}>
             {bookmarked ? '★' : '☆'}
           </button>
@@ -107,7 +116,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
         <span className="badge badge-fandom">{fandomTypeLabels[request.fandom_type]}</span>
         {request.pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[request.pairing]}</span>}
         <span className="badge badge-content">{contentLabels[request.content_level]}</span>
-        {request.tags.map(t => <span key={t} className="badge text-ink-2 border-transparent bg-surface-3">{t.toLowerCase()}</span>)}
+        {request.tags.map(tg => <span key={tg} className="badge text-ink-2 border-transparent bg-surface-3">{tg.toLowerCase()}</span>)}
       </div>
 
       {/* Body */}
@@ -123,23 +132,23 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
       {user && !isAuthor && request.status === 'active' && (
         existingGameId ? (
           <div className="bg-surface-2 border border-edge border-l-3 border-l-accent px-6 py-5 mb-6 flex items-center justify-between gap-4">
-            <p className="font-heading italic text-ink-2 text-[0.95rem]">Вы уже участвуете в этой игре</p>
+            <p className="font-heading italic text-ink-2 text-[0.95rem]">{t('detail.alreadyParticipating') as string}</p>
             <Link href={`/games/${existingGameId}`} className="btn-primary text-[0.95rem] py-2 px-5 no-underline whitespace-nowrap">
-              Открыть игру →
+              {t('detail.openGame') as string}
             </Link>
           </div>
         ) : (
           <div className="bg-surface-2 border border-edge p-6 mb-6">
-            <p className="section-label mb-3">Твой никнейм в этой игре</p>
+            <p className="section-label mb-3">{t('detail.nicknameLabel') as string}</p>
             <div className="flex gap-3 items-center flex-wrap">
               <input
                 value={nickname} onChange={e => setNickname(e.target.value)}
                 className="input-base text-[1rem] py-2 px-3"
                 style={{ width: 'auto' }}
-                placeholder="Игрок"
+                placeholder={t('detail.nicknamePlaceholder') as string}
               />
               <button onClick={respond} disabled={respondLoading} className="btn-primary text-[0.95rem] py-2 px-5">
-                {respondLoading ? '...' : 'Ответить →'}
+                {respondLoading ? '...' : t('detail.respondButton') as string}
               </button>
             </div>
           </div>
@@ -150,24 +159,24 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
       {isAuthor && (
         <div className="flex flex-wrap gap-3 mb-6">
           <Link href={`/requests/${request.id}/edit`} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5 inline-block no-underline">
-            Редактировать
+            {t('detail.editButton') as string}
           </Link>
           {request.status === 'active' && (
             <button onClick={() => changeStatus('inactive')} disabled={statusLoading} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
-              {statusLoading ? '...' : 'Снять из ленты'}
+              {statusLoading ? '...' : t('detail.deactivate') as string}
             </button>
           )}
           {request.status !== 'active' && (
             <button onClick={() => changeStatus('active')} disabled={statusLoading} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
-              {statusLoading ? '...' : 'Вернуть в ленту'}
+              {statusLoading ? '...' : t('detail.activate') as string}
             </button>
           )}
           <button onClick={createInvite} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
-            Создать инвайт-ссылку
+            {t('detail.createInvite') as string}
           </button>
           <button onClick={deleteRequest} disabled={deleteLoading}
             className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5 text-[#c0392b] border-[#c0392b]">
-            {deleteLoading ? '...' : 'Удалить'}
+            {deleteLoading ? '...' : t('detail.deleteButton') as string}
           </button>
         </div>
       )}
@@ -175,18 +184,18 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
       {/* Invite URL */}
       {inviteUrl && (
         <div className="p-4 bg-surface-2 border border-edge mb-6">
-          <p className="section-label mb-2">Инвайт-ссылка</p>
+          <p className="section-label mb-2">{t('detail.inviteLabel') as string}</p>
           <div className="flex gap-2 items-center">
             <code className="font-mono text-[0.85rem] text-accent break-all">{inviteUrl}</code>
             <button onClick={() => { navigator.clipboard?.writeText(inviteUrl).catch(() => {}) }}
-              className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5 shrink-0">Копировать</button>
+              className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5 shrink-0">{t('detail.copyButton') as string}</button>
           </div>
         </div>
       )}
 
       {!user && (
         <p className="text-ink-2 font-heading italic">
-          <Link href="/auth/login" className="text-accent border-b border-current">Войди</Link>, чтобы ответить на заявку.
+          <Link href="/auth/login" className="text-accent border-b border-current">{t('detail.loginToRespond') as string}</Link>{t('detail.loginToRespondSuffix') as string}
         </p>
       )}
     </div>

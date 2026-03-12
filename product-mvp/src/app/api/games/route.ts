@@ -5,7 +5,7 @@ import { getUser } from '@/lib/session'
 // GET /api/games — мои игры
 export async function GET() {
   const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const rows = await query(
     `SELECT g.*, gp.left_at, gp.nickname as my_nickname,

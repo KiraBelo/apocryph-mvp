@@ -2,12 +2,12 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { useSettings } from './SettingsContext'
+import { useSettings, useT } from './SettingsContext'
 
 interface UnreadGame { id: string; title: string | null; ic_unread: string; ooc_unread: string }
 
 interface Props {
-  user: { id: string; email: string } | null
+  user: { id: string; email: string; role?: string } | null
 }
 
 function truncate(str: string, words = 6) {
@@ -18,6 +18,7 @@ function truncate(str: string, words = 6) {
 export default function Nav({ user }: Props) {
   const path = usePathname()
   const { openPanel } = useSettings()
+  const t = useT()
   const [unreadGames, setUnreadGames] = useState<UnreadGame[]>([])
   const [showModal, setShowModal] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
@@ -117,19 +118,19 @@ export default function Nav({ user }: Props) {
   return (
     <nav className="fixed top-0 left-0 right-0 z-200 h-[60px] bg-surface border-b border-edge flex items-center justify-between px-7 transition-[background,border-color] duration-300">
       <Link href="/feed" className="font-heading text-[1.2rem] italic text-ink">
-        <em className="text-accent">А</em>покриф
+        <em className="text-accent">{t('nav.brandAccent') as string}</em>{t('nav.brand') as string}
       </Link>
 
       <div className="flex items-center gap-6">
-        {link('/feed', 'Лента')}
-        {user && link('/my/requests', 'Заявки')}
+        {link('/feed', t('nav.feed') as string)}
+        {user && link('/my/requests', t('nav.requests') as string)}
         {user && (
           <div className="relative flex items-center gap-1.5" ref={modalRef}>
             <Link
               href="/my/games"
               className={`link-accent inline-flex items-center gap-1.5 transition-colors hover:text-accent ${path === '/my/games' ? 'text-accent' : 'text-ink-2'}`}
             >
-              Игры
+              {t('nav.games') as string}
             </Link>
             {icGames.length > 0 && (
               <button
@@ -153,7 +154,7 @@ export default function Nav({ user }: Props) {
                 {icGames.length > 0 && (
                   <>
                     <p className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-accent px-4 pt-3 pb-2 border-b border-edge">
-                      Новые посты
+                      {t('nav.newPosts') as string}
                     </p>
                     {icGames.map(g => (
                       <Link
@@ -167,7 +168,7 @@ export default function Nav({ user }: Props) {
                         className="block py-[0.7rem] px-4 no-underline border-b border-edge border-l-3 border-l-accent transition-[background,padding-left] duration-150 hover:bg-surface-2 hover:pl-5"
                       >
                         <span className="font-heading text-[0.95rem] italic text-ink">
-                          {g.title ? truncate(g.title) : 'Без названия'}
+                          {g.title ? truncate(g.title) : t('nav.untitled') as string}
                         </span>
                       </Link>
                     ))}
@@ -176,7 +177,7 @@ export default function Nav({ user }: Props) {
                 {oocGames.length > 0 && (
                   <>
                     <p className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 px-4 pt-3 pb-2 border-b border-edge">
-                      Оффтоп
+                      {t('nav.offtop') as string}
                     </p>
                     {oocGames.map(g => (
                       <Link
@@ -194,7 +195,7 @@ export default function Nav({ user }: Props) {
                         className="block py-[0.7rem] px-4 no-underline border-b border-edge border-l-3 border-l-ink-2 transition-[background,padding-left] duration-150 hover:bg-surface-2 hover:pl-5"
                       >
                         <span className="font-mono text-[0.85rem] text-ink-2">
-                          {g.title ? truncate(g.title) : 'Без названия'}
+                          {g.title ? truncate(g.title) : t('nav.untitled') as string}
                         </span>
                       </Link>
                     ))}
@@ -204,12 +205,13 @@ export default function Nav({ user }: Props) {
             )}
           </div>
         )}
-        {user && link('/bookmarks', 'Закладки')}
+        {user && link('/bookmarks', t('nav.bookmarks') as string)}
+        {user && (user.role === 'admin' || user.role === 'moderator') && link('/admin', t('nav.admin') as string)}
 
         <button
           onClick={openPanel}
           className="bg-transparent border-none text-ink-2 p-[0.2rem] cursor-pointer flex items-center"
-          title="Настройки"
+          title={t('nav.settings') as string}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
@@ -222,7 +224,7 @@ export default function Nav({ user }: Props) {
             <button
               type="submit"
               className="bg-transparent border-none text-ink-2 p-[0.2rem] cursor-pointer flex items-center"
-              title="Выйти"
+              title={t('nav.logout') as string}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/>
@@ -233,7 +235,7 @@ export default function Nav({ user }: Props) {
           </form>
         ) : (
           <Link href="/auth/login" className="btn-primary text-[0.9rem] py-1.5 px-4 inline-block">
-            Войти →
+            {t('nav.login') as string}
           </Link>
         )}
       </div>

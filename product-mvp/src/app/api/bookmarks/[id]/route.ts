@@ -5,7 +5,7 @@ import { getUser } from '@/lib/session'
 // POST — добавить в закладки
 export async function POST(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { id: requestId } = await params
 
@@ -14,7 +14,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     'SELECT COUNT(*) as count FROM bookmarks WHERE user_id=$1', [user.id]
   )
   if (count && parseInt(count.count) >= 50) {
-    return NextResponse.json({ error: 'Достигнут лимит 50 закладок' }, { status: 400 })
+    return NextResponse.json({ error: 'limitReached' }, { status: 400 })
   }
 
   await query(
@@ -27,7 +27,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 // DELETE — удалить из закладок
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { id: requestId } = await params
   await query('DELETE FROM bookmarks WHERE user_id=$1 AND request_id=$2', [user.id, requestId])

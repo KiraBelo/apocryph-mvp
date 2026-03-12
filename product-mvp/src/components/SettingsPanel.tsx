@@ -1,8 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useSettings, type Settings, type GameLayout } from './SettingsContext'
+import { useSettings, useT, type Settings } from './SettingsContext'
 import type { TagPreset } from './SettingsContext'
-import { FONT_GROUPS, ALL_FONTS } from '@/lib/fonts'
+import { FONT_GROUPS } from '@/lib/fonts'
+import type { Lang } from '@/i18n'
 
 function BtnGroup<T extends string>({ current, options, onSelect }: {
   current: T
@@ -85,7 +86,8 @@ function Toggle({ label, value, onChange, title }: { label: string; value: boole
 }
 
 export default function SettingsPanel() {
-  const { panelOpen, closePanel, theme, fontSize, siteFont, gameSpacing, gameLayout, emailNotifs, notesEnabled, set, tagPresets, setTagPreset } = useSettings()
+  const { panelOpen, closePanel, lang, theme, fontSize, siteFont, gameSpacing, emailNotifs, set, tagPresets, setTagPreset } = useSettings()
+  const t = useT()
   const [openField, setOpenField] = useState<string | null>(null)
   const [expandedPreset, setExpandedPreset] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
@@ -140,7 +142,7 @@ export default function SettingsPanel() {
         {/* Header */}
         <div className="flex justify-between items-baseline">
           <h2 className="font-heading italic font-light text-[1.3rem] text-ink">
-            Настройки
+            {t('settings.title') as string}
           </h2>
           <button onClick={closePanel} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.9rem] leading-none p-[0.2rem]">
             ✕
@@ -148,44 +150,55 @@ export default function SettingsPanel() {
         </div>
 
         <div className="flex flex-col gap-0.5">
-          <Row label="Тема" open={openField === 'theme'} onToggle={() => toggle('theme')}>
+          <Row label={t('settings.language') as string} open={openField === 'lang'} onToggle={() => toggle('lang')}>
+            <BtnGroup<Lang>
+              current={lang}
+              options={[
+                { value: 'ru', label: 'Русский' },
+                { value: 'en', label: 'English' },
+              ]}
+              onSelect={v => set('lang', v)}
+            />
+          </Row>
+
+          <Row label={t('settings.theme') as string} open={openField === 'theme'} onToggle={() => toggle('theme')}>
             <select
               value={theme}
               onChange={e => set('theme', e.target.value as Settings['theme'])}
               className="select-base"
             >
-              <option value="light">Бумага</option>
-              <option value="sepia">Сепия</option>
-              <option value="ink">Чернила</option>
-              <option value="nocturne">Полночь</option>
+              <option value="light">{t('settings.themePaper') as string}</option>
+              <option value="sepia">{t('settings.themeSepia') as string}</option>
+              <option value="ink">{t('settings.themeInk') as string}</option>
+              <option value="nocturne">{t('settings.themeMidnight') as string}</option>
             </select>
           </Row>
 
-          <Row label="Размер текста" open={openField === 'fontSize'} onToggle={() => toggle('fontSize')}>
+          <Row label={t('settings.fontSize') as string} open={openField === 'fontSize'} onToggle={() => toggle('fontSize')}>
             <BtnGroup<Settings['fontSize']>
               current={fontSize}
               options={[
-                { value: 'small', label: 'Мелкий' },
-                { value: 'medium', label: 'Обычный' },
-                { value: 'large', label: 'Крупный' },
+                { value: 'small', label: t('settings.fontSmall') as string },
+                { value: 'medium', label: t('settings.fontMedium') as string },
+                { value: 'large', label: t('settings.fontLarge') as string },
               ]}
               onSelect={v => set('fontSize', v)}
             />
           </Row>
 
-          <Row label="Отступы между постами" open={openField === 'spacing'} onToggle={() => toggle('spacing')}>
+          <Row label={t('settings.spacing') as string} open={openField === 'spacing'} onToggle={() => toggle('spacing')}>
             <BtnGroup<Settings['gameSpacing']>
               current={gameSpacing}
               options={[
-                { value: 'compact', label: 'Компактно' },
-                { value: 'normal', label: 'Обычно' },
-                { value: 'spacious', label: 'Просторно' },
+                { value: 'compact', label: t('settings.spacingCompact') as string },
+                { value: 'normal', label: t('settings.spacingNormal') as string },
+                { value: 'spacious', label: t('settings.spacingSpacious') as string },
               ]}
               onSelect={v => set('gameSpacing', v)}
             />
           </Row>
 
-          <Row label="Шрифт" open={openField === 'font'} onToggle={() => toggle('font')}>
+          <Row label={t('settings.font') as string} open={openField === 'font'} onToggle={() => toggle('font')}>
             <select
               value={siteFont}
               onChange={e => set('siteFont', e.target.value)}
@@ -193,7 +206,7 @@ export default function SettingsPanel() {
               style={{ fontFamily: siteFont }}
             >
               {FONT_GROUPS.flatMap((g, gi) => [
-                <option key={`g-${gi}`} disabled style={{ fontWeight: 'bold' }}>— {g.label} —</option>,
+                <option key={`g-${gi}`} disabled style={{ fontWeight: 'bold' }}>— {t(`editor.${g.key}`) as string} —</option>,
                 ...g.fonts.map(f => (
                   <option key={f.value} value={f.value}>{f.label}</option>
                 )),
@@ -201,13 +214,13 @@ export default function SettingsPanel() {
             </select>
           </Row>
 
-          <Toggle label="Уведомления на e-mail" value={emailNotifs} onChange={v => set('emailNotifs', v)} />
+          <Toggle label={t('settings.emailNotifs') as string} value={emailNotifs} onChange={v => set('emailNotifs', v)} />
         </div>
 
         <div className="h-px bg-edge" />
 
-        {/* === Наборы тегов === */}
-        <Section title="Наборы тегов">
+        {/* === Tag Presets === */}
+        <Section title={t('settings.tagPresets') as string}>
           {tagPresets.map((preset: TagPreset, i: number) => {
             const isOpen = expandedPreset === i
             const hasContent = !!preset.tags
@@ -231,13 +244,13 @@ export default function SettingsPanel() {
                     textTransform: hasContent ? 'none' : 'uppercase',
                     color: hasContent ? 'var(--text)' : 'var(--border)',
                   }}>
-                    {hasContent ? (preset.name || `Набор ${i + 1}`) : `Набор ${i + 1} — пусто`}
+                    {hasContent ? (preset.name || `${t('settings.presetName') as string} ${i + 1}`) : `${t('settings.presetName') as string} ${i + 1} — ${t('settings.presetEmpty') as string}`}
                   </span>
                   <div className="flex gap-0.5 shrink-0 items-center">
                     {hasContent && !isOpen && (
                       <button
                         onClick={e => { e.stopPropagation(); clearPreset(i) }}
-                        title="Очистить"
+                        title={t('settings.clearPreset') as string}
                         className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.7rem] px-[0.2rem] py-[0.1rem] leading-none opacity-50 hover:opacity-100"
                       >
                         ✕
@@ -256,13 +269,13 @@ export default function SettingsPanel() {
                   <div className="px-2.5 pb-2 flex flex-col gap-1.5">
                     <input
                       type="text"
-                      placeholder={`Название набора ${i + 1}`}
+                      placeholder={`${t('settings.presetNamePlaceholder') as string} ${i + 1}`}
                       value={editName}
                       onChange={e => setEditName(e.target.value)}
                       className="input-base text-[0.82rem]"
                     />
                     <textarea
-                      placeholder="Теги через запятую"
+                      placeholder={t('settings.tagsPlaceholder') as string}
                       value={editTags}
                       onChange={e => setEditTags(e.target.value)}
                       rows={2}
@@ -270,10 +283,10 @@ export default function SettingsPanel() {
                     />
                     <div className="flex gap-1.5 justify-end">
                       <button onClick={() => setExpandedPreset(null)} className="btn-ghost py-1 px-2">
-                        Отмена
+                        {t('settings.cancelPreset') as string}
                       </button>
                       <button onClick={savePreset} className="btn-primary text-[0.8rem] py-1 px-2.5">
-                        Сохранить
+                        {t('settings.savePreset') as string}
                       </button>
                     </div>
                   </div>

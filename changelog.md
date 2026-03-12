@@ -1,5 +1,111 @@
 # Changelog — Апокриф
 
+## 2026-03-12 — Фаза 4: Модерация + Админ-панель
+
+### Роли и баны
+- Роли пользователей: `user`, `moderator`, `admin` (колонка `users.role`)
+- Бан пользователей: `banned_at` + `ban_reason` в таблице users
+- Проверка бана при логине (403 + причина), баннер на каждой странице для забаненных
+- Write-эндпоинты (создание заявки, отклик, сообщения, инвайты) проверяют бан через `requireUser()`
+- Иерархия: модератор не может банить/менять роль модератора или админа
+
+### Жалобы и автоскрытие
+- Статусы жалоб: `pending`, `resolved`, `dismissed`
+- Автоскрытие: 2+ жалобы от разных пользователей → `moderation_status = 'hidden'`
+- Resolve → игра остаётся скрытой (read-only для участников)
+- Dismiss → если все pending жалобы отклонены, игра возвращается в `visible`
+- Баннер модерации в GameDialogClient, редактор скрыт для замороженных игр
+- Проверка `moderation_status` при отправке сообщений (403 `gameFrozen`)
+
+### Админ-панель (/admin)
+- Дашборд с 4 счётчиками (pending жалобы, пользователи, забаненные, скрытые игры)
+- /admin/reports — табы (ожидают/решено/отклонено), resolve/dismiss, hide/unhide игры
+- /admin/users — поиск по email, бан (модал с причиной), разбан, смена роли
+- Доступ только для moderator/admin (layout с redirect)
+
+### Bypass для модераторов
+- Модераторы могут открыть любую игру (bypass проверки участника)
+- GET /api/games/[id] возвращает email участников для модераторов (деанонимизация)
+- Ссылка «Модерация» в Nav для mod/admin
+
+### API
+- `POST/GET /api/admin/reports` — список жалоб с фильтром и пагинацией
+- `PATCH /api/admin/reports/[id]` — resolve/dismiss
+- `GET /api/admin/users` — поиск пользователей
+- `PATCH /api/admin/users/[id]` — ban/unban/set_role
+- `PATCH /api/admin/games/[id]` — moderation_status
+
+### Новые файлы
+- `BanBanner.tsx` — красный баннер бана под Nav
+- `AdminReports.tsx`, `AdminUsers.tsx` — клиентские компоненты админки
+- `admin/layout.tsx`, `admin/page.tsx`, `admin/reports/page.tsx`, `admin/users/page.tsx`
+- 6 API routes в `/api/admin/`
+
+### i18n
+- Ключи: `nav.admin`, секция `admin.*` (~25 ключей), `ban.*`, `errors.banned`, `errors.gameFrozen`
+
+## 2026-03-10 (3) — i18n: переключалка языка (RU + EN)
+
+### Инфраструктура
+- Создана система i18n: `src/i18n/ru.ts` (source of truth), `en.ts` (английские переводы), `index.ts` (хук useT())
+- Тип `Translations` с `Widen<>` — TypeScript проверяет наличие всех ключей в en.ts, но позволяет разные значения строк
+- `lang` добавлен в SettingsContext, сохраняется в localStorage (`apocryph-lang`), устанавливает `<html lang="...">`
+- Переключалка языка в SettingsPanel (Русский / English)
+
+### Мигрированные компоненты (все UI-строки через useT())
+- Nav.tsx, FeedClient.tsx, RequestCard.tsx, RequestForm.tsx
+- RequestDetailClient.tsx, MyRequestsClient.tsx, MyGamesClient.tsx
+- GameDialogClient.tsx (~90 строк), InviteClient.tsx, TagAutocomplete.tsx
+- OocEditor.tsx, RichEditor.tsx (тулбар), BookmarksClient.tsx (новый)
+- SettingsPanel.tsx, auth/login, auth/register
+
+### Серверные страницы → клиентские обёртки
+- `InvalidInviteClient.tsx` — для недействительных инвайт-ссылок
+- `RequestFormWrapper.tsx` — обёртка с заголовком для new/edit request
+- `MyRequestsHeader.tsx` — заголовок страницы "Мои заявки"
+- `NotFoundClient.tsx` — страница 404
+
+### Шрифты
+- `lib/fonts.ts` — `FontGroup.label` → `FontGroup.key` (i18n-ключ), группы шрифтов переведены
+
+### ~470 русских строк заменены на вызовы t()
+- Переводятся только строки UI (кнопки, метки, ошибки, тултипы)
+- Пользовательский контент (посты, заявки, OOC) НЕ переводится
+- Landing.tsx отложен (маркетинговый контент)
+- layout.tsx metadata остаётся на русском (server-side)
+
+## 2026-03-10 (2) — Код-ревью: 25 багов найдено и исправлено
+
+### Безопасность (критичные)
+- Убрана утечка email через GET /api/games/[id] (JOIN users больше не возвращает email)
+- Убрана утечка author_email из GET /api/requests (убран JOIN users, явный список колонок)
+- GET /api/games/[id]/messages теперь проверяет что запрашивающий — участник игры
+- Инвайт теперь проверяет used_at при принятии (нельзя принять бесконечно)
+- Race condition в respond: обёрнуто в транзакцию + SELECT FOR UPDATE
+- schema.sql обновлён: добавлены messages.type, last_read_at, last_read_ooc_at и др.
+
+### Данные и логика (важные)
+- requests/[id] — приватные заявки скрыты от чужих пользователей
+- games/[id]/page.tsx — user_id других участников заменяется на participant_id перед отправкой клиенту
+- invite/[token] — использованный инвайт показывает ошибку вместо формы
+- leave/route.ts — проверка участника + guard на повторный выход (left_at IS NULL)
+- report/route.ts — жалоба только от участника игры
+- requests/route.ts — OFFSET параметризирован ($N вместо интерполяции), убрана утечка email
+- sanitize.ts — убран iframe (clickjacking), ужесточены стили (только hex/rgb цвета), убран font-family
+- bookmarks — фильтрация: показываются только active + is_public заявки
+- SettingsContext — gameFont теперь применяется при загрузке (добавлен в applyAllToDOM)
+
+### UX и надёжность
+- send() — проверка ответа сервера, при ошибке контент не теряется + alert
+- submitNote() — проверка ответа + try/catch
+- saveNoteEdit() — проверка ответа + try/catch
+- notes useEffect — добавлен catch (нет вечного loading при ошибке сети)
+- Scroll timers — очищаются при unmount (scrollTimerRef + scrollStopRef)
+- FeedClient load() — try/catch/finally, нет вечного loading
+- MyRequestsClient inviteUrl — привязан к конкретной карточке (не глобальный)
+- InviteClient — try/catch на fetch
+- ooc_enabled — переключать может только создатель игры (первый участник)
+
 ## 2026-03-10 — UX-улучшения: теги, форма заявки, игровой диалог
 
 ### Теги
