@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser } from '@/lib/session'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: gameId } = await params
   const { reason } = await req.json()
@@ -15,15 +16,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Check participant exists and hasn't already left
   const participant = await queryOne<{ id: string; left_at: string | null }>(
     'SELECT id, left_at FROM game_participants WHERE game_id=$1 AND user_id=$2',
-    [gameId, user.id]
+    [gameId, user!.id]
   )
   if (!participant) return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
   if (participant.left_at) return NextResponse.json({ error: 'alreadyLeft' }, { status: 400 })
 
   await query(
-    `UPDATE game_participants SET left_at=NOW(), leave_reason=$3
+    `UPDATE game_participants SET left_at=NOW(), leave_reason=$3, finish_consent=false
      WHERE game_id=$1 AND user_id=$2 AND left_at IS NULL`,
-    [gameId, user.id, reason]
+    [gameId, user!.id, reason]
   )
 
   // Проверяем, не осталось ли активных участников

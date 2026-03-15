@@ -12,7 +12,7 @@ interface Message {
 }
 
 interface Participant {
-  id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: string; left_at: string | null
+  id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: string; left_at: string | null; finish_consent?: boolean
 }
 
 interface NoteEntry {
@@ -25,7 +25,7 @@ interface SearchResult {
 
 interface Props {
   gameId: string
-  game: { id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; moderation_status?: string }
+  game: { id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; moderation_status?: string; status?: string; finished_at?: string | null; published_at?: string | null }
   initialMessages: Message[]
   initialPage: number
   totalPages: number
@@ -132,8 +132,36 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isLeft = !!me.left_at
   const isFrozen = game.moderation_status && game.moderation_status !== 'visible'
+  const [gameStatus, setGameStatus] = useState(game.status || 'active')
+  const isFinished = gameStatus === 'finished'
+  const [myFinishConsent, setMyFinishConsent] = useState(!!me.finish_consent)
+  const partner = participants.find(p => p.user_id !== userId)
+  const [partnerFinishConsent, setPartnerFinishConsent] = useState(!!partner?.finish_consent)
+  const [finishLoading, setFinishLoading] = useState(false)
+  // Publish consent
+  const [myPublishConsent, setMyPublishConsent] = useState(false)
+  const [partnerPublishConsent, setPartnerPublishConsent] = useState(false)
+  const [publishLoading, setPublishLoading] = useState(false)
+  const [publishLoaded, setPublishLoaded] = useState(false)
+  const [icPostCount, setIcPostCount] = useState(0)
+  const MIN_IC_POSTS = 20
 
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Load publish consent when game is finished
+  useEffect(() => {
+    if (!isFinished || publishLoaded) return
+    fetch(`/api/games/${gameId}/publish-consent`).then(r => r.json()).then(data => {
+      if (data.participants) {
+        const myP = data.participants.find((p: { participant_id: string }) => p.participant_id === me.id)
+        const otherP = data.participants.find((p: { participant_id: string }) => p.participant_id !== me.id)
+        setMyPublishConsent(!!myP?.consented)
+        setPartnerPublishConsent(!!otherP?.consented)
+      }
+      if (data.icPostCount != null) setIcPostCount(data.icPostCount)
+      setPublishLoaded(true)
+    }).catch(() => {})
+  }, [isFinished, publishLoaded, gameId, me.id])
 
   // Cleanup scroll timers on unmount
   useEffect(() => {
@@ -336,7 +364,13 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: text, type: activeTab }),
       })
-      if (!res.ok) { alert(t('errors.sendingMessage') as string); return }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error === 'stopListBlocked'
+          ? t('errors.stopListBlocked') as string
+          : t('errors.sendingMessage') as string)
+        return
+      }
       if (activeTab === 'ooc') { setOocContent(''); setOocSendKey(k => k + 1) }
       else { setContent(''); setSendKey(k => k + 1) }
     } catch { alert(t('errors.networkError') as string) }
@@ -636,8 +670,8 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const isOoc = activeTab === 'ooc'
   const isNotes = activeTab === 'notes'
   const visibleMessages = isOoc ? oocMessages : icMessages
-  const partner = participants.find(p => p.user_id !== userId && !p.left_at)
-  const effectiveBanner = bannerPref === 'none' ? null : bannerPref === 'partner' ? (partner?.banner_url ?? null) : (bannerUrl || null)
+  const activePartner = participants.find(p => p.user_id !== userId && !p.left_at)
+  const effectiveBanner = bannerPref === 'none' ? null : bannerPref === 'partner' ? (activePartner?.banner_url ?? null) : (bannerUrl || null)
 
   return (
     <div className={fullscreen ? 'fixed inset-0 z-[500] flex flex-col bg-surface' : 'flex flex-col bg-surface'} style={fullscreen ? undefined : { height: 'calc(100vh - 60px)' }}>
@@ -841,6 +875,84 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
           {game.moderation_status === 'hidden'
             ? t('admin.gameHiddenBanner') as string
             : t('admin.gameResolvedBanner') as string}
+        </div>
+      )}
+
+      {/* Finish banner: partner proposed */}
+      {!isFinished && !isLeft && partnerFinishConsent && !myFinishConsent && (
+        <div className="px-6 py-2 flex items-center justify-center gap-3 bg-accent-dim border-b border-edge font-mono text-[0.75rem] text-accent tracking-wide">
+          <span>{t('game.partnerReadyToFinish') as string}</span>
+          <button
+            disabled={finishLoading}
+            onClick={async () => {
+              setFinishLoading(true)
+              const res = await fetch(`/api/games/${gameId}/finish`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ consent: true })
+              })
+              const data = await res.json()
+              if (data.ok) {
+                setMyFinishConsent(true)
+                if (data.finished) setGameStatus('finished')
+              }
+              setFinishLoading(false)
+            }}
+            className="btn-primary p-[0.25rem_0.7rem] text-[0.7rem]"
+          >
+            {t('game.finishToo') as string}
+          </button>
+        </div>
+      )}
+
+      {/* Finished banner */}
+      {isFinished && !isLeft && (
+        <div className="px-6 py-2 flex items-center justify-center gap-3 bg-accent-dim border-b border-edge font-mono text-[0.75rem] text-accent tracking-wide">
+          <span>{t('game.gameFinished') as string}</span>
+          <button
+            disabled={finishLoading}
+            onClick={async () => {
+              setFinishLoading(true)
+              const res = await fetch(`/api/games/${gameId}/finish`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'reopen' })
+              })
+              const data = await res.json()
+              if (data.ok) {
+                setGameStatus('active')
+                setMyFinishConsent(false)
+                setPartnerFinishConsent(false)
+                setMyPublishConsent(false)
+                setPartnerPublishConsent(false)
+                setPublishLoaded(false)
+              }
+              setFinishLoading(false)
+            }}
+            className="btn-ghost p-[0.25rem_0.7rem] text-[0.7rem]"
+          >
+            {t('game.reopen') as string}
+          </button>
+        </div>
+      )}
+
+      {/* Publish banner: partner proposed */}
+      {isFinished && !isLeft && publishLoaded && partnerPublishConsent && !myPublishConsent && icPostCount >= MIN_IC_POSTS && (
+        <div className="px-6 py-2 flex items-center justify-center gap-3 bg-[#27ae6022] border-b border-[#27ae6044] font-mono text-[0.75rem] text-[#27ae60] tracking-wide">
+          <span>{t('game.partnerWantsPublish') as string}</span>
+          <button
+            disabled={publishLoading}
+            onClick={async () => {
+              setPublishLoading(true)
+              const res = await fetch(`/api/games/${gameId}/publish-consent`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ consent: true })
+              })
+              if (res.ok) setMyPublishConsent(true)
+              setPublishLoading(false)
+            }}
+            className="btn-primary p-[0.25rem_0.7rem] text-[0.7rem]"
+          >
+            {t('game.publishToo') as string}
+          </button>
         </div>
       )}
 
@@ -1088,7 +1200,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
                 ) : (
                   /* ── DIALOG / FEED (+ book+sms) ── */
                   <div key={msg.id} data-msg-id={msg.id} className="flex gap-[0.85rem] items-start" style={{
-                    flexDirection: (gameLayout === 'dialog' || gameLayout === 'feed') ? (isMine ? 'row-reverse' : 'row') : 'row',
+                    flexDirection: gameLayout === 'dialog' ? (isMine ? 'row-reverse' : 'row') : 'row',
                     ...(smsOnly && gameLayout !== 'feed' ? { maxWidth: '860px', marginLeft: 'auto', marginRight: 'auto', width: '100%' } : {}),
                     ...(gameLayout === 'feed' ? { padding: '0.75rem 1rem' } : {}),
                   }}>
@@ -1099,7 +1211,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
                     <div className="min-w-0 flex-1" style={{ maxWidth: gameLayout === 'feed' ? '100%' : '72%' }}>
                       {smsOnly ? (
                         <>
-                          <p className="font-mono text-[0.58rem] tracking-[0.08em] mb-[0.2rem] font-semibold" style={{ color: isMine ? 'var(--accent)' : 'var(--text-2)', textAlign: (gameLayout === 'dialog' || gameLayout === 'feed') && isMine ? 'right' : 'left' }}>
+                          <p className="font-mono text-[0.58rem] tracking-[0.08em] mb-[0.2rem] font-semibold" style={{ color: isMine ? 'var(--accent)' : 'var(--text-2)', textAlign: gameLayout === 'dialog' && isMine ? 'right' : 'left' }}>
                             {msg.nickname}
                             {isMine && !isLeft && (
                               <button onClick={() => isEditing ? cancelEdit() : startEdit(msg)} title={isEditing ? t('game.cancel') as string : t('game.editNote') as string} className="ml-[0.5em] bg-transparent border-none cursor-pointer p-0 leading-none align-middle" style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}>
@@ -1107,7 +1219,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
                                 </button>
                             )}
                           </p>
-                          <p className="sms-meta" style={{ textAlign: (gameLayout === 'dialog' || gameLayout === 'feed') && isMine ? 'right' : 'left', marginBottom: '0.25em', marginTop: 0 }}>
+                          <p className="sms-meta" style={{ textAlign: gameLayout === 'dialog' && isMine ? 'right' : 'left', marginBottom: '0.25em', marginTop: 0 }}>
                             {new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             {msg.edited_at && ` (${t('game.editedShort') as string})`}
                           </p>
@@ -1119,7 +1231,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
                         </>
                       ) : (
                         <>
-                          <p className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2 mb-[0.3rem]" style={{ textAlign: (gameLayout === 'dialog' || gameLayout === 'feed') && isMine ? 'right' : 'left' }}>
+                          <p className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2 mb-[0.3rem]" style={{ textAlign: gameLayout === 'dialog' && isMine ? 'right' : 'left' }}>
                             {msg.nickname}
                             <span className="ml-[0.5em] opacity-40 tracking-[0.04em]">
                               {new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
@@ -1139,9 +1251,10 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
                             style={{
                               overflowWrap: 'break-word', wordBreak: 'break-word', minWidth: 0,
                               ...(gameLayout === 'feed' ? {
-                                background: 'transparent', borderTop: 'none', borderBottom: 'none', padding: '0',
-                                borderLeft: !isMine ? `3px solid ${feedPostBg(msg.user_id).replace('0.10', '0.35')}` : 'none',
-                                borderRight: isMine ? `3px solid ${feedPostBg(msg.user_id).replace('0.10', '0.35')}` : 'none',
+                                background: 'transparent', borderTop: 'none', borderBottom: 'none',
+                                padding: '0 0 0 0.75rem',
+                                borderLeft: `3px solid ${feedPostBg(msg.user_id).replace('0.10', '0.35')}`,
+                                borderRight: 'none',
                               } : {
                                 background: isMine ? 'var(--post-mine-bg)' : 'transparent',
                                 borderTop: 'none', borderBottom: 'none',
@@ -1212,7 +1325,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
           })()}
 
           {/* Input */}
-          {!isLeft && !isFrozen && (
+          {!isLeft && !isFrozen && (!isFinished || isOoc) && (
             <div className="shrink-0" onMouseEnter={() => editorCollapsed && setEditorCollapsed(false)} style={{
               borderTop: `1px solid ${editingId && !isOoc ? 'var(--accent)' : isOoc ? 'var(--text-2)' : 'var(--border)'}`,
               background: isOoc ? 'var(--bg-3)' : 'var(--bg-2)',
@@ -1313,6 +1426,11 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
           {isLeft && (
             <div className="px-6 py-4 text-center bg-surface-2 border-t border-edge font-heading italic text-ink-2">
               {t('game.youLeft') as string}
+            </div>
+          )}
+          {!isLeft && isFinished && !isOoc && (
+            <div className="px-6 py-4 text-center bg-surface-2 border-t border-edge font-heading italic text-ink-2">
+              {t('game.icFrozen') as string}
             </div>
           )}
         </>
@@ -1491,6 +1609,77 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
                 <span className="font-mono text-[0.55rem] text-ink-2">{t('game.notesDesc') as string}</span>
               </label>
             </div>
+
+            {/* ── Manage (finish/publish) ── */}
+            {!isLeft && (
+              <div className="flex flex-col gap-2">
+                <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">{t('game.manageSection') as string}</span>
+                {!isFinished && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={myFinishConsent}
+                      disabled={finishLoading}
+                      onChange={async e => {
+                        const newVal = e.target.checked
+                        setFinishLoading(true)
+                        const res = await fetch(`/api/games/${gameId}/finish`, {
+                          method: 'POST', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ consent: newVal })
+                        })
+                        const data = await res.json()
+                        if (data.ok) {
+                          setMyFinishConsent(newVal)
+                          if (data.finished) {
+                            setGameStatus('finished')
+                            setShowSettings(false)
+                          }
+                        }
+                        setFinishLoading(false)
+                      }}
+                      className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }}
+                    />
+                    <span className="font-mono text-[0.7rem] text-ink">{t('game.readyToFinish') as string}</span>
+                  </label>
+                )}
+                {!isFinished && (
+                  <p className="font-mono text-[0.55rem] text-ink-2 ml-5">
+                    {partnerFinishConsent ? `✓ ${t('game.partnerReadyToFinish') as string}` : t('game.partnerNotReady') as string}
+                  </p>
+                )}
+                {isFinished && publishLoaded && icPostCount >= MIN_IC_POSTS && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={myPublishConsent}
+                      disabled={publishLoading}
+                      onChange={async e => {
+                        const newVal = e.target.checked
+                        setPublishLoading(true)
+                        const res = await fetch(`/api/games/${gameId}/publish-consent`, {
+                          method: 'POST', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ consent: newVal })
+                        })
+                        if (res.ok) setMyPublishConsent(newVal)
+                        setPublishLoading(false)
+                      }}
+                      className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }}
+                    />
+                    <span className="font-mono text-[0.7rem] text-ink">{t('game.publishToLibrary') as string}</span>
+                  </label>
+                )}
+                {isFinished && publishLoaded && icPostCount >= MIN_IC_POSTS && (
+                  <p className="font-mono text-[0.55rem] text-ink-2 ml-5">
+                    {partnerPublishConsent ? `✓ ${t('game.published') as string}` : t('game.partnerNotReady') as string}
+                  </p>
+                )}
+                {isFinished && publishLoaded && icPostCount < MIN_IC_POSTS && (
+                  <p className="font-mono text-[0.55rem] text-ink-2">
+                    {t('game.tooFewMessages') as string} ({icPostCount}/{MIN_IC_POSTS})
+                  </p>
+                )}
+              </div>
+            )}
 
             <button onClick={saveSettings} className="btn-primary p-[0.5rem_1.2rem] text-[0.95rem] self-start">
               {t('game.saveSettings') as string}

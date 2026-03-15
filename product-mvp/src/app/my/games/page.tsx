@@ -24,6 +24,11 @@ interface GameRow {
   request_fandom_type: string | null
   request_pairing: string | null
   request_content_level: string | null
+  status: string
+  finished_at: string | null
+  published_at: string | null
+  partner_finish_consent: boolean
+  partner_publish_consent: boolean
 }
 
 export default async function MyGamesPage() {
@@ -55,7 +60,12 @@ export default async function MyGamesPage() {
               WHERE m.game_id = g.id AND m.type = 'ooc'
                 AND m.participant_id != gp.id
                 AND m.created_at > COALESCE(gp.last_read_ooc_at, '-infinity'::timestamptz))::text as ooc_unread,
-            (SELECT MAX(m.created_at) FROM messages m WHERE m.game_id = g.id)::text as last_message_at
+            (SELECT MAX(m.created_at) FROM messages m WHERE m.game_id = g.id)::text as last_message_at,
+            COALESCE((SELECT bool_or(gp3.finish_consent) FROM game_participants gp3
+              WHERE gp3.game_id = g.id AND gp3.user_id != $1 AND gp3.left_at IS NULL), false) as partner_finish_consent,
+            COALESCE((SELECT bool_or(c.consented) FROM game_publish_consent c
+              JOIN game_participants gp4 ON gp4.id = c.participant_id
+              WHERE c.game_id = g.id AND gp4.user_id != $1), false) as partner_publish_consent
      FROM games g
      JOIN game_participants gp ON gp.game_id = g.id AND gp.user_id = $1
      LEFT JOIN requests r ON r.id = g.request_id

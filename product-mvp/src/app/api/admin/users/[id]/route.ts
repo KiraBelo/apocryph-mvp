@@ -6,9 +6,15 @@ import { requireMod } from '@/lib/session'
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireMod()
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
   if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
 
   const { id: targetId } = await params
+
+  // Cannot modify yourself
+  if (targetId === user!.id) {
+    return NextResponse.json({ error: 'cannotModifySelf' }, { status: 400 })
+  }
   const { action, reason, role: newRole } = await req.json()
 
   // Get target user info for hierarchy checks

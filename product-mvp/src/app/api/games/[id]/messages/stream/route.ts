@@ -1,14 +1,26 @@
 import { NextRequest } from 'next/server'
-import { getUser } from '@/lib/session'
+import { requireUser } from '@/lib/session'
+import { queryOne } from '@/lib/db'
 import { subscribe } from '@/lib/sse'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return new Response('Unauthorized', { status: 401 })
+  if (error === 'banned') return new Response('Banned', { status: 403 })
 
   const { id: gameId } = await params
+
+  // Verify user is a participant of this game (or a moderator)
+  const isMod = user!.role === 'moderator' || user!.role === 'admin'
+  if (!isMod) {
+    const participant = await queryOne(
+      'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2',
+      [gameId, user!.id]
+    )
+    if (!participant) return new Response('Forbidden', { status: 403 })
+  }
 
   const encoder = new TextEncoder()
   let unsubscribe: (() => void) | undefined

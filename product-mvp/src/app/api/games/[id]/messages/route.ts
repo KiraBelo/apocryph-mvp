@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db'
 import { getUser, requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
+import { getActiveStopPhrases, checkStopList, VIOLATION_THRESHOLD } from '@/lib/stoplist'
 
 const PAGE_SIZE = 30
 
@@ -117,7 +118,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id: gameId } = await params
 
   // Check if game is frozen by moderation
-  const game = await queryOne<{ moderation_status: string }>('SELECT moderation_status FROM games WHERE id=$1', [gameId])
+  const game = await queryOne<{ moderation_status: string; status: string }>('SELECT moderation_status, status FROM games WHERE id=$1', [gameId])
   if (game && game.moderation_status !== 'visible') {
     return NextResponse.json({ error: 'gameFrozen' }, { status: 403 })
   }
@@ -125,6 +126,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!content?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
   if (content.length > 200_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
   const msgType = type === 'ooc' ? 'ooc' : 'ic'
+
+  // Block IC posts in finished games (OOC still allowed)
+  if (game && game.status === 'finished' && msgType === 'ic') {
+    return NextResponse.json({ error: 'gameFinished' }, { status: 403 })
+  }
+
+  // Stop-list check
+  const stopPhrases = await getActiveStopPhrases()
+  if (stopPhrases.length > 0) {
+    const match = checkStopList(content, stopPhrases)
+    if (match) {
+      await query(
+        `INSERT INTO stop_violations (game_id, user_id, phrase_id, matched_text, message_type)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [gameId, user.id, match.phraseId, match.context, msgType]
+      )
+      const countRow = await queryOne<{ cnt: string }>(
+        'SELECT COUNT(*) as cnt FROM stop_violations WHERE game_id = $1',
+        [gameId]
+      )
+      if (parseInt(countRow?.cnt || '0') >= VIOLATION_THRESHOLD && game?.moderation_status === 'visible') {
+        await query("UPDATE games SET moderation_status = 'hidden' WHERE id = $1", [gameId])
+        await query(
+          'UPDATE stop_violations SET auto_hidden = true WHERE game_id = $1 ORDER BY created_at DESC LIMIT 1',
+          [gameId]
+        )
+      }
+      return NextResponse.json({ error: 'stopListBlocked' }, { status: 422 })
+    }
+  }
 
   // Найти participant
   const participant = await queryOne<{ id: string; left_at: string | null }>(

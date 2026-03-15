@@ -103,9 +103,13 @@ export default function RequestCard({
     e.preventDefault()
     setLoadingBm(true)
     const method = bookmarked ? 'DELETE' : 'POST'
-    await fetch(`/api/bookmarks/${request.id}`, { method })
-    setBookmarked(b => !b)
-    onBookmark?.(request.id, !bookmarked)
+    try {
+      const res = await fetch(`/api/bookmarks/${request.id}`, { method })
+      if (res.ok) {
+        setBookmarked(b => !b)
+        onBookmark?.(request.id, !bookmarked)
+      }
+    } catch { /* network error */ }
     setLoadingBm(false)
   }
 

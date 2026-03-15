@@ -14,6 +14,10 @@ const ru = {
     offtop: 'Оффтоп',
     untitled: 'Без названия',
     admin: 'Модерация',
+    library: 'Библиотека',
+    proposals: 'Предложения',
+    proposalFinish: 'Завершить сюжет?',
+    proposalPublish: 'Игру можно опубликовать',
   },
 
   // ── Auth ──
@@ -164,6 +168,10 @@ const ru = {
     active: 'Активные',
     starred: 'Избранные',
     finished: 'Завершённые',
+    inactive: 'Неактивные',
+    publishedTab: 'Опубликованные',
+    finishProposed: 'Завершить сюжет?',
+    publishProposed: 'Игру можно опубликовать',
     waitingMyPost: 'Ждут мой пост',
     waitingTheirPost: 'Жду пост соигрока',
     empty: 'Пусто.',
@@ -273,6 +281,21 @@ const ru = {
       'Ожидания от игры не совпали',
       'Сменились интересы',
     ] as readonly string[],
+    // Finish
+    readyToFinish: 'Готов завершить',
+    partnerReadyToFinish: 'Соигрок готов завершить',
+    partnerNotReady: 'Соигрок ещё не готов',
+    finishToo: 'Тоже завершить',
+    gameFinished: 'Игра завершена',
+    reopen: 'Возобновить',
+    icFrozen: 'IC-посты заморожены в завершённой игре',
+    manageSection: 'Управление',
+    // Publish
+    publishToLibrary: 'Опубликовать в Библиотеку',
+    partnerWantsPublish: 'Соигрок хочет опубликовать',
+    publishToo: 'Тоже опубликовать',
+    published: 'Опубликовано',
+    tooFewMessages: 'Для публикации нужно минимум 20 IC-постов',
     // Export fallback
     historyFallback: 'История',
     gameFallback: 'игра',
@@ -422,12 +445,41 @@ const ru = {
     gameFrozen: 'Игра заморожена модерацией',
     gameHiddenBanner: 'Игра скрыта по результатам жалоб. Модераторы рассмотрят ситуацию.',
     gameResolvedBanner: 'Игра закрыта решением модерации. Вы можете читать, но не писать.',
+    stopList: 'Стоп-лист',
+    stopPhrases: 'Фразы',
+    stopViolations: 'Нарушения',
+    stopAddPhrase: 'Добавить фразу',
+    stopPhrase: 'Фраза',
+    stopNote: 'Комментарий',
+    stopActive: 'Активна',
+    stopNoPhrases: 'Стоп-лист пуст',
+    stopNoViolations: 'Нарушений нет',
+    stopAutoHidden: 'Авто-скрытие',
+    stopContext: 'Контекст',
+    stopConfirmDelete: 'Удалить фразу из стоп-листа?',
+    stopViolations7d: 'Нарушения (7д)',
   },
 
   // ── Ban Banner ──
   ban: {
     banner: 'Ваш аккаунт заблокирован',
     bannerDetail: 'Вы можете просматривать контент, но не можете писать.',
+  },
+
+  // ── Library ──
+  library: {
+    sectionLabel: '§ Библиотека',
+    title: 'Библиотека',
+    searchPlaceholder: 'Поиск по тексту...',
+    empty: 'Пока нет опубликованных игр.',
+    messages: 'постов',
+    readGame: 'Читать →',
+    backToLibrary: '← Библиотека',
+    participants: 'Участники',
+    find: 'Найти',
+    loading: 'Загрузка...',
+    notFound: 'Игра не найдена.',
+    layout: 'Раскладка',
   },
 
   // ── Errors ──
@@ -474,6 +526,13 @@ const ru = {
     dataTooLong: 'Слишком длинные данные',
     banned: 'Аккаунт заблокирован',
     gameFrozen: 'Игра заморожена модерацией. Новые сообщения запрещены.',
+    gameFinished: 'Игра завершена. IC-посты заморожены.',
+    gameNotFinished: 'Игра ещё не завершена',
+    tooFewMessages: 'Для публикации нужно минимум 20 IC-постов',
+    stopListBlocked: 'Сообщение содержит запрещённую фразу и не может быть отправлено.',
+    requestLimitReached: 'Лимит заявок (5 в день)',
+    requestCooldown: 'Подождите 2 минуты перед следующей заявкой',
+    duplicateRequest: 'Похожая заявка уже создана сегодня',
   },
 } as const
 

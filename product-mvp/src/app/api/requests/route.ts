@@ -22,11 +22,16 @@ export async function GET(req: NextRequest) {
   const conditions: string[] = ['r.is_public = true', "r.status = 'active'"]
   const params: unknown[]    = []
   let p = 1
+  let joinClause = ''
 
   if (mine === 'true' && user) {
     conditions.length = 0
     conditions.push(`r.author_id = $${p++}`)
     params.push(user.id)
+  } else {
+    // Hide requests from banned users in public feed
+    joinClause = 'JOIN users u ON u.id = r.author_id'
+    conditions.push('u.banned_at IS NULL')
   }
   if (type)         { conditions.push(`r.type = $${p++}`);          params.push(type) }
   if (contentLevel) { conditions.push(`r.content_level = $${p++}`); params.push(contentLevel) }
@@ -39,7 +44,7 @@ export async function GET(req: NextRequest) {
       params.push(tagArr)
     }
   }
-  if (q) {
+  if (q && q.length <= 200) {
     conditions.push(`(r.title ILIKE $${p} OR r.body ILIKE $${p})`)
     params.push(`%${q}%`)
     p++
@@ -60,7 +65,7 @@ export async function GET(req: NextRequest) {
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
   const countResult = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM requests r ${where}`,
+    `SELECT COUNT(*) as count FROM requests r ${joinClause} ${where}`,
     params
   )
   const total = parseInt(countResult?.count || '0', 10)
@@ -70,12 +75,18 @@ export async function GET(req: NextRequest) {
   const rows = await query(
     `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.tags, r.status, r.is_public, r.created_at, r.updated_at, r.author_id
      FROM requests r
+     ${joinClause}
      ${where}
      ORDER BY COALESCE(r.updated_at, r.created_at) DESC
      LIMIT $${p++} OFFSET $${p++}`,
     [...params, PAGE_SIZE, offset]
   )
-  return NextResponse.json({ requests: rows, total, page, totalPages })
+  // Sanitize body on read to protect against stored XSS from old data
+  const safeRows = (rows as { body?: string }[]).map(r => ({
+    ...r,
+    body: r.body ? sanitizeBody(r.body) : r.body,
+  }))
+  return NextResponse.json({ requests: safeRows, total, page, totalPages })
 }
 
 // POST /api/requests — создать заявку
@@ -99,6 +110,41 @@ export async function POST(req: NextRequest) {
   const tagsArr: string[] = (tags || []).map((t: string) => t.trim().toLowerCase()).filter(Boolean)
   if (tagsArr.length > 20 || tagsArr.some((t: string) => t.length > 50)) {
     return NextResponse.json({ error: 'tooManyTags' }, { status: 400 })
+  }
+
+  // Anti-spam: rate limit (5 requests/day)
+  const recentCount = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) as count FROM requests WHERE author_id = $1 AND created_at > NOW() - INTERVAL '1 day'`,
+    [user.id]
+  )
+  if (recentCount && parseInt(recentCount.count) >= 5) {
+    return NextResponse.json({ error: 'requestLimitReached' }, { status: 429 })
+  }
+
+  // Anti-spam: cooldown (2 minutes between requests)
+  const lastRequest = await queryOne<{ created_at: string }>(
+    `SELECT created_at FROM requests WHERE author_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [user.id]
+  )
+  if (lastRequest) {
+    const diff = Date.now() - new Date(lastRequest.created_at).getTime()
+    if (diff < 2 * 60 * 1000) {
+      return NextResponse.json({ error: 'requestCooldown' }, { status: 429 })
+    }
+  }
+
+  // Anti-spam: fuzzy duplicate detection (similar title OR body in last 24h)
+  const duplicate = await queryOne<{ id: string }>(
+    `SELECT id FROM requests
+     WHERE author_id = $1 AND created_at > NOW() - INTERVAL '1 day'
+     AND (
+       similarity(LOWER(title), LOWER($2)) > 0.7
+       OR ($3 IS NOT NULL AND $3 != '' AND similarity(body, $3) > 0.7)
+     ) LIMIT 1`,
+    [user.id, title, description || null]
+  )
+  if (duplicate) {
+    return NextResponse.json({ error: 'duplicateRequest' }, { status: 409 })
   }
 
   const structuredTags: { id?: number; slug: string }[] = body.structured_tags || []

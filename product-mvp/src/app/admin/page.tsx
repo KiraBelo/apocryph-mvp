@@ -14,12 +14,16 @@ export default async function AdminDashboard() {
   const [hiddenGames] = await query<{ cnt: string }>(
     `SELECT COUNT(*) as cnt FROM games WHERE moderation_status != 'visible'`
   )
+  const [violations7d] = await query<{ cnt: string }>(
+    `SELECT COUNT(*) as cnt FROM stop_violations WHERE created_at > NOW() - INTERVAL '7 days'`
+  )
 
   const stats = [
     { label: 'Жалобы (ожидают)', value: pendingReports?.cnt || '0', href: '/admin/reports' },
     { label: 'Пользователей', value: totalUsers?.cnt || '0', href: '/admin/users' },
     { label: 'Забанено', value: bannedUsers?.cnt || '0', href: '/admin/users' },
     { label: 'Скрытых игр', value: hiddenGames?.cnt || '0', href: '/admin/reports' },
+    { label: 'Нарушения (7д)', value: violations7d?.cnt || '0', href: '/admin/stop-list' },
   ]
 
   return (

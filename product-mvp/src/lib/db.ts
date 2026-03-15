@@ -9,6 +9,7 @@ function createPool() {
   return new Pool({
     connectionString: process.env.DATABASE_URL,
     max: 10,
+    connectionTimeoutMillis: 5000,
   })
 }
 
@@ -43,7 +44,11 @@ export async function withTransaction<T>(
     await client.query('COMMIT')
     return result
   } catch (e) {
-    await client.query('ROLLBACK')
+    try {
+      await client.query('ROLLBACK')
+    } catch {
+      // ROLLBACK failed, original error is more important
+    }
     throw e
   } finally {
     client.release()

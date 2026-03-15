@@ -2,6 +2,10 @@ import { getIronSession, SessionOptions } from 'iron-session'
 import { cookies } from 'next/headers'
 import { queryOne } from './db'
 
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+  throw new Error('SESSION_SECRET must be set and at least 32 characters')
+}
+
 export type Role = 'user' | 'moderator' | 'admin'
 
 export interface SessionData {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -17,19 +17,23 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if ((!r.is_public || r.status !== 'active') && r.author_id !== user?.id) {
     return NextResponse.json({ error: 'notFound' }, { status: 404 })
   }
-  return NextResponse.json(row)
+  // Sanitize body on read to protect against stored XSS
+  const safe = { ...(row as Record<string, unknown>) }
+  if (typeof safe.body === 'string') safe.body = sanitizeBody(safe.body)
+  return NextResponse.json(safe)
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id } = await params
   const request = await queryOne<{ author_id: string }>(
     'SELECT author_id FROM requests WHERE id = $1', [id]
   )
   if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-  if (request.author_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   const body = await req.json()
 
@@ -103,15 +107,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id } = await params
   const request = await queryOne<{ author_id: string }>(
     'SELECT author_id FROM requests WHERE id = $1', [id]
   )
   if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-  if (request.author_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   await query('DELETE FROM requests WHERE id=$1', [id])
   return NextResponse.json({ ok: true })

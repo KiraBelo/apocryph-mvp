@@ -67,7 +67,9 @@ export default function RequestForm({ initial }: Props) {
 
     if (!res.ok) {
       const d = await res.json()
-      setError(d.error ?? t('errors.generic') as string)
+      const errKey = `errors.${d.error}`
+      const translated = t(errKey)
+      setError((translated !== errKey ? translated : d.error ?? t('errors.generic')) as string)
       setLoading(false)
       return
     }

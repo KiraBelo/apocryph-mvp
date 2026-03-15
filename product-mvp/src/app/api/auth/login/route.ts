@@ -4,7 +4,12 @@ import { getSession } from '@/lib/session'
 import type { Role } from '@/lib/session'
 
 export async function POST(req: NextRequest) {
-  const { email, password } = await req.json()
+  let email: string, password: string
+  try {
+    ({ email, password } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
 
   const user = await verifyUser(email, password)
   if (!user) {

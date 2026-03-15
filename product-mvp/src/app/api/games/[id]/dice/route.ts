@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: gameId } = await params
   const { sides } = await req.json()
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const participant = await queryOne<{ id: string; nickname: string; left_at: string | null }>(
     'SELECT id, nickname, left_at FROM game_participants WHERE game_id=$1 AND user_id=$2',
-    [gameId, user.id]
+    [gameId, user!.id]
   )
   if (!participant || participant.left_at) {
     return NextResponse.json({ error: 'notParticipant' }, { status: 403 })

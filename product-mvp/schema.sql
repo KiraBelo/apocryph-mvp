@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS games (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id  UUID REFERENCES requests(id) ON DELETE SET NULL,
   banner_url  TEXT,
-  ooc_enabled BOOLEAN NOT NULL DEFAULT true,
+  ooc_enabled BOOLEAN NOT NULL DEFAULT false,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -121,13 +121,14 @@ CREATE TABLE IF NOT EXISTS reports (
   game_id     UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   reason      TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','resolved','dismissed')),
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_game_reporter_pending
   ON reports (game_id, reporter_id) WHERE status = 'pending';
 
 -- Migrations for banner preferences
-ALTER TABLE games ADD COLUMN IF NOT EXISTS ooc_enabled BOOLEAN NOT NULL DEFAULT false;
+-- ooc_enabled is now in CREATE TABLE with DEFAULT false
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_url TEXT;
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_pref TEXT NOT NULL DEFAULT 'own' CHECK (banner_pref IN ('own','partner','none'));
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS starred_at TIMESTAMPTZ;
@@ -216,6 +217,9 @@ CREATE INDEX IF NOT EXISTS idx_requests_content ON requests(content_level);
 CREATE INDEX IF NOT EXISTS idx_messages_game    ON messages(game_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_gp_user         ON game_participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_gp_game         ON game_participants(game_id);
+CREATE INDEX IF NOT EXISTS idx_games_request_id ON games(request_id);
+CREATE INDEX IF NOT EXISTS idx_requests_author  ON requests(author_id);
+CREATE INDEX IF NOT EXISTS idx_messages_participant ON messages(participant_id);
 
 -- ── MODERATION (Фаза 4) ─────────────────────────────────────────
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'
@@ -223,13 +227,56 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'
 ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT;
 
-ALTER TABLE reports ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'
-  CHECK (status IN ('pending','resolved','dismissed'));
+-- status is now in CREATE TABLE
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved_by UUID REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
 
 ALTER TABLE games ADD COLUMN IF NOT EXISTS moderation_status TEXT NOT NULL DEFAULT 'visible'
   CHECK (moderation_status IN ('visible','hidden','under_review'));
+
+-- ── GAME LIFECYCLE ───────────────────────────────────────────
+ALTER TABLE games ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'finished'));
+ALTER TABLE games ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
+ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS finish_consent BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
+
+-- ── PUBLIC GAMES (Библиотека) ─────────────────────────────────
+ALTER TABLE games ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_games_published ON games(published_at) WHERE published_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS game_publish_consent (
+  game_id        UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  participant_id UUID NOT NULL REFERENCES game_participants(id) ON DELETE CASCADE,
+  consented      BOOLEAN NOT NULL,
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (game_id, participant_id)
+);
+
+-- ── STOP-LIST PHRASES ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS stop_phrases (
+  id          SERIAL PRIMARY KEY,
+  phrase      TEXT NOT NULL,
+  note        TEXT,
+  is_active   BOOLEAN NOT NULL DEFAULT true,
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stop_phrases_phrase
+  ON stop_phrases (phrase) WHERE is_active = true;
+
+CREATE TABLE IF NOT EXISTS stop_violations (
+  id              SERIAL PRIMARY KEY,
+  game_id         UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  phrase_id       INTEGER NOT NULL REFERENCES stop_phrases(id) ON DELETE CASCADE,
+  matched_text    TEXT NOT NULL,
+  message_type    TEXT NOT NULL DEFAULT 'ic',
+  auto_hidden     BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_stop_violations_game ON stop_violations (game_id);
+CREATE INDEX IF NOT EXISTS idx_stop_violations_created ON stop_violations (created_at DESC);
 
 -- ================================================================
 -- SEED DATA — 16 заявок для холодного старта

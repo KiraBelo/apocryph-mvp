@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useSettings, useT } from './SettingsContext'
 
 interface UnreadGame { id: string; title: string | null; ic_unread: string; ooc_unread: string }
+interface Proposal { id: string; title: string | null; type: 'finish' | 'publish' }
 
 interface Props {
   user: { id: string; email: string; role?: string } | null
@@ -20,6 +21,7 @@ export default function Nav({ user }: Props) {
   const { openPanel } = useSettings()
   const t = useT()
   const [unreadGames, setUnreadGames] = useState<UnreadGame[]>([])
+  const [proposals, setProposals] = useState<Proposal[]>([])
   const [showModal, setShowModal] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -29,7 +31,7 @@ export default function Nav({ user }: Props) {
   const fetchUnread = () =>
     fetch('/api/games/unread-count')
       .then(r => r.json())
-      .then(d => setUnreadGames(d.games ?? []))
+      .then(d => { setUnreadGames(d.games ?? []); setProposals(d.proposals ?? []) })
 
   useEffect(() => {
     if (!user) return
@@ -39,9 +41,9 @@ export default function Nav({ user }: Props) {
   }, [user, path])
 
   useEffect(() => {
-    const total = icGames.length + oocGames.length
+    const total = icGames.length + oocGames.length + proposals.length
     document.title = total > 0 ? `(${total}) Апокриф` : 'Апокриф'
-  }, [icGames.length, oocGames.length])
+  }, [icGames.length, oocGames.length, proposals.length])
 
   useEffect(() => {
     const total = icGames.length + oocGames.length
@@ -123,6 +125,7 @@ export default function Nav({ user }: Props) {
 
       <div className="flex items-center gap-6">
         {link('/feed', t('nav.feed') as string)}
+        {link('/library', t('nav.library') as string)}
         {user && link('/my/requests', t('nav.requests') as string)}
         {user && (
           <div className="relative flex items-center gap-1.5" ref={modalRef}>
@@ -146,6 +149,15 @@ export default function Nav({ user }: Props) {
                 className="font-mono text-[0.55rem] tracking-[0.02em] bg-ink-2 text-surface rounded-full w-[1.35rem] h-[1.35rem] inline-flex items-center justify-center leading-none border-none cursor-pointer"
               >
                 {oocGames.length}
+              </button>
+            )}
+            {proposals.length > 0 && (
+              <button
+                onClick={e => { e.stopPropagation(); setShowModal(v => !v) }}
+                className="font-mono text-[0.55rem] tracking-[0.02em] rounded-full w-[1.35rem] h-[1.35rem] inline-flex items-center justify-center leading-none border-none cursor-pointer"
+                style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}
+              >
+                {proposals.length}
               </button>
             )}
 
@@ -196,6 +208,29 @@ export default function Nav({ user }: Props) {
                       >
                         <span className="font-mono text-[0.85rem] text-ink-2">
                           {g.title ? truncate(g.title) : t('nav.untitled') as string}
+                        </span>
+                      </Link>
+                    ))}
+                  </>
+                )}
+                {proposals.length > 0 && (
+                  <>
+                    <p className="font-mono text-[0.6rem] tracking-[0.15em] uppercase px-4 pt-3 pb-2 border-b border-edge" style={{ color: 'var(--accent)' }}>
+                      {t('nav.proposals') as string}
+                    </p>
+                    {proposals.map(p => (
+                      <Link
+                        key={`prop-${p.type}-${p.id}`}
+                        href={`/games/${p.id}`}
+                        onClick={() => setShowModal(false)}
+                        className="block py-[0.7rem] px-4 no-underline border-b border-edge transition-[background,padding-left] duration-150 hover:bg-surface-2 hover:pl-5"
+                        style={{ borderLeft: '3px solid var(--accent-dim)' }}
+                      >
+                        <span className="font-heading text-[0.95rem] italic text-ink">
+                          {p.title ? truncate(p.title) : t('nav.untitled') as string}
+                        </span>
+                        <span className="block font-mono text-[0.55rem] tracking-[0.08em] text-ink-2 mt-0.5">
+                          {p.type === 'finish' ? t('nav.proposalFinish') as string : t('nav.proposalPublish') as string}
                         </span>
                       </Link>
                     ))}

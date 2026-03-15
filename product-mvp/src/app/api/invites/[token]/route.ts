@@ -6,7 +6,7 @@ import { getUser } from '@/lib/session'
 export async function GET(_: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const invite = await queryOne<{ request_id: string; used_at: string | null }>(
-    'SELECT i.*, r.title, r.type FROM invites i JOIN requests r ON r.id=i.request_id WHERE i.token=$1',
+    'SELECT i.token, i.request_id, i.used_at, r.title, r.type FROM invites i JOIN requests r ON r.id=i.request_id WHERE i.token=$1',
     [token]
   )
   if (!invite) return NextResponse.json({ error: 'inviteInvalid' }, { status: 404 })

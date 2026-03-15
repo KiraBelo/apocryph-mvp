@@ -16,6 +16,10 @@ const en: Translations = {
     offtop: 'OOC',
     untitled: 'Untitled',
     admin: 'Moderation',
+    library: 'Library',
+    proposals: 'Proposals',
+    proposalFinish: 'Finish the story?',
+    proposalPublish: 'Game can be published',
   },
 
   // ── Auth ──
@@ -166,6 +170,10 @@ const en: Translations = {
     active: 'Active',
     starred: 'Starred',
     finished: 'Finished',
+    inactive: 'Inactive',
+    publishedTab: 'Published',
+    finishProposed: 'Finish the story?',
+    publishProposed: 'Game can be published',
     waitingMyPost: 'Waiting for my post',
     waitingTheirPost: 'Waiting for partner',
     empty: 'Empty.',
@@ -275,6 +283,21 @@ const en: Translations = {
       "Expectations didn't match",
       'My interests have changed',
     ] as readonly string[],
+    // Finish
+    readyToFinish: 'Ready to finish',
+    partnerReadyToFinish: 'Partner is ready to finish',
+    partnerNotReady: 'Partner is not ready yet',
+    finishToo: 'Finish too',
+    gameFinished: 'Game finished',
+    reopen: 'Reopen',
+    icFrozen: 'IC posts are frozen in a finished game',
+    manageSection: 'Manage',
+    // Publish
+    publishToLibrary: 'Publish to Library',
+    partnerWantsPublish: 'Partner wants to publish',
+    publishToo: 'Publish too',
+    published: 'Published',
+    tooFewMessages: 'At least 20 IC posts required to publish',
     // Export fallback
     historyFallback: 'History',
     gameFallback: 'game',
@@ -424,12 +447,41 @@ const en: Translations = {
     gameFrozen: 'Game frozen by moderation',
     gameHiddenBanner: 'This game is hidden due to reports. Moderators will review the situation.',
     gameResolvedBanner: 'This game has been closed by moderation. You can read but not write.',
+    stopList: 'Stop-list',
+    stopPhrases: 'Phrases',
+    stopViolations: 'Violations',
+    stopAddPhrase: 'Add phrase',
+    stopPhrase: 'Phrase',
+    stopNote: 'Note',
+    stopActive: 'Active',
+    stopNoPhrases: 'Stop-list is empty',
+    stopNoViolations: 'No violations',
+    stopAutoHidden: 'Auto-hidden',
+    stopContext: 'Context',
+    stopConfirmDelete: 'Delete phrase from stop-list?',
+    stopViolations7d: 'Violations (7d)',
   },
 
   // ── Ban Banner ──
   ban: {
     banner: 'Your account is banned',
     bannerDetail: 'You can view content but cannot write.',
+  },
+
+  // ── Library ──
+  library: {
+    sectionLabel: '§ Library',
+    title: 'Library',
+    searchPlaceholder: 'Search text...',
+    empty: 'No published games yet.',
+    messages: 'posts',
+    readGame: 'Read →',
+    backToLibrary: '← Library',
+    participants: 'Participants',
+    find: 'Search',
+    loading: 'Loading...',
+    notFound: 'Game not found.',
+    layout: 'Layout',
   },
 
   // ── Errors ──
@@ -474,6 +526,15 @@ const en: Translations = {
     inviteInvalid: 'Link is invalid',
     invalidData: 'Invalid data',
     dataTooLong: 'Data is too long',
+    banned: 'Account is banned',
+    gameFrozen: 'Game is frozen by moderation. New messages are not allowed.',
+    gameFinished: 'Game is finished. IC posts are frozen.',
+    gameNotFinished: 'Game is not finished yet',
+    tooFewMessages: 'At least 20 IC posts required to publish',
+    stopListBlocked: 'Message contains a prohibited phrase and cannot be sent.',
+    requestLimitReached: 'Request limit reached (5/day)',
+    requestCooldown: 'Wait 2 minutes before next request',
+    duplicateRequest: 'A similar request already exists today',
   },
 }
 

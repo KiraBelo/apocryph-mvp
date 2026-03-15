@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser } from '@/lib/session'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
@@ -33,7 +33,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   )
 
   const myParticipant = (participants as Array<{ user_id: string; left_at: string | null }>)
-    .find(p => p.user_id === user.id)
+    .find(p => p.user_id === user!.id)
   // Allow moderators to view any game
   if (!myParticipant && !isMod) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
@@ -42,8 +42,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
 // PATCH — обновить баннер или никнейм
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: gameId } = await params
   const { banner_url, nickname, avatar_url, ooc_enabled, banner_pref, starred, hidden } = await req.json()
@@ -67,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       'SELECT user_id FROM game_participants WHERE game_id=$1 ORDER BY id LIMIT 1',
       [gameId]
     )
-    if (first?.user_id === user.id) {
+    if (first?.user_id === user!.id) {
       await query('UPDATE games SET ooc_enabled=$2 WHERE id=$1', [gameId, ooc_enabled])
     }
   }
@@ -79,20 +80,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         banner_url=COALESCE($5,banner_url),
         banner_pref=COALESCE($6,banner_pref)
       WHERE game_id=$1 AND user_id=$2`,
-      [gameId, user.id, nickname, avatar_url, banner_url, banner_pref]
+      [gameId, user!.id, nickname, avatar_url, banner_url, banner_pref]
     )
   }
 
   if (starred !== undefined) {
     await query(
       `UPDATE game_participants SET starred_at=$3 WHERE game_id=$1 AND user_id=$2`,
-      [gameId, user.id, starred ? new Date().toISOString() : null]
+      [gameId, user!.id, starred ? new Date().toISOString() : null]
     )
   }
   if (hidden !== undefined) {
     await query(
       `UPDATE game_participants SET hidden_at=$3 WHERE game_id=$1 AND user_id=$2`,
-      [gameId, user.id, hidden ? new Date().toISOString() : null]
+      [gameId, user!.id, hidden ? new Date().toISOString() : null]
     )
   }
 

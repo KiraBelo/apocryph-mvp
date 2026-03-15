@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
+import { sanitizeBody } from '@/lib/sanitize'
 
 // GET — загрузить все свои заметки к игре (новые сверху)
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const note = await queryOne<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
     'INSERT INTO game_notes (game_id, user_id, title, content) VALUES ($1, $2, $3, $4) RETURNING id, title, content, created_at, updated_at',
-    [gameId, user.id, title ?? '', content ?? '']
+    [gameId, user.id, title ?? '', sanitizeBody(content ?? '')]
   )
   return NextResponse.json({ note })
 }

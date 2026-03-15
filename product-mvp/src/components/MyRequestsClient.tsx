@@ -57,9 +57,13 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
   }
 
   async function deleteRequest(id: string) {
-    setRequests(prev => prev.filter(r => r.id !== id))
     setConfirmDelete(null)
-    fetch(`/api/requests/${id}`, { method: 'DELETE' })
+    try {
+      const res = await fetch(`/api/requests/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setRequests(prev => prev.filter(r => r.id !== id))
+      }
+    } catch { /* network error */ }
   }
 
   return (

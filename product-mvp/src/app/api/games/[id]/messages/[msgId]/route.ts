@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
 
 // PATCH — редактировать своё сообщение
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; msgId: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
 
   const { id: gameId, msgId } = await params
   const { content } = await req.json()
@@ -23,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
      FROM messages m
      JOIN game_participants gp ON gp.id = m.participant_id
      WHERE m.id = $1 AND m.game_id = $2 AND gp.user_id = $3`,
-    [msgId, gameId, user.id]
+    [msgId, gameId, user!.id]
   )
   if (!existing) return NextResponse.json({ error: 'notFound' }, { status: 404 })
 

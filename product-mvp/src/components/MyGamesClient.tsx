@@ -25,6 +25,11 @@ interface GameRow {
   request_fandom_type: string | null
   request_pairing: string | null
   request_content_level: string | null
+  status: string
+  finished_at: string | null
+  published_at: string | null
+  partner_finish_consent: boolean
+  partner_publish_consent: boolean
 }
 
 interface Props {
@@ -32,12 +37,13 @@ interface Props {
   userId: string
 }
 
+type MainTab = 'active' | 'finished' | 'inactive' | 'starred' | 'published'
+
 export default function MyGamesClient({ games: initialGames, userId }: Props) {
   const t = useT()
   const [games, setGames] = useState(initialGames)
-  const [mainTab, setMainTab] = useState<'active' | 'finished' | 'starred'>('active')
+  const [mainTab, setMainTab] = useState<MainTab>('active')
   const [subTab, setSubTab] = useState<'waiting-them' | 'waiting-me'>('waiting-me')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const typeLabels: Record<string, string> = { duo: t('filters.duo') as string, multiplayer: t('filters.multiplayer') as string }
   const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
@@ -50,16 +56,17 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
   }
 
   const visible = games.filter(g => !g.hidden_at)
-  const active = visible.filter(g => !g.left_at)
-  const finished = visible.filter(g => g.left_at)
+
+  // Tab filters
+  const active = visible.filter(g => g.status === 'active' && !g.left_at)
+  const finished = visible.filter(g => g.status === 'finished')
+  const inactive = visible.filter(g => !!g.left_at && g.status !== 'finished')
   const starred = visible.filter(g => g.starred_at).sort((a, b) => {
-    const aFinished = a.left_at ? 1 : 0
-    const bFinished = b.left_at ? 1 : 0
-    if (aFinished !== bFinished) return aFinished - bFinished
     const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
     const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
     return bTime - aTime
   })
+  const published = visible.filter(g => !!g.published_at)
 
   const waitingMe = active.filter(g => g.last_message_user_id !== userId)
   const waitingThem = active.filter(g => g.last_message_user_id === userId)
@@ -94,28 +101,33 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
     ${isActive ? 'text-accent border-b border-accent' : 'text-ink-2 border-b border-transparent'}`
 
   const currentGames =
-    mainTab === 'finished'
-      ? finished
-      : mainTab === 'starred'
-      ? starred
-      : subTab === 'waiting-me'
-      ? waitingMe
-      : waitingThem
+    mainTab === 'finished' ? finished
+    : mainTab === 'inactive' ? inactive
+    : mainTab === 'starred' ? starred
+    : mainTab === 'published' ? published
+    : subTab === 'waiting-me' ? waitingMe
+    : waitingThem
 
   return (
     <div className="max-w-[1050px] mx-auto px-7 py-12">
       <p className="section-label mb-2">{t('myGames.sectionLabel') as string}</p>
       <h1 className="page-title mb-10">{t('myGames.title') as string}</h1>
 
-      <div className="flex gap-8 mb-1 border-b border-edge">
+      <div className="flex gap-8 mb-1 border-b border-edge flex-wrap">
         <button onClick={() => setMainTab('active')} className={tabCls(mainTab === 'active')}>
           {t('myGames.active') as string} <span className="opacity-60">({active.length})</span>
+        </button>
+        <button onClick={() => setMainTab('finished')} className={tabCls(mainTab === 'finished')}>
+          {t('myGames.finished') as string} <span className="opacity-60">({finished.length})</span>
+        </button>
+        <button onClick={() => setMainTab('inactive')} className={tabCls(mainTab === 'inactive')}>
+          {t('myGames.inactive') as string} <span className="opacity-60">({inactive.length})</span>
         </button>
         <button onClick={() => setMainTab('starred')} className={tabCls(mainTab === 'starred')}>
           {t('myGames.starred') as string} <span className="opacity-60">({starred.length})</span>
         </button>
-        <button onClick={() => setMainTab('finished')} className={tabCls(mainTab === 'finished')}>
-          {t('myGames.finished') as string} <span className="opacity-60">({finished.length})</span>
+        <button onClick={() => setMainTab('published')} className={tabCls(mainTab === 'published')}>
+          {t('myGames.publishedTab') as string} <span className="opacity-60">({published.length})</span>
         </button>
       </div>
 
@@ -139,13 +151,15 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
           {currentGames.map(g => {
             const tags = g.request_tags ?? []
             const activeCount = parseInt(g.active_participants) || 0
+            const isGameFinished = g.status === 'finished'
+            const isInactive = !!g.left_at
 
             return (
               <article
                 key={g.id}
                 className="card p-7 relative"
                 style={{
-                  opacity: mainTab === 'finished' ? 0.7 : 1,
+                  opacity: isInactive ? 0.7 : 1,
                   borderLeft: parseInt(g.ic_unread) > 0
                     ? '3px solid var(--accent)'
                     : parseInt(g.ooc_unread) > 0
@@ -153,6 +167,20 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                     : '3px solid transparent',
                 }}
               >
+                {/* Proposal banners */}
+                {!isGameFinished && !isInactive && g.partner_finish_consent && (
+                  <div className="flex items-center gap-2 -mx-7 -mt-7 mb-4 px-5 py-2 font-mono text-[0.65rem] tracking-[0.08em]"
+                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', borderBottom: '1px solid var(--accent)' }}>
+                    {t('myGames.finishProposed') as string}
+                  </div>
+                )}
+                {isGameFinished && g.partner_publish_consent && !g.published_at && (
+                  <div className="flex items-center gap-2 -mx-7 -mt-7 mb-4 px-5 py-2 font-mono text-[0.65rem] tracking-[0.08em]"
+                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', borderBottom: '1px solid var(--accent)' }}>
+                    {t('myGames.publishProposed') as string}
+                  </div>
+                )}
+
                 {/* Header row */}
                 <div className="flex items-center justify-between gap-4 mb-3">
                   <Link href={`/games/${g.id}`}>
@@ -161,7 +189,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                     </h3>
                   </Link>
                   <div className="flex items-center gap-2 shrink-0">
-                    {g.left_at && (
+                    {isInactive && (
                       <button
                         onClick={() => hideGame(g.id)}
                         title={t('myGames.hideFromList') as string}
@@ -186,6 +214,8 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                   {g.request_fandom_type && <span className="badge badge-fandom">{fandomTypeLabels[g.request_fandom_type] ?? g.request_fandom_type}</span>}
                   {g.request_pairing && g.request_pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[g.request_pairing] ?? g.request_pairing}</span>}
                   {g.request_content_level && <span className="badge badge-content">{contentLabels[g.request_content_level] ?? g.request_content_level}</span>}
+                  {isGameFinished && <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>{t('myGames.finished') as string}</span>}
+                  {g.published_at && <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>{t('game.published') as string}</span>}
                   {tags.map(tg => (
                     <span key={tg} className="badge badge-tag">#{tg.toLowerCase()}</span>
                   ))}
