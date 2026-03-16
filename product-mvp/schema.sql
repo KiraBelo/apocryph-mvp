@@ -379,5 +379,7 @@ INSERT INTO requests (author_id, title, body, type, content_level, fandom_type, 
 
 ON CONFLICT DO NOTHING;
 
+CREATE INDEX IF NOT EXISTS idx_messages_game_type ON messages(game_id, type, created_at);
+
 -- Seed: luna = admin
 UPDATE users SET role = 'admin' WHERE email = 'luna@apocryph.test';

@@ -1,5 +1,95 @@
 # Changelog
 
+## 2026-03-16 — Масштабируемость (Фаза 2)
+
+- **DB pool увеличен** — с 10 до 25 подключений + таймаут простоя 30с (`db.ts`)
+- **Индекс messages** — `idx_messages_game_type(game_id, type, created_at)` для быстрой фильтрации IC/OOC (`schema.sql`)
+- **CSP заголовок** — Content-Security-Policy защищает от XSS даже если санитизация обойдена (`next.config.ts`)
+- **React.memo для MessageBubble** — сообщения не перерисовываются если не изменились (`MessageBubble.tsx`)
+- **SSE лимит подключений** — максимум 5 SSE на пользователя, защита от DoS (`sse.ts`, `stream/route.ts`)
+- **Деплой с откатом** — `deploy.sh` автоматически откатывается к старой сборке если новая упала
+
+---
+
+## 2026-03-16 — Декомпозиция GameDialogClient + Безопасность (Фаза 1)
+
+### Рефакторинг: GameDialogClient.tsx (1726 → 313 строк, -82%)
+
+Главный компонент игрового диалога разбит на независимые части.
+
+**Кастомные хуки (src/components/hooks/):**
+- `useGameSSE` — подключение к серверу в реальном времени (SSE)
+- `useGameChat` — отправка/редактирование сообщений, пагинация
+- `useGameNotes` — CRUD заметок (личный дневник)
+- `useGameSearch` — поиск по сообщениям и заметкам
+- `useDiceRoller` — бросок кубиков
+
+**Компоненты (src/components/game/):**
+- `MessageFeed` — лента сообщений + пагинация
+- `MessageBubble` — отдельное сообщение (3 раскладки: диалог/лента/книга)
+- `MessageEditor` — редактор постов (IC/OOC) + панель кубиков
+- `NotesTab` — вкладка заметок
+- `SearchPanel` — панель поиска
+- `SettingsModal` — настройки игры
+- `StatusBanners` — баннеры статуса (завершение, публикация)
+- `ExportModal` — экспорт игры (txt/html/md/pdf)
+- `TopBar` — верхняя панель с вкладками и кнопками
+- `Modal` — компонент модального окна
+- `MsgContent` — мемоизированный рендер HTML-контента
+- `types.ts` — интерфейсы (Message, Participant, NoteEntry и др.)
+- `utils.ts` — UI-утилиты
+- `exportUtils.ts` — функции экспорта
+
+### Безопасность (Фаза 1)
+
+- **Cookie secure по умолчанию** — сессионные куки теперь отправляются только по HTTPS в продакшене (`session.ts`)
+- **Rate limiting** — ограничение попыток входа (5/15 мин) и регистрации (3/час) с одного IP (`rate-limit.ts`, `login/route.ts`, `register/route.ts`)
+- **Криптографический генератор для кубиков** — `Math.random()` → `crypto.randomInt()` (`dice/route.ts`)
+- **Экранирование LIKE-запросов** — спецсимволы `%` и `_` экранируются в поиске публичных игр (`public-games/route.ts`)
+- **escapeHtml для заголовков** — заголовок заявки экранируется при создании первого поста игры (`respond/route.ts`)
+- **Проверка бана в publish-consent** — `getUser()` → `requireUser()` с проверкой бана (`publish-consent/route.ts`)
+- **Валидация URL аватаров/баннеров** — сервер принимает только `http://` и `https://` ссылки (`games/[id]/route.ts`)
+
+### Новые файлы
+
+- `src/components/hooks/useGameSSE.ts`
+- `src/components/hooks/useGameChat.ts`
+- `src/components/hooks/useGameNotes.ts`
+- `src/components/hooks/useGameSearch.ts`
+- `src/components/hooks/useDiceRoller.ts`
+- `src/components/game/MessageFeed.tsx`
+- `src/components/game/MessageBubble.tsx`
+- `src/components/game/MessageEditor.tsx`
+- `src/components/game/NotesTab.tsx`
+- `src/components/game/SearchPanel.tsx`
+- `src/components/game/SettingsModal.tsx`
+- `src/components/game/StatusBanners.tsx`
+- `src/components/game/ExportModal.tsx`
+- `src/components/game/TopBar.tsx`
+- `src/components/game/Modal.tsx`
+- `src/components/game/MsgContent.tsx`
+- `src/components/game/types.ts`
+- `src/components/game/utils.ts`
+- `src/components/game/exportUtils.ts`
+- `src/lib/rate-limit.ts`
+- `code-review.md` — полный аудит проекта (31 находка)
+
+### Изменённые файлы
+
+- `src/components/GameDialogClient.tsx` — переписан как тонкий оркестратор (1726 → 313 строк)
+- `src/lib/game-utils.ts` — добавлены htmlToText, isSMSOnly, downloadFile, paginationRange, NOTE_COLLAPSE_CHARS
+- `src/lib/session.ts` — cookie secure по умолчанию в production
+- `src/lib/rate-limit.ts` — новый in-memory rate limiter
+- `src/app/api/auth/login/route.ts` — rate limiting (5 попыток/15 мин)
+- `src/app/api/auth/register/route.ts` — rate limiting (3 регистрации/час)
+- `src/app/api/games/[id]/dice/route.ts` — crypto.randomInt
+- `src/app/api/games/[id]/route.ts` — валидация URL аватаров/баннеров
+- `src/app/api/games/[id]/publish-consent/route.ts` — requireUser + ban check
+- `src/app/api/public-games/route.ts` — экранирование LIKE
+- `src/app/api/requests/[id]/respond/route.ts` — escapeHtml для title
+
+---
+
 ## 2026-03-15
 
 ### Жизненный цикл игр + Библиотека

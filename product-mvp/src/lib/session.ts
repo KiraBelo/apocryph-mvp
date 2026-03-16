@@ -18,7 +18,7 @@ const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET!,
   cookieName: 'apocryph_session',
   cookieOptions: {
-    secure: process.env.USE_HTTPS === 'true',
+    secure: process.env.NODE_ENV === 'production' || process.env.USE_HTTPS === 'true',
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 30, // 30 days

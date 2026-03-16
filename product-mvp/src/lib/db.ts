@@ -8,8 +8,9 @@ declare global {
 function createPool() {
   return new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 10,
+    max: 25,
     connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
   })
 }
 

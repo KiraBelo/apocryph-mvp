@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createUser } from '@/lib/auth'
 import { getSession } from '@/lib/session'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   let email: string, password: string
@@ -8,6 +9,12 @@ export async function POST(req: NextRequest) {
     ({ email, password } = await req.json())
   } catch {
     return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const { allowed } = rateLimit(`register:${ip}`, 3, 60 * 60 * 1000)
+  if (!allowed) {
+    return NextResponse.json({ error: 'tooManyAttempts' }, { status: 429 })
   }
 
   if (!email || !password || password.length < 6) {

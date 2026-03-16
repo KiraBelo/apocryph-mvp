@@ -49,6 +49,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id: gameId } = await params
   const { banner_url, nickname, avatar_url, ooc_enabled, banner_pref, starred, hidden } = await req.json()
 
+  if (avatar_url && !/^https?:\/\//i.test(avatar_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
+  if (banner_url && !/^https?:\/\//i.test(banner_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
+
   if (nickname && nickname.length > 50) {
     return NextResponse.json({ error: 'nicknameTooLong' }, { status: 400 })
   }

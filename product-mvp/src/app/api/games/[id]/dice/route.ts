@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { query, queryOne } from '@/lib/db'
 import { requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
   }
 
-  const result = Math.floor(Math.random() * s) + 1
+  const result = crypto.randomInt(1, s + 1)
   const content = JSON.stringify({ sides: s, result, roller: participant.nickname })
 
   const message = await queryOne(

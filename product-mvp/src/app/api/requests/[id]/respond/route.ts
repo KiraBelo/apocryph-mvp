@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
 import { requireUser } from '@/lib/session'
+import { escapeHtml } from '@/lib/game-utils'
 
 // POST /api/requests/[id]/respond — откликнуться на заявку
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Первый пост — текст заявки
       if (authorParticipant) {
         const tagLine = request.tags?.length ? request.tags.map(t => `#${t}`).join(' ') : ''
-        const parts = [`<h3>${request.title}</h3>`]
+        const parts = [`<h3>${escapeHtml(request.title)}</h3>`]
         if (tagLine) parts.push(`<p>${tagLine}</p>`)
         if (request.body) parts.push(request.body)
         const firstPostContent = parts.join('\n')

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { requireUser } from '@/lib/session'
 import { queryOne } from '@/lib/db'
-import { subscribe } from '@/lib/sse'
+import { subscribe, canConnect, trackConnect, trackDisconnect } from '@/lib/sse'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,8 +22,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!participant) return new Response('Forbidden', { status: 403 })
   }
 
+  if (!canConnect(user!.id)) {
+    return new Response('Too many connections', { status: 429 })
+  }
+
+  const userId = user!.id
   const encoder = new TextEncoder()
   let unsubscribe: (() => void) | undefined
+
+  trackConnect(userId)
 
   const stream = new ReadableStream({
     start(controller) {
@@ -47,11 +54,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       req.signal.addEventListener('abort', () => {
         clearInterval(ping)
         unsubscribe?.()
+        trackDisconnect(userId)
         controller.close()
       })
     },
     cancel() {
       unsubscribe?.()
+      trackDisconnect(userId)
     },
   })
 

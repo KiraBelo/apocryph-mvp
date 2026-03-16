@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
   }
 
   if (q) {
-    const like = `%${q}%`
+    const escaped = q.replace(/[%_\\]/g, '\\$&')
+    const like = `%${escaped}%`
     conditions.push(`(r.title ILIKE $${p} OR r.body ILIKE $${p})`)
     p++
     params.push(like)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser } from '@/lib/session'
 
 const MIN_IC_POSTS = 20
 
@@ -55,8 +55,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
 // POST — give or revoke consent
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: gameId } = await params
   let consent: boolean
