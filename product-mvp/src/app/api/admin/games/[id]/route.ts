@@ -15,7 +15,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'invalidStatus' }, { status: 400 })
   }
 
-  await query('UPDATE games SET moderation_status = $2 WHERE id = $1', [gameId, moderation_status])
-
-  return NextResponse.json({ ok: true })
+  try {
+    await query('UPDATE games SET moderation_status = $2 WHERE id = $1', [gameId, moderation_status])
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API /api/admin/games/[id]] PATCH:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

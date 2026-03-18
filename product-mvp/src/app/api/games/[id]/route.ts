@@ -9,35 +9,40 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { id: gameId } = await params
   const isMod = user.role === 'moderator' || user.role === 'admin'
 
-  const game = await queryOne(
-    `SELECT g.*, r.title as request_title, r.type as request_type
-     FROM games g
-     LEFT JOIN requests r ON r.id = g.request_id
-     WHERE g.id = $1`,
-    [gameId]
-  )
-  if (!game) return NextResponse.json({ error: 'notFound' }, { status: 404 })
+  try {
+    const game = await queryOne(
+      `SELECT g.*, r.title as request_title, r.type as request_type
+       FROM games g
+       LEFT JOIN requests r ON r.id = g.request_id
+       WHERE g.id = $1`,
+      [gameId]
+    )
+    if (!game) return NextResponse.json({ error: 'notFound' }, { status: 404 })
 
-  // For moderators: include email for deanonymization
-  const participantFields = isMod
-    ? 'gp.id, gp.game_id, gp.user_id, gp.nickname, gp.avatar_url, gp.banner_url, gp.banner_pref, gp.left_at, gp.leave_reason, u.email as user_email'
-    : 'gp.id, gp.game_id, gp.user_id, gp.nickname, gp.avatar_url, gp.banner_url, gp.banner_pref, gp.left_at, gp.leave_reason'
-  const participantJoin = isMod ? 'JOIN users u ON u.id = gp.user_id' : ''
+    // For moderators: include email for deanonymization
+    const participantFields = isMod
+      ? 'gp.id, gp.game_id, gp.user_id, gp.nickname, gp.avatar_url, gp.banner_url, gp.banner_pref, gp.left_at, gp.leave_reason, u.email as user_email'
+      : 'gp.id, gp.game_id, gp.user_id, gp.nickname, gp.avatar_url, gp.banner_url, gp.banner_pref, gp.left_at, gp.leave_reason'
+    const participantJoin = isMod ? 'JOIN users u ON u.id = gp.user_id' : ''
 
-  const participants = await query(
-    `SELECT ${participantFields}
-     FROM game_participants gp ${participantJoin}
-     WHERE gp.game_id = $1
-     ORDER BY gp.id`,
-    [gameId]
-  )
+    const participants = await query(
+      `SELECT ${participantFields}
+       FROM game_participants gp ${participantJoin}
+       WHERE gp.game_id = $1
+       ORDER BY gp.id`,
+      [gameId]
+    )
 
-  const myParticipant = (participants as Array<{ user_id: string; left_at: string | null }>)
-    .find(p => p.user_id === user!.id)
-  // Allow moderators to view any game
-  if (!myParticipant && !isMod) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    const myParticipant = (participants as Array<{ user_id: string; left_at: string | null }>)
+      .find(p => p.user_id === user!.id)
+    // Allow moderators to view any game
+    if (!myParticipant && !isMod) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
-  return NextResponse.json({ game, participants, myParticipant: myParticipant || null, isMod })
+    return NextResponse.json({ game, participants, myParticipant: myParticipant || null, isMod })
+  } catch (error) {
+    console.error('[API /api/games/[id]] GET:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }
 
 // PATCH — обновить баннер или никнейм
@@ -65,40 +70,45 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'invalidBannerPref' }, { status: 400 })
   }
 
-  if (ooc_enabled !== undefined) {
-    // Only the first participant (game creator) can toggle OOC
-    const first = await queryOne<{ user_id: string }>(
-      'SELECT user_id FROM game_participants WHERE game_id=$1 ORDER BY id LIMIT 1',
-      [gameId]
-    )
-    if (first?.user_id === user!.id) {
-      await query('UPDATE games SET ooc_enabled=$2 WHERE id=$1', [gameId, ooc_enabled])
+  try {
+    if (ooc_enabled !== undefined) {
+      // Only the first participant (game creator) can toggle OOC
+      const first = await queryOne<{ user_id: string }>(
+        'SELECT user_id FROM game_participants WHERE game_id=$1 ORDER BY id LIMIT 1',
+        [gameId]
+      )
+      if (first?.user_id === user!.id) {
+        await query('UPDATE games SET ooc_enabled=$2 WHERE id=$1', [gameId, ooc_enabled])
+      }
     }
-  }
-  if (nickname !== undefined || avatar_url !== undefined || banner_url !== undefined || banner_pref !== undefined) {
-    await query(
-      `UPDATE game_participants SET
-        nickname=COALESCE($3,nickname),
-        avatar_url=COALESCE($4,avatar_url),
-        banner_url=COALESCE($5,banner_url),
-        banner_pref=COALESCE($6,banner_pref)
-      WHERE game_id=$1 AND user_id=$2`,
-      [gameId, user!.id, nickname, avatar_url, banner_url, banner_pref]
-    )
-  }
+    if (nickname !== undefined || avatar_url !== undefined || banner_url !== undefined || banner_pref !== undefined) {
+      await query(
+        `UPDATE game_participants SET
+          nickname=COALESCE($3,nickname),
+          avatar_url=COALESCE($4,avatar_url),
+          banner_url=COALESCE($5,banner_url),
+          banner_pref=COALESCE($6,banner_pref)
+        WHERE game_id=$1 AND user_id=$2`,
+        [gameId, user!.id, nickname, avatar_url, banner_url, banner_pref]
+      )
+    }
 
-  if (starred !== undefined) {
-    await query(
-      `UPDATE game_participants SET starred_at=$3 WHERE game_id=$1 AND user_id=$2`,
-      [gameId, user!.id, starred ? new Date().toISOString() : null]
-    )
-  }
-  if (hidden !== undefined) {
-    await query(
-      `UPDATE game_participants SET hidden_at=$3 WHERE game_id=$1 AND user_id=$2`,
-      [gameId, user!.id, hidden ? new Date().toISOString() : null]
-    )
-  }
+    if (starred !== undefined) {
+      await query(
+        `UPDATE game_participants SET starred_at=$3 WHERE game_id=$1 AND user_id=$2`,
+        [gameId, user!.id, starred ? new Date().toISOString() : null]
+      )
+    }
+    if (hidden !== undefined) {
+      await query(
+        `UPDATE game_participants SET hidden_at=$3 WHERE game_id=$1 AND user_id=$2`,
+        [gameId, user!.id, hidden ? new Date().toISOString() : null]
+      )
+    }
 
-  return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API /api/games/[id]] PATCH:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

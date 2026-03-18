@@ -2,9 +2,9 @@
 // Хранится на globalThis чтобы пережить HMR в dev-режиме
 type Listener = (data: unknown) => void
 
-const g = globalThis as any
+const g = globalThis as unknown as { __sseListeners?: Map<string, Set<Listener>> }
 if (!g.__sseListeners) g.__sseListeners = new Map<string, Set<Listener>>()
-const listeners: Map<string, Set<Listener>> = g.__sseListeners
+const listeners = g.__sseListeners
 
 export function subscribe(gameId: string, fn: Listener): () => void {
   if (!listeners.has(gameId)) listeners.set(gameId, new Set())

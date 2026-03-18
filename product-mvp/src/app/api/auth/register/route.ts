@@ -37,7 +37,13 @@ export async function POST(req: NextRequest) {
     session.role = 'user'
     await session.save()
     return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: 'emailTaken' }, { status: 409 })
+  } catch (error) {
+    // Expected: duplicate email constraint
+    if (error instanceof Error && error.message.includes('duplicate key')) {
+      return NextResponse.json({ error: 'emailTaken' }, { status: 409 })
+    }
+    // Unexpected: log and return 500
+    console.error('[API /api/auth/register] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
   }
 }

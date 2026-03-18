@@ -1,5 +1,129 @@
 # Changelog — Апокриф
 
+## 2026-03-14 — Исправления по аудиту Harness Engineering (19 фиксов)
+
+### CRITICAL — Безопасность API
+- **SSE stream без проверки участника** — добавлена проверка `game_participants` + бана перед SSE-подключением
+- **7 write-эндпоинтов без проверки бана** — PATCH requests/[id], PATCH games/[id], PATCH messages/[msgId], POST dice, POST leave, POST report, PATCH messages/[msgId] переведены на `requireUser()`
+- **Admin layout без проверки бана** — `getUser()` → `requireMod()`, забаненные модераторы больше не видят админку
+- **Self-ban guard** — админ/мод не может забанить или изменить роль самому себе (`cannotModifySelf`)
+
+### CRITICAL — XSS
+- **request.body без санитизации на чтении** — `sanitizeBody()` применяется при выдаче body в GET /api/requests и GET /api/requests/[id]
+- **note.content без санитизации** — `sanitizeBody()` применяется при записи заметок (POST/PATCH notes)
+
+### CRITICAL — Schema
+- **ooc_enabled DEFAULT true → false** — исправлено в CREATE TABLE
+- **Unique index reports.status** — колонка status добавлена в CREATE TABLE, index создаётся корректно
+
+### IMPORTANT — Безопасность
+- **Security headers** — X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy в next.config.ts
+- **SESSION_SECRET проверка** — приложение не стартует без SESSION_SECRET длиной ≥32 символов
+- **Email валидация** — базовая regex-проверка формата email при регистрации
+- **req.json() без try/catch** — login/register корректно обрабатывают невалидный JSON (400 вместо 500)
+- **GET invites/[token]** — возвращает только `token, request_id, used_at, title, type` вместо `i.*`
+- **Параметр q** — ограничен 200 символами для защиты от DoS через тяжёлый ILIKE
+
+### IMPORTANT — Производительность
+- **3 индекса БД** — `idx_games_request_id`, `idx_requests_author`, `idx_messages_participant`
+- **Pool connectionTimeoutMillis** — добавлен таймаут 5 сек, ROLLBACK failure не глотает оригинальное исключение
+
+### IMPORTANT — Логические ошибки Frontend
+- **toggleBookmark** — проверяет `res.ok` перед переключением UI, при ошибке состояние сохраняется
+- **deleteRequest** — ждёт ответа сервера (`await`), удаляет из списка только при `res.ok`
+- **TOCTOU race на лимит закладок** — count + insert обёрнуты в `withTransaction`
+
+### Скрытие заявок забаненных
+- Публичная лента фильтрует заявки по `u.banned_at IS NULL` (JOIN users)
+
+## 2026-03-13 — Аудит Harness Engineering (31 находка)
+
+### CRITICAL — Безопасность API (8)
+- **SSE stream без проверки участника** (`games/[id]/messages/stream/route.ts`) — любой залогиненный может подслушивать чужие игры через SSE
+- **6 write-эндпоинтов без проверки бана** — PATCH requests/[id], PATCH games/[id], PATCH messages/[msgId], POST dice, POST leave, POST report используют `getUser()` вместо `requireUser()`
+- **Admin routes без проверки `error === 'banned'`** — admin/reports, admin/users и их подроуты пропускают забаненных модераторов
+
+### CRITICAL — XSS (3)
+- **`request.body` без санитизации на чтении** — RequestCard, MyRequestsClient, RequestDetailClient рендерят HTML через `dangerouslySetInnerHTML` без `sanitizeBody()`
+- **Экспорт без санитизации** — `exportHtml()`/`exportPdf()` в GameDialogClient вставляют `msg.content` напрямую в HTML
+- **`note.content` без санитизации** — GameDialogClient рендерит заметки через `dangerouslySetInnerHTML`
+
+### CRITICAL — Schema (2)
+- **Unique index `idx_reports_game_reporter_pending`** ссылается на колонку `status` до её создания — на fresh install index не создаётся
+- **`ooc_enabled DEFAULT true`** в CREATE TABLE противоречит `DEFAULT false` в миграции и CLAUDE.md
+
+### IMPORTANT — Безопасность (6)
+- **CSS injection через `style`** на `<span>`/`<p>` в sanitize.ts — position, z-index, width проходят фильтр
+- **`SESSION_SECRET!`** без проверки при старте — undefined password = крэш
+- **Нет security headers** — X-Frame-Options, X-Content-Type-Options, Referrer-Policy отсутствуют в next.config.ts
+- **Email не валидируется** при регистрации — можно зарегистрироваться с невалидным email
+- **`req.json()` без try/catch** в login/register — невалидный JSON = 500 со стектрейсом
+- **GET invites/[token]** возвращает `i.*` — лишние поля наружу
+
+### IMPORTANT — Производительность / Индексы (5)
+- **Нет `idx_games_request_id`** — full scan при создании/join игры
+- **Нет `idx_requests_author`** — full scan «мои заявки»
+- **Нет `idx_messages_participant`** — full scan FK cascade
+- **Pool без `connectionTimeoutMillis`** — зависает при недоступной БД
+- **ROLLBACK failure** в `withTransaction` глотает оригинальное исключение
+
+### IMPORTANT — Логические ошибки Frontend (7)
+- **`toggleBookmark`** в RequestCard не проверяет `res.ok` — UI флипается при ошибке сервера
+- **`deleteRequest`** в MyRequestsClient — fire-and-forget без await и отката
+- **Nav.tsx setInterval fetch** без AbortController — setState после unmount
+- **`setSearchLoading(false)`** в GameDialogClient вне try — loading мигает при abort
+- **TOCTOU race** на лимит 50 закладок — count + insert без транзакции
+- **Админ может забанить сам себя** — нет self-ban guard
+- **Параметр `q`** в requests GET без ограничения длины → тяжёлый ILIKE
+
+## 2026-03-12 (3) — Стоп-лист запрещённых фраз
+
+### Таблицы БД
+- `stop_phrases` — фразы с полями `phrase`, `note`, `is_active`, `created_by`; уникальный индекс по активным
+- `stop_violations` — лог нарушений: `game_id`, `user_id`, `phrase_id`, `matched_text`, `auto_hidden`
+
+### Утилита (`lib/stoplist.ts`)
+- In-memory кеш активных фраз с TTL 60 сек, инвалидация при CRUD
+- `checkStopList()` — strip HTML → lowercase → substring-match, возвращает контекст ±25 символов
+- `VIOLATION_THRESHOLD = 3` — авто-скрытие игры после 3 нарушений
+
+### Интеграция в POST messages
+- Проверка стоп-листа после санитизации, перед INSERT сообщения
+- При совпадении: запись в `stop_violations`, проверка порога → авто-скрытие, ответ 422 `stopListBlocked`
+- GameDialogClient показывает локализованную ошибку при блокировке
+
+### Admin API
+- `GET/POST /api/admin/stop-list` — список фраз (пагинация, поиск) + создание (мин 3, макс 200 символов)
+- `PATCH/DELETE /api/admin/stop-list/[id]` — изменение/удаление фразы
+- `GET /api/admin/violations` — лог нарушений (пагинация, фильтр по game_id)
+
+### Admin UI (`/admin/stop-list`)
+- Два таба: Фразы (добавление, вкл/выкл, удаление) и Нарушения (лог со ссылками на игры)
+- Дашборд: карточка «Нарушения (7д)» со счётчиком
+
+### i18n
+- Ключи `admin.stopList.*` (12 шт.) + `errors.stopListBlocked` в ru.ts и en.ts
+
+## 2026-03-12 (2) — Security review: исправления безопасности
+
+### Critical
+- **Инвайты — проверка владельца**: `POST /api/invites` теперь проверяет `author_id === user.id`, чужие заявки нельзя инвайтить
+- **Инвайты — race condition**: `POST /api/invites/[token]` обёрнут в `withTransaction` + `SELECT ... FOR UPDATE`, двойное использование инвайта невозможно
+- **requireMod() — роль из БД**: роль и бан-статус теперь проверяются из БД, а не из cookie. Разжалованный модератор теряет доступ сразу
+
+### High
+- **GET /api/requests/[id] — видимость**: неопубликованные и приватные заявки доступны только автору
+- **CSS-санитизация**: regex для `color`/`background-color` теперь требует полное значение `rgb(R,G,B)`, предотвращает CSS injection через `url()`
+- **Дедупликация репортов**: unique index `(game_id, reporter_id) WHERE status='pending'` + проверка в API. Спам жалобами невозможен
+- **XSS в экспорте**: `escapeHtml()` для никнеймов и заголовков в HTML/PDF экспорте
+- **XSS в цитировании**: `quotePost()` экранирует текст перед вставкой в HTML-шаблон
+
+### Medium
+- **Stale closure в редакторах**: `useEffect` в RichEditor/OocEditor получил правильные deps `[editor, content]`
+- **AbortController в поиске**: GameDialogClient search fetch отменяется при unmount, нет setState после размонтирования
+- **Пустые посты**: `send()` проверяет `<p></p>` (пустой TipTap документ), не только `.trim()`
+- **Подтверждение смены роли**: AdminUsers показывает `confirm()` перед изменением роли пользователя
+
 ## 2026-03-12 — Фаза 4: Модерация + Админ-панель
 
 ### Роли и баны

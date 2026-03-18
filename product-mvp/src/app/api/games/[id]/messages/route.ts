@@ -26,74 +26,79 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Type filter: ic = everything except ooc and dice; ooc = only ooc
   const typeFilter = type === 'ooc' ? "m.type = 'ooc'" : "m.type NOT IN ('ooc', 'dice')"
 
-  // ── Search mode ──
-  if (search.length >= 2) {
-    const escaped = search.replace(/[%_\\]/g, '\\$&')
+  try {
+    // ── Search mode ──
+    if (search.length >= 2) {
+      const escaped = search.replace(/[%_\\]/g, '\\$&')
 
-    // We need row_num to compute which page each result is on
-    // First get total count for this type to compute pages
+      // We need row_num to compute which page each result is on
+      // First get total count for this type to compute pages
+      const countRes = await queryOne<{ count: string }>(
+        `SELECT COUNT(*) as count FROM messages m WHERE m.game_id = $1 AND ${typeFilter}`,
+        [gameId]
+      )
+      const total = parseInt(countRes?.count || '0', 10)
+
+      const results = await query<{
+        id: string; content: string; created_at: string; nickname: string; global_row: number
+      }>(
+        `WITH numbered AS (
+          SELECT m.id, m.content, m.created_at, gp.nickname,
+                 ROW_NUMBER() OVER (ORDER BY m.created_at ASC, m.id ASC) as global_row
+          FROM messages m
+          JOIN game_participants gp ON gp.id = m.participant_id
+          WHERE m.game_id = $1 AND ${typeFilter}
+        )
+        SELECT id, content, created_at, nickname, global_row
+        FROM numbered
+        WHERE content ILIKE '%' || $2 || '%'
+        ORDER BY created_at DESC
+        LIMIT 50`,
+        [gameId, escaped]
+      )
+
+      const totalPages = Math.max(1, Math.ceil(total / limit))
+
+      return NextResponse.json({
+        results: results.map(r => ({
+          id: r.id,
+          snippet: htmlToSnippet(r.content, search),
+          created_at: r.created_at,
+          nickname: r.nickname,
+          page: Math.ceil(Number(r.global_row) / limit),
+        })),
+        totalPages,
+      })
+    }
+
+    // ── Pagination mode ──
     const countRes = await queryOne<{ count: string }>(
       `SELECT COUNT(*) as count FROM messages m WHERE m.game_id = $1 AND ${typeFilter}`,
       [gameId]
     )
     const total = parseInt(countRes?.count || '0', 10)
-
-    const results = await query<{
-      id: string; content: string; created_at: string; nickname: string; global_row: number
-    }>(
-      `WITH numbered AS (
-        SELECT m.id, m.content, m.created_at, gp.nickname,
-               ROW_NUMBER() OVER (ORDER BY m.created_at ASC, m.id ASC) as global_row
-        FROM messages m
-        JOIN game_participants gp ON gp.id = m.participant_id
-        WHERE m.game_id = $1 AND ${typeFilter}
-      )
-      SELECT id, content, created_at, nickname, global_row
-      FROM numbered
-      WHERE content ILIKE '%' || $2 || '%'
-      ORDER BY created_at DESC
-      LIMIT 50`,
-      [gameId, escaped]
-    )
-
     const totalPages = Math.max(1, Math.ceil(total / limit))
 
-    return NextResponse.json({
-      results: results.map(r => ({
-        id: r.id,
-        snippet: htmlToSnippet(r.content, search),
-        created_at: r.created_at,
-        nickname: r.nickname,
-        page: Math.ceil(Number(r.global_row) / limit),
-      })),
-      totalPages,
-    })
+    // Default to last page
+    const pageParam = sp.get('page')
+    const page = pageParam ? Math.max(1, Math.min(parseInt(pageParam, 10) || totalPages, totalPages)) : totalPages
+    const offset = (page - 1) * limit
+
+    const rows = await query(
+      `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
+       FROM messages m
+       JOIN game_participants gp ON gp.id = m.participant_id
+       WHERE m.game_id = $1 AND ${typeFilter}
+       ORDER BY m.created_at ASC, m.id ASC
+       LIMIT $2 OFFSET $3`,
+      [gameId, limit, offset]
+    )
+
+    return NextResponse.json({ messages: rows, total, page, totalPages })
+  } catch (error) {
+    console.error('[API /api/games/[id]/messages] GET:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
   }
-
-  // ── Pagination mode ──
-  const countRes = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM messages m WHERE m.game_id = $1 AND ${typeFilter}`,
-    [gameId]
-  )
-  const total = parseInt(countRes?.count || '0', 10)
-  const totalPages = Math.max(1, Math.ceil(total / limit))
-
-  // Default to last page
-  const pageParam = sp.get('page')
-  const page = pageParam ? Math.max(1, Math.min(parseInt(pageParam, 10) || totalPages, totalPages)) : totalPages
-  const offset = (page - 1) * limit
-
-  const rows = await query(
-    `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
-     FROM messages m
-     JOIN game_participants gp ON gp.id = m.participant_id
-     WHERE m.game_id = $1 AND ${typeFilter}
-     ORDER BY m.created_at ASC, m.id ASC
-     LIMIT $2 OFFSET $3`,
-    [gameId, limit, offset]
-  )
-
-  return NextResponse.json({ messages: rows, total, page, totalPages })
 }
 
 // Strip HTML tags for search snippet
@@ -117,72 +122,77 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id: gameId } = await params
 
-  // Check if game is frozen by moderation
-  const game = await queryOne<{ moderation_status: string; status: string }>('SELECT moderation_status, status FROM games WHERE id=$1', [gameId])
-  if (game && game.moderation_status !== 'visible') {
-    return NextResponse.json({ error: 'gameFrozen' }, { status: 403 })
-  }
-  const { content, type = 'ic' } = await req.json()
-  if (!content?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
-  if (content.length > 200_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
-  const msgType = type === 'ooc' ? 'ooc' : 'ic'
+  try {
+    // Check if game is frozen by moderation
+    const game = await queryOne<{ moderation_status: string; status: string }>('SELECT moderation_status, status FROM games WHERE id=$1', [gameId])
+    if (game && game.moderation_status !== 'visible') {
+      return NextResponse.json({ error: 'gameFrozen' }, { status: 403 })
+    }
+    const { content, type = 'ic' } = await req.json()
+    if (!content?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
+    if (content.length > 200_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
+    const msgType = type === 'ooc' ? 'ooc' : 'ic'
 
-  // Block IC posts in finished games (OOC still allowed)
-  if (game && game.status === 'finished' && msgType === 'ic') {
-    return NextResponse.json({ error: 'gameFinished' }, { status: 403 })
-  }
+    // Block IC posts in finished games (OOC still allowed)
+    if (game && game.status === 'finished' && msgType === 'ic') {
+      return NextResponse.json({ error: 'gameFinished' }, { status: 403 })
+    }
 
-  // Stop-list check
-  const stopPhrases = await getActiveStopPhrases()
-  if (stopPhrases.length > 0) {
-    const match = checkStopList(content, stopPhrases)
-    if (match) {
-      await query(
-        `INSERT INTO stop_violations (game_id, user_id, phrase_id, matched_text, message_type)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [gameId, user.id, match.phraseId, match.context, msgType]
-      )
-      const countRow = await queryOne<{ cnt: string }>(
-        'SELECT COUNT(*) as cnt FROM stop_violations WHERE game_id = $1',
-        [gameId]
-      )
-      if (parseInt(countRow?.cnt || '0') >= VIOLATION_THRESHOLD && game?.moderation_status === 'visible') {
-        await query("UPDATE games SET moderation_status = 'hidden' WHERE id = $1", [gameId])
+    // Stop-list check
+    const stopPhrases = await getActiveStopPhrases()
+    if (stopPhrases.length > 0) {
+      const match = checkStopList(content, stopPhrases)
+      if (match) {
         await query(
-          'UPDATE stop_violations SET auto_hidden = true WHERE game_id = $1 ORDER BY created_at DESC LIMIT 1',
+          `INSERT INTO stop_violations (game_id, user_id, phrase_id, matched_text, message_type)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [gameId, user.id, match.phraseId, match.context, msgType]
+        )
+        const countRow = await queryOne<{ cnt: string }>(
+          'SELECT COUNT(*) as cnt FROM stop_violations WHERE game_id = $1',
           [gameId]
         )
+        if (parseInt(countRow?.cnt || '0') >= VIOLATION_THRESHOLD && game?.moderation_status === 'visible') {
+          await query("UPDATE games SET moderation_status = 'hidden' WHERE id = $1", [gameId])
+          await query(
+            'UPDATE stop_violations SET auto_hidden = true WHERE game_id = $1 ORDER BY created_at DESC LIMIT 1',
+            [gameId]
+          )
+        }
+        return NextResponse.json({ error: 'stopListBlocked' }, { status: 422 })
       }
-      return NextResponse.json({ error: 'stopListBlocked' }, { status: 422 })
     }
+
+    // Найти participant
+    const participant = await queryOne<{ id: string; left_at: string | null }>(
+      'SELECT id, left_at FROM game_participants WHERE game_id=$1 AND user_id=$2',
+      [gameId, user.id]
+    )
+    if (!participant || participant.left_at) {
+      return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
+    }
+
+    const message = await queryOne(
+      `INSERT INTO messages (game_id, participant_id, content, type)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [gameId, participant.id, sanitizeBody(content), msgType]
+    )
+
+    // Получаем полные данные с никнеймом
+    const full = await queryOne(
+      `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
+       FROM messages m
+       JOIN game_participants gp ON gp.id = m.participant_id
+       WHERE m.id = $1`,
+      [(message as { id: string }).id]
+    )
+
+    // Нотифицируем SSE-слушателей
+    notifyGame(gameId, { _type: 'new', ...(full as object) })
+
+    return NextResponse.json(full, { status: 201 })
+  } catch (error) {
+    console.error('[API /api/games/[id]/messages] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
   }
-
-  // Найти participant
-  const participant = await queryOne<{ id: string; left_at: string | null }>(
-    'SELECT id, left_at FROM game_participants WHERE game_id=$1 AND user_id=$2',
-    [gameId, user.id]
-  )
-  if (!participant || participant.left_at) {
-    return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
-  }
-
-  const message = await queryOne(
-    `INSERT INTO messages (game_id, participant_id, content, type)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [gameId, participant.id, sanitizeBody(content), msgType]
-  )
-
-  // Получаем полные данные с никнеймом
-  const full = await queryOne(
-    `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
-     FROM messages m
-     JOIN game_participants gp ON gp.id = m.participant_id
-     WHERE m.id = $1`,
-    [(message as { id: string }).id]
-  )
-
-  // Нотифицируем SSE-слушателей
-  notifyGame(gameId, { _type: 'new', ...(full as object) })
-
-  return NextResponse.json(full, { status: 201 })
 }

@@ -9,14 +9,19 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const { id: gameId } = await params
 
-  const member = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
-  if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  try {
+    const member = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
+    if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
-  const notes = await query<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
-    'SELECT id, title, content, created_at, updated_at FROM game_notes WHERE game_id=$1 AND user_id=$2 ORDER BY created_at DESC',
-    [gameId, user.id]
-  )
-  return NextResponse.json({ notes })
+    const notes = await query<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
+      'SELECT id, title, content, created_at, updated_at FROM game_notes WHERE game_id=$1 AND user_id=$2 ORDER BY created_at DESC',
+      [gameId, user.id]
+    )
+    return NextResponse.json({ notes })
+  } catch (error) {
+    console.error('[API /api/games/[id]/notes] GET:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }
 
 // POST — создать новую заметку
@@ -33,12 +38,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'noteTooLong' }, { status: 400 })
   }
 
-  const member = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
-  if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  try {
+    const member = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
+    if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
-  const note = await queryOne<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
-    'INSERT INTO game_notes (game_id, user_id, title, content) VALUES ($1, $2, $3, $4) RETURNING id, title, content, created_at, updated_at',
-    [gameId, user.id, title ?? '', sanitizeBody(content ?? '')]
-  )
-  return NextResponse.json({ note })
+    const note = await queryOne<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
+      'INSERT INTO game_notes (game_id, user_id, title, content) VALUES ($1, $2, $3, $4) RETURNING id, title, content, created_at, updated_at',
+      [gameId, user.id, title ?? '', sanitizeBody(content ?? '')]
+    )
+    return NextResponse.json({ note })
+  } catch (error) {
+    console.error('[API /api/games/[id]/notes] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

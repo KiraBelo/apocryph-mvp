@@ -22,81 +22,86 @@ export async function GET(req: NextRequest) {
   const lang = searchParams.get('lang') || 'ru'
   const limit = Math.min(parseInt(searchParams.get('limit') || '15'), 50)
 
-  // Get children of a parent tag (e.g. pairings for a fandom)
-  if (parentId) {
-    const rows = await query<TagRow>(
-      `SELECT t.id, t.slug, COALESCE(ti.name, ti_ru.name, t.slug) as name,
-              t.category, t.approved, t.usage_count, t.parent_tag_id
-       FROM tags t
-       LEFT JOIN tag_i18n ti ON ti.tag_id = t.id AND ti.lang = $1
-       LEFT JOIN tag_i18n ti_ru ON ti_ru.tag_id = t.id AND ti_ru.lang = 'ru'
-       WHERE t.parent_tag_id = $2
-       ORDER BY t.usage_count DESC, t.slug
-       LIMIT $3`,
-      [lang, parseInt(parentId), limit]
-    )
-    return NextResponse.json(rows)
-  }
+  try {
+    // Get children of a parent tag (e.g. pairings for a fandom)
+    if (parentId) {
+      const rows = await query<TagRow>(
+        `SELECT t.id, t.slug, COALESCE(ti.name, ti_ru.name, t.slug) as name,
+                t.category, t.approved, t.usage_count, t.parent_tag_id
+         FROM tags t
+         LEFT JOIN tag_i18n ti ON ti.tag_id = t.id AND ti.lang = $1
+         LEFT JOIN tag_i18n ti_ru ON ti_ru.tag_id = t.id AND ti_ru.lang = 'ru'
+         WHERE t.parent_tag_id = $2
+         ORDER BY t.usage_count DESC, t.slug
+         LIMIT $3`,
+        [lang, parseInt(parentId), limit]
+      )
+      return NextResponse.json(rows)
+    }
 
-  // No query or too short → return popular approved tags
-  if (q.length < 2) {
+    // No query or too short → return popular approved tags
+    if (q.length < 2) {
+      const sql = `
+        SELECT t.id, t.slug, COALESCE(ti.name, ti_ru.name, t.slug) as name,
+               t.category, t.approved, t.usage_count
+        FROM tags t
+        LEFT JOIN tag_i18n ti ON ti.tag_id = t.id AND ti.lang = $1
+        LEFT JOIN tag_i18n ti_ru ON ti_ru.tag_id = t.id AND ti_ru.lang = 'ru'
+        WHERE t.approved = true
+          ${category ? 'AND t.category = $3' : ''}
+        ORDER BY t.usage_count DESC, t.slug
+        LIMIT $2
+      `
+      const params: unknown[] = [lang, limit]
+      if (category) params.push(category)
+      const rows = await query<TagRow>(sql, params)
+      return NextResponse.json(rows)
+    }
+
+    // Fuzzy search: exact → prefix → contains → trigram similarity
+    const escaped = q.replace(/[%_\\]/g, '\\$&')
+    const pattern = `%${escaped}%`
     const sql = `
-      SELECT t.id, t.slug, COALESCE(ti.name, ti_ru.name, t.slug) as name,
-             t.category, t.approved, t.usage_count
-      FROM tags t
-      LEFT JOIN tag_i18n ti ON ti.tag_id = t.id AND ti.lang = $1
-      LEFT JOIN tag_i18n ti_ru ON ti_ru.tag_id = t.id AND ti_ru.lang = 'ru'
-      WHERE t.approved = true
-        ${category ? 'AND t.category = $3' : ''}
-      ORDER BY t.usage_count DESC, t.slug
-      LIMIT $2
+      WITH matched AS (
+        SELECT DISTINCT ON (t.id)
+          t.id, t.slug,
+          COALESCE(ti.name, ti_ru.name, t.slug) as name,
+          t.category, t.approved, t.usage_count,
+          a.alias as matched_alias,
+          CASE
+            WHEN t.slug = $1 OR ti.name ILIKE $1 OR a.alias = $1 THEN 0
+            WHEN t.slug ILIKE $2 || '%' OR ti.name ILIKE $2 || '%' OR a.alias ILIKE $2 || '%' THEN 1
+            WHEN t.slug ILIKE $3 OR ti.name ILIKE $3 OR a.alias ILIKE $3 THEN 2
+            ELSE 3
+          END as match_rank,
+          GREATEST(
+            similarity(t.slug, $1),
+            COALESCE(similarity(ti.name, $1), 0),
+            COALESCE(similarity(a.alias, $1), 0)
+          ) as sim
+        FROM tags t
+        LEFT JOIN tag_i18n ti ON ti.tag_id = t.id AND ti.lang = $4
+        LEFT JOIN tag_i18n ti_ru ON ti_ru.tag_id = t.id AND ti_ru.lang = 'ru'
+        LEFT JOIN tag_aliases a ON a.tag_id = t.id
+        WHERE
+          t.slug ILIKE $3 OR ti.name ILIKE $3 OR a.alias ILIKE $3
+          OR t.slug % $1 OR ti.name % $1 OR a.alias % $1
+          ${category ? 'AND t.category = $6' : ''}
+      )
+      SELECT id, slug, name, category, approved, usage_count, matched_alias
+      FROM matched
+      ORDER BY match_rank, sim DESC, usage_count DESC
+      LIMIT $5
     `
-    const params: unknown[] = [lang, limit]
+    const params: unknown[] = [q, q, pattern, lang, limit]
     if (category) params.push(category)
+
     const rows = await query<TagRow>(sql, params)
     return NextResponse.json(rows)
+  } catch (error) {
+    console.error('[API /api/tags] GET:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
   }
-
-  // Fuzzy search: exact → prefix → contains → trigram similarity
-  const escaped = q.replace(/[%_\\]/g, '\\$&')
-  const pattern = `%${escaped}%`
-  const sql = `
-    WITH matched AS (
-      SELECT DISTINCT ON (t.id)
-        t.id, t.slug,
-        COALESCE(ti.name, ti_ru.name, t.slug) as name,
-        t.category, t.approved, t.usage_count,
-        a.alias as matched_alias,
-        CASE
-          WHEN t.slug = $1 OR ti.name ILIKE $1 OR a.alias = $1 THEN 0
-          WHEN t.slug ILIKE $2 || '%' OR ti.name ILIKE $2 || '%' OR a.alias ILIKE $2 || '%' THEN 1
-          WHEN t.slug ILIKE $3 OR ti.name ILIKE $3 OR a.alias ILIKE $3 THEN 2
-          ELSE 3
-        END as match_rank,
-        GREATEST(
-          similarity(t.slug, $1),
-          COALESCE(similarity(ti.name, $1), 0),
-          COALESCE(similarity(a.alias, $1), 0)
-        ) as sim
-      FROM tags t
-      LEFT JOIN tag_i18n ti ON ti.tag_id = t.id AND ti.lang = $4
-      LEFT JOIN tag_i18n ti_ru ON ti_ru.tag_id = t.id AND ti_ru.lang = 'ru'
-      LEFT JOIN tag_aliases a ON a.tag_id = t.id
-      WHERE
-        t.slug ILIKE $3 OR ti.name ILIKE $3 OR a.alias ILIKE $3
-        OR t.slug % $1 OR ti.name % $1 OR a.alias % $1
-        ${category ? 'AND t.category = $6' : ''}
-    )
-    SELECT id, slug, name, category, approved, usage_count, matched_alias
-    FROM matched
-    ORDER BY match_rank, sim DESC, usage_count DESC
-    LIMIT $5
-  `
-  const params: unknown[] = [q, q, pattern, lang, limit]
-  if (category) params.push(category)
-
-  const rows = await query<TagRow>(sql, params)
-  return NextResponse.json(rows)
 }
 
 // POST /api/tags — create user tag
@@ -170,31 +175,36 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Create new tag (unapproved, unreviewed) in a transaction
-  const newTag = await withTransaction(async (client) => {
-    const res = await client.query(
-      `INSERT INTO tags (slug, category, parent_tag_id, approved, reviewed, created_by)
-       VALUES ($1, $3, $4, false, false, $2)
-       RETURNING id`,
-      [slug, user.id, category, parentTagId]
-    )
-    const row = res.rows[0] as { id: number } | undefined
-    if (row) {
-      await client.query(
-        `INSERT INTO tag_i18n (tag_id, lang, name) VALUES ($1, 'ru', $2)
-         ON CONFLICT (tag_id, lang) DO UPDATE SET name = $2`,
-        [row.id, name]
+  try {
+    // Create new tag (unapproved, unreviewed) in a transaction
+    const newTag = await withTransaction(async (client) => {
+      const res = await client.query(
+        `INSERT INTO tags (slug, category, parent_tag_id, approved, reviewed, created_by)
+         VALUES ($1, $3, $4, false, false, $2)
+         RETURNING id`,
+        [slug, user.id, category, parentTagId]
       )
-    }
-    return row ?? null
-  })
+      const row = res.rows[0] as { id: number } | undefined
+      if (row) {
+        await client.query(
+          `INSERT INTO tag_i18n (tag_id, lang, name) VALUES ($1, 'ru', $2)
+           ON CONFLICT (tag_id, lang) DO UPDATE SET name = $2`,
+          [row.id, name]
+        )
+      }
+      return row ?? null
+    })
 
-  return NextResponse.json({
-    id: newTag?.id,
-    slug,
-    name,
-    category,
-    approved: false,
-    usage_count: 0,
-  })
+    return NextResponse.json({
+      id: newTag?.id,
+      slug,
+      name,
+      category,
+      approved: false,
+      usage_count: 0,
+    })
+  } catch (error) {
+    console.error('[API /api/tags] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

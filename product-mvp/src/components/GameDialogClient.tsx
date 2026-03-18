@@ -108,11 +108,11 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
     return () => document.removeEventListener('keydown', handler)
   }, [fullscreen])
 
-  useEffect(() => { fetch(`/api/games/${gameId}/read`, { method: 'POST' }) }, [gameId])
+  useEffect(() => { fetch(`/api/games/${gameId}/read`, { method: 'POST' }).catch(() => {}) }, [gameId])
 
   useEffect(() => {
-    if (activeTab === 'ooc') fetch(`/api/games/${gameId}/read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tab: 'ooc' }) })
-    else if (activeTab === 'ic') fetch(`/api/games/${gameId}/read`, { method: 'POST' })
+    if (activeTab === 'ooc') fetch(`/api/games/${gameId}/read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tab: 'ooc' }) }).catch(() => {})
+    else if (activeTab === 'ic') fetch(`/api/games/${gameId}/read`, { method: 'POST' }).catch(() => {})
   }, [activeTab, gameId])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

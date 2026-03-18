@@ -85,6 +85,7 @@ const ru = {
     nsfwFlexible: 'NSFW по договорённости',
     multiPairing: 'Мультипейринг',
     pairingNotImportant: 'Пейринг не важен',
+    tagPlaceholder: 'Начните вводить тег...',
   },
 
   // ── Request Card ──

@@ -280,8 +280,7 @@ CREATE INDEX IF NOT EXISTS idx_stop_violations_created ON stop_violations (creat
 
 -- ================================================================
 -- SEED DATA — 16 заявок для холодного старта
--- Пароль для всех seed-пользователей: apocryph123
--- bcrypt hash of 'apocryph123' with 10 rounds
+-- Seed-пользователи для разработки (пароли задаются через .env)
 -- ================================================================
 
 INSERT INTO users (id, email, password_hash) VALUES

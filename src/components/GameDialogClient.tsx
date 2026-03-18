@@ -61,6 +61,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
   const [showLeave, setShowLeave] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showEndProposal, setShowEndProposal] = useState(false)
   const [leaveReason, setLeaveReason] = useState('')
   const [reportReason, setReportReason] = useState('')
   const [nickname, setNickname] = useState(me.nickname)
@@ -1162,52 +1163,94 @@ export default function GameDialogClient({ gameId, game, initialMessages, partic
 
       {/* Settings modal */}
       {showSettings && (
-        <Modal onClose={() => setShowSettings(false)} title="Настройки игры">
+        <Modal onClose={() => { setShowSettings(false); setShowEndProposal(false) }} title="Настройки игры" wide>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span style={fieldLabel}>Твой никнейм в этой игре</span>
-              <input value={nickname} onChange={e => setNickname(e.target.value)} style={settingInput} maxLength={50} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span style={fieldLabel}>URL аватара персонажа</span>
-              <input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} style={settingInput} placeholder="https://..." maxLength={512} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span style={fieldLabel}>URL баннера игры</span>
-              <input value={bannerUrl} onChange={e => setBannerUrl(e.target.value)} style={settingInput} placeholder="https://..." maxLength={512} />
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span style={fieldLabel}>Отображение баннера</span>
-              {([['own', 'Мой баннер'], ['partner', 'Баннер соигрока'], ['none', 'Без баннера']] as const).map(([val, label]) => (
-                <label key={val} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="banner_pref"
-                    checked={bannerPref === val}
-                    onChange={() => setBannerPref(val)}
-                    style={{ accentColor: 'var(--text-2)', width: '14px', height: '14px', flexShrink: 0 }}
-                  />
-                  <span style={{ fontFamily: 'var(--serif-body)', fontSize: '0.9rem', color: 'var(--text)' }}>{label}</span>
-                </label>
-              ))}
+
+            {/* Предложить завершить сюжет */}
+            <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+              {!showEndProposal ? (
+                <button
+                  onClick={() => setShowEndProposal(true)}
+                  style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-2)', fontFamily: 'var(--serif-body)', fontSize: '0.88rem', padding: '0.45rem 0.9rem', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                >
+                  Предложить завершить сюжет
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <p style={{ fontFamily: 'var(--serif-body)', fontSize: '0.85rem', color: 'var(--text-2)', margin: 0 }}>
+                    Соигрок получит предложение завершить сюжет.
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => { /* TODO: логика публикации предложения */ }}
+                      style={{ background: 'var(--accent)', color: '#fff', border: 'none', fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.88rem', padding: '0.45rem 1rem', cursor: 'pointer' }}
+                    >
+                      Опубликовать
+                    </button>
+                    <button
+                      onClick={() => setShowEndProposal(false)}
+                      style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-2)', fontFamily: 'var(--mono)', fontSize: '0.65rem', letterSpacing: '0.08em', padding: '0.45rem 0.75rem', cursor: 'pointer' }}
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={oocEnabled}
-                onChange={e => setOocEnabled(e.target.checked)}
-                style={{ accentColor: 'var(--text-2)', width: '16px', height: '16px', marginTop: '0.15rem', flexShrink: 0 }}
-              />
-              <div>
-                <span style={fieldLabel}>Включить вкладку «Оффтоп»</span>
-                <p style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', color: 'var(--text-2)', marginTop: '0.2rem' }}>
-                  Для обсуждений вне истории
-                </p>
+
+            {/* Два столбца */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem 1.5rem' }}>
+              {/* Левый столбец: персонаж */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <span style={fieldLabel}>Никнейм в этой игре</span>
+                  <input value={nickname} onChange={e => setNickname(e.target.value)} style={settingInput} maxLength={50} />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <span style={fieldLabel}>URL аватара</span>
+                  <input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} style={settingInput} placeholder="https://..." maxLength={512} />
+                </label>
               </div>
-            </label>
-            <button onClick={saveSettings} style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'var(--serif)', fontStyle: 'italic', border: 'none', padding: '0.6rem 1.4rem', cursor: 'pointer', alignSelf: 'flex-start' }}>
-              Сохранить →
-            </button>
+
+              {/* Правый столбец: баннер */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <span style={fieldLabel}>URL моего баннера</span>
+                  <input value={bannerUrl} onChange={e => setBannerUrl(e.target.value)} style={settingInput} placeholder="https://..." maxLength={512} />
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <span style={fieldLabel}>Показывать баннер</span>
+                  {([['own', 'Мой'], ['partner', 'Соигрока'], ['none', 'Не показывать']] as const).map(([val, label]) => (
+                    <label key={val} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="banner_pref"
+                        checked={bannerPref === val}
+                        onChange={() => setBannerPref(val)}
+                        style={{ accentColor: 'var(--text-2)', width: '14px', height: '14px', flexShrink: 0 }}
+                      />
+                      <span style={{ fontFamily: 'var(--serif-body)', fontSize: '0.9rem', color: 'var(--text)' }}>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Нижняя строка: галочка + кнопка */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.25rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={oocEnabled}
+                  onChange={e => setOocEnabled(e.target.checked)}
+                  style={{ accentColor: 'var(--text-2)', width: '16px', height: '16px', flexShrink: 0 }}
+                />
+                <span style={fieldLabel}>Вкладка «Оффтоп»</span>
+              </label>
+              <button onClick={saveSettings} style={{ background: 'var(--accent)', color: '#fff', fontFamily: 'var(--serif)', fontStyle: 'italic', border: 'none', padding: '0.6rem 1.4rem', cursor: 'pointer' }}>
+                Сохранить →
+              </button>
+            </div>
           </div>
         </Modal>
       )}
@@ -1227,11 +1270,11 @@ function tabBtnStyle(isActive: boolean, tab: 'ic' | 'ooc' | 'notes'): React.CSSP
   }
 }
 
-function Modal({ onClose, title, children }: { onClose: () => void; title: string; children: React.ReactNode }) {
+function Modal({ onClose, title, children, wide }: { onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '2rem', maxWidth: '480px', width: '100%', position: 'relative' }}>
+      <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '2rem', maxWidth: wide ? '640px' : '480px', width: '100%', position: 'relative' }}>
         <button onClick={onClose} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
         <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.5rem', fontStyle: 'italic', color: 'var(--text)', marginBottom: '1.25rem' }}>{title}</h2>
         {children}

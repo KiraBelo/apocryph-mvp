@@ -6,6 +6,7 @@ import { requireMod } from '@/lib/session'
 export async function GET(req: NextRequest) {
   const { error } = await requireMod()
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
   if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
 
   const sp = req.nextUrl.searchParams
@@ -16,20 +17,25 @@ export async function GET(req: NextRequest) {
 
   const escapedQ = q.replace(/[%_\\]/g, '\\$&')
 
-  const users = await query(
-    `SELECT id, email, role, banned_at, ban_reason, created_at
-     FROM users
-     WHERE email ILIKE '%' || $1 || '%'
-     ORDER BY created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [escapedQ, limit, offset]
-  )
+  try {
+    const users = await query(
+      `SELECT id, email, role, banned_at, ban_reason, created_at
+       FROM users
+       WHERE email ILIKE '%' || $1 || '%'
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [escapedQ, limit, offset]
+    )
 
-  const countRow = await query<{ cnt: string }>(
-    `SELECT COUNT(*) as cnt FROM users WHERE email ILIKE '%' || $1 || '%'`,
-    [escapedQ]
-  )
-  const total = parseInt(countRow[0]?.cnt || '0')
+    const countRow = await query<{ cnt: string }>(
+      `SELECT COUNT(*) as cnt FROM users WHERE email ILIKE '%' || $1 || '%'`,
+      [escapedQ]
+    )
+    const total = parseInt(countRow[0]?.cnt || '0')
 
-  return NextResponse.json({ users, total, page })
+    return NextResponse.json({ users, total, page })
+  } catch (error) {
+    console.error('[API /api/admin/users] GET:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

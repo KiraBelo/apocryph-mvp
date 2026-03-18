@@ -183,7 +183,7 @@ export const useSettings = () => useContext(Ctx)
 export function useT() {
   const { lang } = useContext(Ctx)
   return useCallback(
-    (key: string): string | readonly string[] => translate(lang, key),
+    (key: string): string | readonly string[] | Record<string, string> => translate(lang, key),
     [lang]
   )
 }

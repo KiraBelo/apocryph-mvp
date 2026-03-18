@@ -11,19 +11,24 @@ export async function POST(req: NextRequest) {
 
   const { requestId } = await req.json()
 
-  // Verify ownership
-  const request = await queryOne<{ author_id: string }>(
-    'SELECT author_id FROM requests WHERE id = $1', [requestId]
-  )
-  if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-  if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  try {
+    // Verify ownership
+    const request = await queryOne<{ author_id: string }>(
+      'SELECT author_id FROM requests WHERE id = $1', [requestId]
+    )
+    if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
+    if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
-  const token = randomBytes(16).toString('hex')
+    const token = randomBytes(16).toString('hex')
 
-  await query(
-    'INSERT INTO invites (token, request_id) VALUES ($1,$2)',
-    [token, requestId]
-  )
+    await query(
+      'INSERT INTO invites (token, request_id) VALUES ($1,$2)',
+      [token, requestId]
+    )
 
-  return NextResponse.json({ token })
+    return NextResponse.json({ token })
+  } catch (error) {
+    console.error('[API /api/invites] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

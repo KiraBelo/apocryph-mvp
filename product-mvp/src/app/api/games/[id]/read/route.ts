@@ -13,16 +13,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (body?.tab === 'ooc') tab = 'ooc'
   } catch { /* no body */ }
 
-  if (tab === 'ooc') {
-    await query(
-      `UPDATE game_participants SET last_read_ooc_at = NOW() WHERE game_id = $1 AND user_id = $2`,
-      [id, user.id]
-    )
-  } else {
-    await query(
-      `UPDATE game_participants SET last_read_at = NOW() WHERE game_id = $1 AND user_id = $2`,
-      [id, user.id]
-    )
+  try {
+    if (tab === 'ooc') {
+      await query(
+        `UPDATE game_participants SET last_read_ooc_at = NOW() WHERE game_id = $1 AND user_id = $2`,
+        [id, user.id]
+      )
+    } else {
+      await query(
+        `UPDATE game_participants SET last_read_at = NOW() WHERE game_id = $1 AND user_id = $2`,
+        [id, user.id]
+      )
+    }
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API /api/games/[id]/read] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
   }
-  return NextResponse.json({ ok: true })
 }

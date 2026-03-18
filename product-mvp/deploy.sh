@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-SERVER=31.192.111.43
+SERVER=root@31.192.111.43
 APP_DIR=/opt/apocryph
 
-echo "Building locally..."
-npm run build
+echo "Type-checking..."
+npx tsc --noEmit
 
 echo "Uploading..."
-tar -czf /tmp/apocryph-deploy.tar.gz --exclude=node_modules --exclude=.env.local .
+tar -czf /tmp/apocryph-deploy.tar.gz --exclude=node_modules --exclude=.env.local --exclude=.next .
 scp /tmp/apocryph-deploy.tar.gz $SERVER:/tmp/
 
 echo "Deploying with rollback support..."
@@ -23,7 +23,7 @@ ssh $SERVER << 'EOF'
   # Restore .env
   cp /tmp/.env.local.bak .env.local 2>/dev/null || true
   # Install deps if needed
-  npm install --production
+  npm install
   # Build with rollback
   mv .next .next-old 2>/dev/null || true
   if npx next build; then

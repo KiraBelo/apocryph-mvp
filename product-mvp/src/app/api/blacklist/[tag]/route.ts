@@ -11,9 +11,14 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { tag } = await params
-  await pool.query(
-    'DELETE FROM user_tag_blacklist WHERE user_id = $1 AND tag = $2',
-    [user.id, decodeURIComponent(tag)]
-  )
-  return NextResponse.json({ ok: true })
+  try {
+    await pool.query(
+      'DELETE FROM user_tag_blacklist WHERE user_id = $1 AND tag = $2',
+      [user.id, decodeURIComponent(tag)]
+    )
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API /api/blacklist/[tag]] DELETE:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

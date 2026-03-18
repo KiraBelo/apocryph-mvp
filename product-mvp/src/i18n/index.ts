@@ -6,14 +6,16 @@ export type Lang = 'ru' | 'en'
 const messages: Record<Lang, Translations> = { ru, en }
 
 /** Get a nested translation value by dot-separated key */
-export function translate(lang: Lang, key: string): string | readonly string[] {
+export function translate(lang: Lang, key: string): string | readonly string[] | Record<string, string> {
   const parts = key.split('.')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let val: any = messages[lang]
+  let val: unknown = messages[lang]
   for (const p of parts) {
-    val = val?.[p]
+    if (val && typeof val === 'object') val = (val as Record<string, unknown>)[p]
+    else return key
   }
-  return val ?? key
+  if (typeof val === 'string' || Array.isArray(val)) return val
+  if (val && typeof val === 'object') return val as Record<string, string>
+  return key
 }
 
 export type { Translations }

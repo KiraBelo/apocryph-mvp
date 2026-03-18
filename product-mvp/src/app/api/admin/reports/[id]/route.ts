@@ -15,31 +15,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'invalidStatus' }, { status: 400 })
   }
 
-  // Update the report
-  const report = await queryOne<{ game_id: string }>(
-    `UPDATE reports SET status = $1, resolved_by = $2, resolved_at = NOW()
-     WHERE id = $3 AND status = 'pending'
-     RETURNING game_id`,
-    [status, user!.id, reportId]
-  )
-  if (!report) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-
-  // If dismissed: check if all pending reports for this game are now resolved/dismissed
-  // If so, unhide the game
-  if (status === 'dismissed') {
-    const remaining = await queryOne<{ cnt: string }>(
-      `SELECT COUNT(*) as cnt FROM reports WHERE game_id = $1 AND status = 'pending'`,
-      [report.game_id]
+  try {
+    // Update the report
+    const report = await queryOne<{ game_id: string }>(
+      `UPDATE reports SET status = $1, resolved_by = $2, resolved_at = NOW()
+       WHERE id = $3 AND status = 'pending'
+       RETURNING game_id`,
+      [status, user!.id, reportId]
     )
-    if (parseInt(remaining?.cnt || '0') === 0) {
-      await query(
-        `UPDATE games SET moderation_status = 'visible' WHERE id = $1`,
+    if (!report) return NextResponse.json({ error: 'notFound' }, { status: 404 })
+
+    // If dismissed: check if all pending reports for this game are now resolved/dismissed
+    // If so, unhide the game
+    if (status === 'dismissed') {
+      const remaining = await queryOne<{ cnt: string }>(
+        `SELECT COUNT(*) as cnt FROM reports WHERE game_id = $1 AND status = 'pending'`,
         [report.game_id]
       )
+      if (parseInt(remaining?.cnt || '0') === 0) {
+        await query(
+          `UPDATE games SET moderation_status = 'visible' WHERE id = $1`,
+          [report.game_id]
+        )
+      }
     }
+
+    // If resolved: game stays hidden (read-only for participants)
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API /api/admin/reports/[id]] PATCH:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
   }
-
-  // If resolved: game stays hidden (read-only for participants)
-
-  return NextResponse.json({ ok: true })
 }

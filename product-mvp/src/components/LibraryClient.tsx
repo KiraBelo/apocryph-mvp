@@ -23,6 +23,13 @@ function FilterSelect({ value, onChange, options }: {
     return () => document.removeEventListener('mousedown', close)
   }, [open])
 
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
+
   return (
     <div ref={ref} className="relative min-w-[130px]">
       <button
@@ -93,9 +100,9 @@ export default function LibraryClient() {
     { value: 'sl', label: 'M/M' },
     { value: 'fm', label: 'F/F' },
     { value: 'gt', label: 'M/F' },
-    { value: 'any', label: t('filters.anyPairing') as string },
     { value: 'multi', label: t('filters.multi') as string },
     { value: 'other', label: t('filters.other') as string },
+    { value: 'any', label: t('filters.notImportant') as string },
   ]
   const contentOptions = [
     { value: '', label: t('filters.anyNsfw') as string },
@@ -106,7 +113,7 @@ export default function LibraryClient() {
     { value: 'flexible', label: t('filters.nsfwFlexible') as string },
   ]
 
-  const tagsString = filterTags.map(t => t.name).join(',')
+  const tagsString = filterTags.map(t => t.slug).join(',')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -147,27 +154,52 @@ export default function LibraryClient() {
       <h1 className="page-title mb-10">{t('library.title') as string}</h1>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-8">
+      <div className={`flex flex-wrap gap-3 p-[1.25rem_1.5rem] bg-surface-2 border border-edge ${filterTags.length > 0 ? '' : 'mb-8'}`}>
         <input
-          type="text"
+          type="search"
           value={q}
           onChange={e => setQ(e.target.value)}
           placeholder={t('library.searchPlaceholder') as string}
-          className="filter-input min-w-[200px] flex-1"
+          className="filter-input flex-[1_1_200px]"
         />
         <FilterSelect value={type} onChange={setType} options={typeOptions} />
         <FilterSelect value={fandomType} onChange={setFandomType} options={fandomOptions} />
         <FilterSelect value={pairing} onChange={setPairing} options={pairingOptions} />
         <FilterSelect value={content} onChange={setContent} options={contentOptions} />
-      </div>
-      {/* Tag filter */}
-      <div className="mb-8">
         <TagAutocomplete
           selectedTags={filterTags}
           onTagsChange={setFilterTags}
+          maxTags={10}
+          allowCreate={false}
           placeholder={t('filters.tagPlaceholder') as string}
+          className="flex-[1_1_250px] min-w-0"
+          chipsOutside
         />
       </div>
+      {/* Tag chips — full width */}
+      {filterTags.length > 0 && (
+        <div className="flex flex-wrap gap-[0.4rem] px-[1.5rem] pb-[1rem] -mt-1 bg-surface-2 border-x border-b border-edge mb-8">
+          {filterTags.map(tag => (
+            <span
+              key={tag.slug}
+              className="tag-chip flex items-center gap-1"
+              style={{
+                borderLeft: `2px solid ${({'fandom':'var(--accent)','genre':'#6a9fb5','trope':'#b58900','setting':'#859900','character_type':'#d33682','pairing':'#e040a0','mood':'#cb4b16','format':'#2aa198'}[tag.category || 'other'] || 'var(--text-2)')}`,
+              }}
+            >
+              {tag.name || tag.slug}
+              <button
+                type="button"
+                onClick={() => setFilterTags(filterTags.filter(t => t.slug !== tag.slug))}
+                className="ml-0.5 opacity-50 hover:opacity-100 cursor-pointer"
+                style={{ fontSize: '0.8rem', lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Games grid */}
       {loading ? (

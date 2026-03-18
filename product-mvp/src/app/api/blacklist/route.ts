@@ -7,11 +7,16 @@ export async function GET() {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const rows = await query<{ tag: string }>(
-    'SELECT tag FROM user_tag_blacklist WHERE user_id = $1 ORDER BY tag',
-    [user.id]
-  )
-  return NextResponse.json(rows.map(r => r.tag))
+  try {
+    const rows = await query<{ tag: string }>(
+      'SELECT tag FROM user_tag_blacklist WHERE user_id = $1 ORDER BY tag',
+      [user.id]
+    )
+    return NextResponse.json(rows.map(r => r.tag))
+  } catch (error) {
+    console.error('[API /api/blacklist] GET:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }
 
 // POST /api/blacklist — добавить тег в чёрный список
@@ -24,11 +29,16 @@ export async function POST(req: NextRequest) {
   if (!normalized) return NextResponse.json({ error: 'invalidTag' }, { status: 400 })
   if (normalized.length > 50) return NextResponse.json({ error: 'invalidTag' }, { status: 400 })
 
-  await queryOne(
-    'INSERT INTO user_tag_blacklist (user_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-    [user.id, normalized]
-  )
-  return NextResponse.json({ tag: normalized }, { status: 201 })
+  try {
+    await queryOne(
+      'INSERT INTO user_tag_blacklist (user_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [user.id, normalized]
+    )
+    return NextResponse.json({ tag: normalized }, { status: 201 })
+  } catch (error) {
+    console.error('[API /api/blacklist] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }
 
 // DELETE /api/blacklist — очистить весь чёрный список
@@ -36,6 +46,11 @@ export async function DELETE() {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  await query('DELETE FROM user_tag_blacklist WHERE user_id = $1', [user.id])
-  return NextResponse.json({ ok: true })
+  try {
+    await query('DELETE FROM user_tag_blacklist WHERE user_id = $1', [user.id])
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API /api/blacklist] DELETE:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

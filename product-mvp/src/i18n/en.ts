@@ -87,6 +87,7 @@ const en: Translations = {
     nsfwFlexible: 'NSFW negotiable',
     multiPairing: 'Multi-pairing',
     pairingNotImportant: 'Pairing not important',
+    tagPlaceholder: 'Start typing a tag...',
   },
 
   // ── Request Card ──

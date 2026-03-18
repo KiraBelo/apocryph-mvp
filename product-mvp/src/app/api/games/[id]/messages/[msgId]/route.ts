@@ -18,23 +18,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const sanitized = sanitizeBody(content)
   if (!sanitized?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
 
-  // Проверяем: сообщение принадлежит текущему пользователю
-  const existing = await queryOne<{ id: string; participant_id: string }>(
-    `SELECT m.id, m.participant_id
-     FROM messages m
-     JOIN game_participants gp ON gp.id = m.participant_id
-     WHERE m.id = $1 AND m.game_id = $2 AND gp.user_id = $3`,
-    [msgId, gameId, user!.id]
-  )
-  if (!existing) return NextResponse.json({ error: 'notFound' }, { status: 404 })
+  try {
+    // Проверяем: сообщение принадлежит текущему пользователю
+    const existing = await queryOne<{ id: string; participant_id: string }>(
+      `SELECT m.id, m.participant_id
+       FROM messages m
+       JOIN game_participants gp ON gp.id = m.participant_id
+       WHERE m.id = $1 AND m.game_id = $2 AND gp.user_id = $3`,
+      [msgId, gameId, user!.id]
+    )
+    if (!existing) return NextResponse.json({ error: 'notFound' }, { status: 404 })
 
-  const updated = await queryOne(
-    `UPDATE messages SET content = $1, edited_at = NOW() WHERE id = $2
-     RETURNING id, content, edited_at`,
-    [sanitized, msgId]
-  )
+    const updated = await queryOne(
+      `UPDATE messages SET content = $1, edited_at = NOW() WHERE id = $2
+       RETURNING id, content, edited_at`,
+      [sanitized, msgId]
+    )
 
-  notifyGame(gameId, { _type: 'edit', ...(updated as object) })
+    notifyGame(gameId, { _type: 'edit', ...(updated as object) })
 
-  return NextResponse.json(updated)
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('[API /api/games/[id]/messages/[msgId]] PATCH:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

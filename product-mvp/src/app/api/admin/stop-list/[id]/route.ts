@@ -13,9 +13,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const body = await req.json()
 
-  const existing = await queryOne('SELECT id FROM stop_phrases WHERE id = $1', [id])
-  if (!existing) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-
   const sets: string[] = []
   const vals: unknown[] = []
   let idx = 1
@@ -37,14 +34,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (sets.length === 0) return NextResponse.json({ error: 'noChanges' }, { status: 400 })
 
-  vals.push(id)
-  const row = await queryOne(
-    `UPDATE stop_phrases SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
-    vals
-  )
+  try {
+    const existing = await queryOne('SELECT id FROM stop_phrases WHERE id = $1', [id])
+    if (!existing) return NextResponse.json({ error: 'notFound' }, { status: 404 })
 
-  invalidateStopPhraseCache()
-  return NextResponse.json({ phrase: row })
+    vals.push(id)
+    const row = await queryOne(
+      `UPDATE stop_phrases SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
+      vals
+    )
+
+    invalidateStopPhraseCache()
+    return NextResponse.json({ phrase: row })
+  } catch (error) {
+    console.error('[API /api/admin/stop-list/[id]] PATCH:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }
 
 // DELETE /api/admin/stop-list/[id]
@@ -55,7 +60,12 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
 
   const { id } = await params
-  await query('DELETE FROM stop_phrases WHERE id = $1', [id])
-  invalidateStopPhraseCache()
-  return NextResponse.json({ ok: true })
+  try {
+    await query('DELETE FROM stop_phrases WHERE id = $1', [id])
+    invalidateStopPhraseCache()
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[API /api/admin/stop-list/[id]] DELETE:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }

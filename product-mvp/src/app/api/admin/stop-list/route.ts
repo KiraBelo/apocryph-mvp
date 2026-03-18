@@ -23,27 +23,32 @@ export async function GET(req: NextRequest) {
     ? [search.replace(/[%_\\]/g, '\\$&'), limit, offset]
     : [limit, offset]
 
-  const phrases = await query(
-    `SELECT sp.*, u.email as created_by_email
-     FROM stop_phrases sp
-     LEFT JOIN users u ON u.id = sp.created_by
-     ${whereClause}
-     ORDER BY sp.created_at DESC
-     LIMIT $${search ? 2 : 1} OFFSET $${search ? 3 : 2}`,
-    params
-  )
+  try {
+    const phrases = await query(
+      `SELECT sp.*, u.email as created_by_email
+       FROM stop_phrases sp
+       LEFT JOIN users u ON u.id = sp.created_by
+       ${whereClause}
+       ORDER BY sp.created_at DESC
+       LIMIT $${search ? 2 : 1} OFFSET $${search ? 3 : 2}`,
+      params
+    )
 
-  const countParams = search ? [search.replace(/[%_\\]/g, '\\$&')] : []
-  const [countRow] = await query<{ cnt: string }>(
-    `SELECT COUNT(*) as cnt FROM stop_phrases sp ${whereClause}`,
-    countParams
-  )
+    const countParams = search ? [search.replace(/[%_\\]/g, '\\$&')] : []
+    const [countRow] = await query<{ cnt: string }>(
+      `SELECT COUNT(*) as cnt FROM stop_phrases sp ${whereClause}`,
+      countParams
+    )
 
-  return NextResponse.json({
-    phrases,
-    total: parseInt(countRow?.cnt || '0'),
-    page,
-  })
+    return NextResponse.json({
+      phrases,
+      total: parseInt(countRow?.cnt || '0'),
+      page,
+    })
+  } catch (error) {
+    console.error('[API /api/admin/stop-list] GET:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }
 
 // POST /api/admin/stop-list — create phrase
@@ -62,12 +67,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'phraseTooLong' }, { status: 400 })
   }
 
-  const row = await query(
-    `INSERT INTO stop_phrases (phrase, note, created_by)
-     VALUES ($1, $2, $3) RETURNING *`,
-    [cleaned, note?.trim() || null, user!.id]
-  )
+  try {
+    const row = await query(
+      `INSERT INTO stop_phrases (phrase, note, created_by)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [cleaned, note?.trim() || null, user!.id]
+    )
 
-  invalidateStopPhraseCache()
-  return NextResponse.json({ phrase: row[0] }, { status: 201 })
+    invalidateStopPhraseCache()
+    return NextResponse.json({ phrase: row[0] }, { status: 201 })
+  } catch (error) {
+    console.error('[API /api/admin/stop-list] POST:', error)
+    return NextResponse.json({ error: 'serverError' }, { status: 500 })
+  }
 }
