@@ -68,6 +68,7 @@ export default function SettingsModal({
         return
       }
       onSettingsSaved(nickname, avatarUrl)
+      onClose()
     } catch {
       alert(t('errors.networkError') as string)
     }

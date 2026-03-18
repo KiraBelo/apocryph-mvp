@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { Message } from '../game/types'
 
 export function useGameChat({ gameId, participantId, activeTab, t }: {
@@ -30,6 +30,43 @@ export function useGameChat({ gameId, participantId, activeTab, t }: {
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Draft auto-save
+  const draftKey = (type: 'ic' | 'ooc') => `apocryph_draft_${gameId}_${type}`
+
+  // Restore drafts on mount (only if not editing)
+  useEffect(() => {
+    const icDraft = localStorage.getItem(draftKey('ic'))
+    const oocDraft = localStorage.getItem(draftKey('ooc'))
+    if (icDraft) setContent(icDraft)
+    if (oocDraft) setOocContent(oocDraft)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId])
+
+  // Auto-save every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const icDraft = content.trim()
+      const oocDraft = oocContent.trim()
+      if (icDraft) localStorage.setItem(draftKey('ic'), icDraft)
+      else localStorage.removeItem(draftKey('ic'))
+      if (oocDraft) localStorage.setItem(draftKey('ooc'), oocDraft)
+      else localStorage.removeItem(draftKey('ooc'))
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [content, oocContent, gameId])
+
+  // Save on beforeunload
+  useEffect(() => {
+    function saveDrafts() {
+      if (content.trim()) localStorage.setItem(draftKey('ic'), content)
+      else localStorage.removeItem(draftKey('ic'))
+      if (oocContent.trim()) localStorage.setItem(draftKey('ooc'), oocContent)
+      else localStorage.removeItem(draftKey('ooc'))
+    }
+    window.addEventListener('beforeunload', saveDrafts)
+    return () => window.removeEventListener('beforeunload', saveDrafts)
+  }, [content, oocContent, gameId])
+
   async function send() {
     const text = activeTab === 'ooc' ? oocContent : content
     if (!text.trim() || text.replace(/<[^>]*>/g, '').trim() === '' || sending) return
@@ -47,8 +84,8 @@ export function useGameChat({ gameId, participantId, activeTab, t }: {
           : t('errors.sendingMessage') as string)
         return
       }
-      if (activeTab === 'ooc') { setOocContent(''); setOocSendKey(k => k + 1) }
-      else { setContent(''); setSendKey(k => k + 1) }
+      if (activeTab === 'ooc') { setOocContent(''); setOocSendKey(k => k + 1); localStorage.removeItem(draftKey('ooc')) }
+      else { setContent(''); setSendKey(k => k + 1); localStorage.removeItem(draftKey('ic')) }
     } catch { alert(t('errors.networkError') as string) }
     finally { setSending(false) }
   }
