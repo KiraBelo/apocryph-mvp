@@ -35,14 +35,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         )
         if (!meRes.rows[0]) return { error: 'forbidden', status: 403 }
 
-        // Reopen: reset everything
+        // Reopen: reset game status, but only current user's consent
         await client.query(
           "UPDATE games SET status='active', finished_at=NULL, published_at=NULL WHERE id=$1",
           [gameId]
         )
         await client.query(
-          'UPDATE game_participants SET finish_consent=false WHERE game_id=$1',
-          [gameId]
+          'UPDATE game_participants SET finish_consent=false WHERE game_id=$1 AND user_id=$2',
+          [gameId, user!.id]
         )
         await client.query(
           'DELETE FROM game_publish_consent WHERE game_id=$1',

@@ -75,7 +75,7 @@ export default function SettingsModal({
   }
 
   return (
-    <Modal onClose={onClose} title={t('game.settingsTitle') as string}>
+    <Modal onClose={onClose} title={t('game.settingsTitle') as string} wide>
       <div className="flex flex-col gap-5">
         {/* ── Character ── */}
         <div className="flex flex-col gap-3">
@@ -85,7 +85,12 @@ export default function SettingsModal({
             <input value={nickname} onChange={e => setNickname(e.target.value)} className="bg-surface-2 border border-edge text-ink font-body text-[0.95rem] p-[0.45rem_0.7rem] outline-none" maxLength={50} />
           </label>
           <label className="flex flex-col gap-[0.3rem]">
-            <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.avatarLabel') as string}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.avatarLabel') as string}</span>
+              {avatarUrl && /^https?:\/\//i.test(avatarUrl.trim()) && (
+                <div className="w-9 h-9 rounded-full border border-edge shrink-0" style={{ backgroundImage: `url(${avatarUrl.trim().replace(/[()'"\\]/g, '')})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+              )}
+            </div>
             <input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} className="bg-surface-2 border border-edge text-ink font-body text-[0.95rem] p-[0.45rem_0.7rem] outline-none" placeholder="https://..." maxLength={512} />
           </label>
         </div>
@@ -97,7 +102,7 @@ export default function SettingsModal({
             <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.layoutLabel') as string}</span>
             <div className="flex gap-2">
               {([['dialog', t('game.layoutDialog') as string], ['feed', t('game.layoutFeed') as string], ['book', t('game.layoutBook') as string]] as const).map(([val, label]) => (
-                <button key={val} onClick={() => set('gameLayout', val as 'dialog' | 'feed' | 'book')} className="flex-1 font-heading italic text-[0.85rem] border p-[0.35rem_0.5rem] cursor-pointer" style={{ background: gameLayout === val ? 'var(--accent-dim)' : 'var(--bg-2)', borderColor: gameLayout === val ? 'var(--accent)' : 'var(--border)', color: gameLayout === val ? 'var(--accent)' : 'var(--text)' }}>
+                <button key={val} onClick={() => set('gameLayout', val as 'dialog' | 'feed' | 'book')} className="flex-1 font-heading italic text-[0.95rem] border p-[0.45rem_0.5rem] cursor-pointer transition-all duration-150" style={{ background: gameLayout === val ? 'var(--accent-dim)' : 'var(--bg-2)', borderColor: gameLayout === val ? 'var(--accent)' : 'var(--border)', color: gameLayout === val ? 'var(--accent)' : 'var(--text)' }}>
                   {label}
                 </button>
               ))}
@@ -111,6 +116,9 @@ export default function SettingsModal({
           <label className="flex flex-col gap-[0.3rem]">
             <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.bannerLabel') as string}</span>
             <input value={bannerUrl} onChange={e => setBannerUrl(e.target.value)} className="bg-surface-2 border border-edge text-ink font-body text-[0.95rem] p-[0.45rem_0.7rem] outline-none" placeholder="https://..." maxLength={512} />
+            {bannerUrl && /^https?:\/\//i.test(bannerUrl.trim()) && (
+              <div className="w-full h-12 border border-edge mt-1" style={{ backgroundImage: `url(${bannerUrl.trim().replace(/[()'"\\]/g, '')})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            )}
           </label>
           <div className="flex gap-3">
             {([['own', t('game.bannerOwn') as string], ['partner', t('game.bannerPartner') as string], ['none', t('game.bannerNone') as string]] as const).map(([val, label]) => (
@@ -141,74 +149,128 @@ export default function SettingsModal({
         {!isLeft && (
           <div className="flex flex-col gap-2">
             <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">{t('game.manageSection') as string}</span>
-            {!isFinished && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={myFinishConsent}
-                  disabled={finishLoading}
-                  onChange={async e => {
-                    const newVal = e.target.checked
-                    setFinishLoading(true)
+
+            {/* Finish checkbox — always visible */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isFinished || myFinishConsent}
+                disabled={finishLoading}
+                onChange={async e => {
+                  const newVal = e.target.checked
+                  setFinishLoading(true)
+                  if (isFinished && !newVal) {
+                    // Reopen
+                    const res = await fetch(`/api/games/${gameId}/finish`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'reopen' })
+                    })
+                    const data = await res.json().catch(() => ({}))
+                    if (data.ok) {
+                      setGameStatus('active')
+                      setMyFinishConsent(false)
+                      setMyPublishConsent(false)
+                      setPartnerPublishConsent(false)
+                      setPublishLoaded(false)
+                    }
+                  } else {
+                    // Toggle consent
                     const res = await fetch(`/api/games/${gameId}/finish`, {
                       method: 'POST', headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ consent: newVal })
                     })
-                    const data = await res.json()
+                    const data = await res.json().catch(() => ({}))
                     if (data.ok) {
                       setMyFinishConsent(newVal)
-                      if (data.finished) {
-                        setGameStatus('finished')
-                        onClose()
-                      }
+                      if (data.finished) setGameStatus('finished')
                     }
-                    setFinishLoading(false)
-                  }}
-                  className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }}
-                />
-                <span className="font-mono text-[0.7rem] text-ink">{t('game.readyToFinish') as string}</span>
-              </label>
-            )}
-            {!isFinished && (
-              <p className="font-mono text-[0.55rem] text-ink-2 ml-5">
-                {partnerFinishConsent ? `✓ ${t('game.partnerReadyToFinish') as string}` : t('game.partnerNotReady') as string}
-              </p>
-            )}
+                  }
+                  setFinishLoading(false)
+                }}
+                className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }}
+              />
+              <span className="font-mono text-[0.7rem] text-ink">{t('game.readyToFinish') as string}</span>
+            </label>
+            <p className="font-mono text-[0.55rem] text-ink-2 ml-5">
+              {isFinished
+                ? `✓ ${t('game.gameFinished') as string}`
+                : partnerFinishConsent
+                  ? `✓ ${t('game.partnerReadyToFinish') as string}`
+                  : t('game.partnerNotReady') as string}
+            </p>
+
+            {/* Publish — button instead of checkbox */}
             {isFinished && publishLoaded && icPostCount >= MIN_IC_POSTS && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={myPublishConsent}
+              myPublishConsent && partnerPublishConsent ? (
+                /* Published — can revoke */
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-mono text-[0.55rem] text-ink-2">✓ {t('game.gamePublished') as string}</span>
+                  <button
+                    disabled={publishLoading}
+                    onClick={async () => {
+                      setPublishLoading(true)
+                      const res = await fetch(`/api/games/${gameId}/publish-consent`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ consent: false })
+                      })
+                      if (res.ok) setMyPublishConsent(false)
+                      setPublishLoading(false)
+                    }}
+                    className="btn-ghost p-[0.2rem_0.5rem] text-[0.6rem]"
+                  >
+                    {t('game.revokePublish') as string}
+                  </button>
+                </div>
+              ) : myPublishConsent ? (
+                /* I proposed, waiting for partner */
+                <p className="font-mono text-[0.55rem] text-ink-2 mt-1">
+                  ✓ {t('game.publishToLibrary') as string} — {t('game.partnerNotReady') as string}
+                </p>
+              ) : partnerPublishConsent ? (
+                /* Partner proposed, I can agree */
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-mono text-[0.55rem] text-ink-2">
+                    {t('game.partnerWantsPublish') as string}
+                  </span>
+                  <button
+                    disabled={publishLoading}
+                    onClick={async () => {
+                      setPublishLoading(true)
+                      const res = await fetch(`/api/games/${gameId}/publish-consent`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ consent: true })
+                      })
+                      if (res.ok) setMyPublishConsent(true)
+                      setPublishLoading(false)
+                    }}
+                    className="btn-primary p-[0.2rem_0.5rem] text-[0.6rem]"
+                  >
+                    {t('game.publishToo') as string}
+                  </button>
+                </div>
+              ) : (
+                /* Nobody proposed yet */
+                <button
                   disabled={publishLoading}
-                  onChange={async e => {
-                    const newVal = e.target.checked
+                  onClick={async () => {
                     setPublishLoading(true)
                     const res = await fetch(`/api/games/${gameId}/publish-consent`, {
                       method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ consent: newVal })
+                      body: JSON.stringify({ consent: true })
                     })
-                    if (res.ok) setMyPublishConsent(newVal)
+                    if (res.ok) setMyPublishConsent(true)
                     setPublishLoading(false)
                   }}
-                  className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }}
-                />
-                <span className="font-mono text-[0.7rem] text-ink">{t('game.publishToLibrary') as string}</span>
-              </label>
-            )}
-            {isFinished && publishLoaded && icPostCount >= MIN_IC_POSTS && (
-              <p className="font-mono text-[0.55rem] text-ink-2 ml-5">
-                {partnerPublishConsent ? `✓ ${t('game.published') as string}` : t('game.partnerNotReady') as string}
-              </p>
-            )}
-            {isFinished && publishLoaded && icPostCount < MIN_IC_POSTS && (
-              <p className="font-mono text-[0.55rem] text-ink-2">
-                {t('game.tooFewMessages') as string} ({icPostCount}/{MIN_IC_POSTS})
-              </p>
+                  className="btn-ghost p-[0.3rem_0.6rem] text-[0.65rem] mt-1 self-start"
+                >
+                  {t('game.proposePublish') as string}
+                </button>
+              )
             )}
           </div>
         )}
 
-        <button onClick={saveSettings} className="btn-primary p-[0.5rem_1.2rem] text-[0.95rem] self-start">
+        <button onClick={saveSettings} className="btn-primary p-[0.6rem_1.2rem] text-[0.95rem] w-full">
           {t('game.saveSettings') as string}
         </button>
       </div>

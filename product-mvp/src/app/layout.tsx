@@ -30,6 +30,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="ru" data-theme="light" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Merriweather:ital,wght@0,300;0,400;1,300;1,400&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=Caveat:wght@400;500&family=Raleway:ital,wght@0,300;0,400;1,300;1,400&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono:wght@400&family=Neucha&family=Marck+Script&family=Montserrat:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Open+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Nunito:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+      </head>
       <body>
         <SettingsProvider>
           <Nav user={user} />

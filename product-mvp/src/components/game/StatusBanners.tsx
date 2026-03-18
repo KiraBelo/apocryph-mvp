@@ -29,54 +29,77 @@ export default function StatusBanners({
 }: StatusBannersProps) {
   const t = useT()
   const isFinished = gameStatus === 'finished'
+  const isPublished = isFinished && publishLoaded && myPublishConsent && partnerPublishConsent
 
   return (
     <>
       {/* Moderation banner */}
       {isFrozen && (
-        <div className="px-6 py-2 text-center bg-[#c0392b22] border-b border-[#c0392b44] font-mono text-[0.75rem] text-[#c0392b] tracking-wide">
+        <div className="px-6 py-2 text-center border-b border-edge font-mono text-[0.7rem] text-ink-2 tracking-wide" style={{ background: 'var(--bg-2)' }}>
           {moderationStatus === 'hidden'
             ? t('admin.gameHiddenBanner') as string
             : t('admin.gameResolvedBanner') as string}
         </div>
       )}
 
-      {/* Finish banner: partner proposed */}
+      {/* Partner wants to finish (I haven't agreed yet) */}
       {!isFinished && !isLeft && partnerFinishConsent && !myFinishConsent && (
-        <div className="px-6 py-2 flex items-center justify-center gap-3 bg-accent-dim border-b border-edge font-mono text-[0.75rem] text-accent tracking-wide">
+        <div className="px-6 py-1.5 flex items-center justify-center gap-3 border-b border-edge font-mono text-[0.7rem] text-ink-2 tracking-wide" style={{ background: 'var(--bg-2)' }}>
           <span>{t('game.partnerReadyToFinish') as string}</span>
           <button
             disabled={finishLoading}
             onClick={() => onFinishConsent(true)}
-            className="btn-primary p-[0.25rem_0.7rem] text-[0.7rem]"
+            className="btn-primary p-[0.2rem_0.6rem] text-[0.65rem]"
           >
             {t('game.finishToo') as string}
           </button>
         </div>
       )}
 
-      {/* Finished banner */}
-      {isFinished && !isLeft && (
-        <div className="px-6 py-2 flex items-center justify-center gap-3 bg-accent-dim border-b border-edge font-mono text-[0.75rem] text-accent tracking-wide">
-          <span>{t('game.gameFinished') as string}</span>
+      {/* Published — single combined banner (no need for separate "finished" banner) */}
+      {isPublished && !isLeft && (
+        <div className="px-6 py-1.5 flex items-center justify-center gap-4 border-b border-edge font-mono text-[0.7rem] tracking-wide" style={{ background: 'var(--bg-2)' }}>
+          <span className="text-ink-2">{t('game.gamePublished') as string}</span>
+          <button
+            disabled={publishLoading}
+            onClick={() => onPublishConsent(false)}
+            className="btn-ghost p-[0.2rem_0.6rem] text-[0.65rem]"
+          >
+            {t('game.revokePublish') as string}
+          </button>
+          <span className="text-ink-2 opacity-50">·</span>
           <button
             disabled={finishLoading}
             onClick={onReopen}
-            className="btn-ghost p-[0.25rem_0.7rem] text-[0.7rem]"
+            className="btn-ghost p-[0.2rem_0.6rem] text-[0.65rem]"
           >
             {t('game.reopen') as string}
           </button>
         </div>
       )}
 
-      {/* Publish banner: partner proposed */}
-      {isFinished && !isLeft && publishLoaded && partnerPublishConsent && !myPublishConsent && icPostCount >= MIN_IC_POSTS && (
-        <div className="px-6 py-2 flex items-center justify-center gap-3 bg-[#27ae6022] border-b border-[#27ae6044] font-mono text-[0.75rem] text-[#27ae60] tracking-wide">
+      {/* Finished but NOT published — simple banner with reopen */}
+      {isFinished && !isPublished && !isLeft && (
+        <div className="px-6 py-1.5 flex items-center justify-center gap-3 border-b border-edge font-mono text-[0.7rem] text-ink-2 tracking-wide" style={{ background: 'var(--bg-2)' }}>
+          <span>{t('game.gameFinished') as string}</span>
+          <button
+            disabled={finishLoading}
+            onClick={onReopen}
+            className="btn-ghost p-[0.2rem_0.6rem] text-[0.65rem]"
+          >
+            {t('game.reopen') as string}
+          </button>
+        </div>
+      )}
+
+      {/* Partner wants to publish (I haven't agreed yet) */}
+      {isFinished && !isPublished && !isLeft && publishLoaded && partnerPublishConsent && !myPublishConsent && icPostCount >= MIN_IC_POSTS && (
+        <div className="px-6 py-1.5 flex items-center justify-center gap-3 border-b border-edge font-mono text-[0.7rem] text-ink-2 tracking-wide" style={{ background: 'var(--bg-2)' }}>
           <span>{t('game.partnerWantsPublish') as string}</span>
           <button
             disabled={publishLoading}
             onClick={() => onPublishConsent(true)}
-            className="btn-primary p-[0.25rem_0.7rem] text-[0.7rem]"
+            className="btn-primary p-[0.2rem_0.6rem] text-[0.65rem]"
           >
             {t('game.publishToo') as string}
           </button>

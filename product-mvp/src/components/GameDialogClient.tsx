@@ -10,6 +10,7 @@ import SearchPanel from './game/SearchPanel'
 import StatusBanners from './game/StatusBanners'
 import ExportModal from './game/ExportModal'
 import SettingsModal from './game/SettingsModal'
+import EpilogueModal from './game/EpilogueModal'
 import TopBar from './game/TopBar'
 import NotesTab from './game/NotesTab'
 import { useGameSSE } from './hooks/useGameSSE'
@@ -68,6 +69,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const [publishLoading, setPublishLoading] = useState(false)
   const [publishLoaded, setPublishLoaded] = useState(false)
   const [icPostCount, setIcPostCount] = useState(0)
+  const [showEpilogue, setShowEpilogue] = useState(false)
 
   // ── Scroll collapse refs ──
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -83,7 +85,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
 
   // ── Effects ──
   useEffect(() => {
-    if (!isFinished || publishLoaded) return
+    if (publishLoaded) return
     fetch(`/api/games/${gameId}/publish-consent`).then(r => r.json()).then(data => {
       if (data.participants) {
         const myP = data.participants.find((p: { participant_id: string }) => p.participant_id === me.id)
@@ -94,7 +96,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
       if (data.icPostCount != null) setIcPostCount(data.icPostCount)
       setPublishLoaded(true)
     }).catch(() => {})
-  }, [isFinished, publishLoaded, gameId, me.id])
+  }, [publishLoaded, gameId, me.id])
 
   useEffect(() => () => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
@@ -156,7 +158,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
       const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent }) })
       if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
       const data = await res.json()
-      if (data.ok) { setMyFinishConsent(consent); if (data.finished) setGameStatus('finished') }
+      if (data.ok) { setMyFinishConsent(consent); if (data.finished) { setGameStatus('finished'); setShowEpilogue(true) } }
     } catch { alert(t('errors.networkError') as string) }
     finally { setFinishLoading(false) }
   }
@@ -167,7 +169,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
       const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reopen' }) })
       if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
       const data = await res.json()
-      if (data.ok) { setGameStatus('active'); setMyFinishConsent(false); setPartnerFinishConsent(false); setMyPublishConsent(false); setPartnerPublishConsent(false); setPublishLoaded(false) }
+      if (data.ok) { setGameStatus('active'); setMyFinishConsent(false); setMyPublishConsent(false); setPartnerPublishConsent(false); setPublishLoaded(false) }
     } catch { alert(t('errors.networkError') as string) }
     finally { setFinishLoading(false) }
   }
@@ -299,6 +301,28 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
           <textarea value={reportReason} onChange={e => setReportReason(e.target.value)} placeholder={t('game.reportPlaceholder') as string} rows={4} className="w-full font-body text-[1rem] bg-surface border border-edge text-ink p-[0.65rem] outline-none resize-y mb-4" />
           <button onClick={async () => { try { const res = await fetch(`/api/games/${gameId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reportReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return } setShowReport(false); alert(t('game.reportSent') as string) } catch { alert(t('errors.networkError') as string) } }} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">{t('game.reportButton') as string}</button>
         </Modal>
+      )}
+
+      {showEpilogue && (
+        <EpilogueModal
+          requestTitle={requestTitle}
+          participants={participants.filter(p => !p.left_at).map(p => ({ nickname: p.nickname }))}
+          icPostCount={icPostCount}
+          publishLoading={publishLoading}
+          onPublish={async () => {
+            setPublishLoading(true)
+            try {
+              const res = await fetch(`/api/games/${gameId}/publish-consent`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ consent: true })
+              })
+              if (res.ok) setMyPublishConsent(true)
+            } catch { /* ignore */ }
+            finally { setPublishLoading(false) }
+            setShowEpilogue(false)
+          }}
+          onSkip={() => setShowEpilogue(false)}
+        />
       )}
 
       {showSettings && (

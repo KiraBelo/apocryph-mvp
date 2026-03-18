@@ -65,7 +65,7 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
 
   if (loading && !data) {
     return (
-      <div className="max-w-[900px] mx-auto px-7 py-12">
+      <div className="max-w-[1400px] mx-auto px-7 py-12">
         <p className="text-ink-2 font-heading italic">{t('library.loading') as string}</p>
       </div>
     )
@@ -73,7 +73,7 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
 
   if (error || !data) {
     return (
-      <div className="max-w-[900px] mx-auto px-7 py-12">
+      <div className="max-w-[1400px] mx-auto px-7 py-12">
         <p className="text-ink-2 font-heading italic">{t('library.notFound') as string}</p>
         <Link href="/library" className="link-accent no-underline mt-4 inline-block">
           {t('library.backToLibrary') as string}
@@ -92,7 +92,7 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
   }
 
   return (
-    <div className="max-w-[900px] mx-auto px-7 py-12">
+    <div className="max-w-[1400px] mx-auto px-7 py-12">
       {/* Back link */}
       <Link href="/library" className="link-accent no-underline text-[0.85rem] mb-6 inline-block">
         ← {t('library.backToLibrary') as string}
@@ -168,7 +168,7 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
       </div>
 
       {/* Messages */}
-      <div className="flex flex-col gap-0">
+      <div className={`flex flex-col gap-0 mx-auto w-full ${layout === 'feed' ? 'max-w-[1050px]' : ''}`}>
         {messages.map((msg, idx) => {
           const author = participantMap.get(msg.participant_id)
           const nickname = author?.nickname ?? msg.nickname
