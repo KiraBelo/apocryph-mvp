@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -77,7 +78,21 @@ export default function RegisterPage() {
 
           {error && <p className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
 
-          <button type="submit" disabled={loading} className="btn-primary text-[1rem] p-[0.7rem_1.4rem] mt-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={ageConfirmed}
+              onChange={e => setAgeConfirmed(e.target.checked)}
+              className="w-4 h-4 shrink-0"
+              style={{ accentColor: 'var(--accent)' }}
+            />
+            <span className="text-[0.85rem] text-ink-2">
+              {t('auth.ageConfirm') as string}
+            </span>
+          </label>
+
+          <button type="submit" disabled={loading || !ageConfirmed} className="btn-primary text-[1rem] p-[0.7rem_1.4rem] mt-1"
+            style={{ opacity: (loading || !ageConfirmed) ? 0.5 : 1, cursor: (loading || !ageConfirmed) ? 'not-allowed' : 'pointer' }}>
             {loading ? '...' : t('auth.registerButton') as string}
           </button>
         </form>

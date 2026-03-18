@@ -84,7 +84,13 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-ink-2 font-body text-[0.95rem]">
+        <p className="mt-4 text-ink-2 font-body text-[0.95rem]">
+          <Link href="/auth/forgot-password" className="text-accent border-b border-current">
+            {t('auth.forgotPassword') as string}
+          </Link>
+        </p>
+
+        <p className="mt-4 text-ink-2 font-body text-[0.95rem]">
           {t('auth.noAccount') as string}{' '}
           <Link href="/auth/register" className="text-accent border-b border-current">
             {t('auth.registerLink') as string}
