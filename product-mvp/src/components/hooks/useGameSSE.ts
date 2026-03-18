@@ -27,7 +27,7 @@ export function useGameSSE({ gameId, isLeft, onNewMessage, onEditMessage, onDice
         try {
           const parsed = JSON.parse(data.content)
           onDiceMessageRef.current({ sides: parsed.sides, result: parsed.result, roller: parsed.roller })
-        } catch {}
+        } catch (e) { console.error('SSE dice parse error:', e) }
       } else {
         const { _type: _, ...msg } = data
         onNewMessageRef.current(msg as Message)

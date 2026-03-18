@@ -75,21 +75,40 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
     const g = games.find(x => x.id === gameId)
     if (!g) return
     const newVal = !g.starred_at
+    const oldVal = g.starred_at
     setGames(prev => prev.map(x => x.id === gameId ? { ...x, starred_at: newVal ? new Date().toISOString() : null } : x))
-    await fetch(`/api/games/${gameId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ starred: newVal }),
-    })
+    try {
+      const res = await fetch(`/api/games/${gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ starred: newVal }),
+      })
+      if (!res.ok) {
+        setGames(prev => prev.map(x => x.id === gameId ? { ...x, starred_at: oldVal } : x))
+        alert(t('errors.networkError') as string)
+      }
+    } catch {
+      setGames(prev => prev.map(x => x.id === gameId ? { ...x, starred_at: oldVal } : x))
+      alert(t('errors.networkError') as string)
+    }
   }
 
   async function hideGame(gameId: string) {
     setGames(prev => prev.map(x => x.id === gameId ? { ...x, hidden_at: new Date().toISOString() } : x))
-    await fetch(`/api/games/${gameId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hidden: true }),
-    })
+    try {
+      const res = await fetch(`/api/games/${gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden: true }),
+      })
+      if (!res.ok) {
+        setGames(prev => prev.map(x => x.id === gameId ? { ...x, hidden_at: null } : x))
+        alert(t('errors.networkError') as string)
+      }
+    } catch {
+      setGames(prev => prev.map(x => x.id === gameId ? { ...x, hidden_at: null } : x))
+      alert(t('errors.networkError') as string)
+    }
   }
 
   const tabCls = (isActive: boolean) =>

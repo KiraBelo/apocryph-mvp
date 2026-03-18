@@ -71,9 +71,12 @@ export function useGameNotes({ gameId, t }: {
   }
 
   async function deleteNote(noteId: number) {
-    await fetch(`/api/games/${gameId}/notes/${noteId}`, { method: 'DELETE' })
-    setNotes(prev => prev.filter(n => n.id !== noteId))
-    setDeleteConfirmId(null)
+    try {
+      const res = await fetch(`/api/games/${gameId}/notes/${noteId}`, { method: 'DELETE' })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      setNotes(prev => prev.filter(n => n.id !== noteId))
+      setDeleteConfirmId(null)
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   function toggleNoteExpand(id: number) {

@@ -32,6 +32,7 @@ export default function Nav({ user }: Props) {
     fetch('/api/games/unread-count')
       .then(r => r.json())
       .then(d => { setUnreadGames(d.games ?? []); setProposals(d.proposals ?? []) })
+      .catch(() => {})
 
   useEffect(() => {
     if (!user) return

@@ -109,7 +109,7 @@ export default function RequestCard({
         setBookmarked(b => !b)
         onBookmark?.(request.id, !bookmarked)
       }
-    } catch { /* network error */ }
+    } catch { alert(t('errors.networkError') as string) }
     setLoadingBm(false)
   }
 

@@ -152,25 +152,34 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
 
   async function handleFinishConsent(consent: boolean) {
     setFinishLoading(true)
-    const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent }) })
-    const data = await res.json()
-    if (data.ok) { setMyFinishConsent(consent); if (data.finished) setGameStatus('finished') }
-    setFinishLoading(false)
+    try {
+      const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent }) })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      const data = await res.json()
+      if (data.ok) { setMyFinishConsent(consent); if (data.finished) setGameStatus('finished') }
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setFinishLoading(false) }
   }
 
   async function handleReopen() {
     setFinishLoading(true)
-    const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reopen' }) })
-    const data = await res.json()
-    if (data.ok) { setGameStatus('active'); setMyFinishConsent(false); setPartnerFinishConsent(false); setMyPublishConsent(false); setPartnerPublishConsent(false); setPublishLoaded(false) }
-    setFinishLoading(false)
+    try {
+      const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reopen' }) })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      const data = await res.json()
+      if (data.ok) { setGameStatus('active'); setMyFinishConsent(false); setPartnerFinishConsent(false); setMyPublishConsent(false); setPartnerPublishConsent(false); setPublishLoaded(false) }
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setFinishLoading(false) }
   }
 
   async function handlePublishConsent(consent: boolean) {
     setPublishLoading(true)
-    const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent }) })
-    if (res.ok) setMyPublishConsent(consent)
-    setPublishLoading(false)
+    try {
+      const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent }) })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      setMyPublishConsent(consent)
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setPublishLoading(false) }
   }
 
   // ── Render ──
@@ -281,14 +290,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
               </label>
             ))}
           </div>
-          <button onClick={async () => { if (!leaveReason) { alert(t('errors.selectLeaveReason') as string); return }; await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); router.push('/my/games') }} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
+          <button onClick={async () => { if (!leaveReason) { alert(t('errors.selectLeaveReason') as string); return }; try { const res = await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return } router.push('/my/games') } catch { alert(t('errors.networkError') as string) } }} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
         </Modal>
       )}
 
       {showReport && (
         <Modal onClose={() => setShowReport(false)} title={t('game.reportTitle') as string}>
           <textarea value={reportReason} onChange={e => setReportReason(e.target.value)} placeholder={t('game.reportPlaceholder') as string} rows={4} className="w-full font-body text-[1rem] bg-surface border border-edge text-ink p-[0.65rem] outline-none resize-y mb-4" />
-          <button onClick={async () => { await fetch(`/api/games/${gameId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reportReason }) }); setShowReport(false); alert(t('game.reportSent') as string) }} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">{t('game.reportButton') as string}</button>
+          <button onClick={async () => { try { const res = await fetch(`/api/games/${gameId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reportReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return } setShowReport(false); alert(t('game.reportSent') as string) } catch { alert(t('errors.networkError') as string) } }} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">{t('game.reportButton') as string}</button>
         </Modal>
       )}
 

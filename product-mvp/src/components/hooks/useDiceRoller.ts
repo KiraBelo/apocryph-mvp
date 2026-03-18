@@ -14,12 +14,15 @@ export function useDiceRoller({ gameId, participantId, t }: {
     const s = parseInt(diceSides)
     if (isNaN(s) || s < 2 || s > 100) return
     setDiceRolling(true)
-    await fetch(`/api/games/${gameId}/dice`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sides: s }),
-    })
-    setDiceRolling(false)
+    try {
+      const res = await fetch(`/api/games/${gameId}/dice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sides: s }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setDiceRolling(false) }
   }
 
   function enqueueDice(data: { sides: number; result: number; roller: string }) {

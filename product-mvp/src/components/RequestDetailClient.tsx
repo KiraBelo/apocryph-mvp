@@ -74,20 +74,38 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
 
   async function changeStatus(status: string) {
     setStatusLoading(true)
-    await fetch(`/api/requests/${request.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
-    router.refresh()
+    try {
+      const res = await fetch(`/api/requests/${request.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (res.ok) {
+        router.refresh()
+      } else {
+        alert(t('errors.networkError') as string)
+      }
+    } catch {
+      alert(t('errors.networkError') as string)
+    }
     setStatusLoading(false)
   }
 
   async function deleteRequest() {
     if (!confirm(t('detail.confirmDelete') as string)) return
     setDeleteLoading(true)
-    await fetch(`/api/requests/${request.id}`, { method: 'DELETE' })
-    router.push('/my/requests')
+    try {
+      const res = await fetch(`/api/requests/${request.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        router.push('/my/requests')
+      } else {
+        alert(t('errors.networkError') as string)
+        setDeleteLoading(false)
+      }
+    } catch {
+      alert(t('errors.networkError') as string)
+      setDeleteLoading(false)
+    }
   }
 
   return (

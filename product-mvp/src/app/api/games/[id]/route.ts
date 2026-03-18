@@ -56,6 +56,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (avatar_url && !/^https?:\/\//i.test(avatar_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
   if (banner_url && !/^https?:\/\//i.test(banner_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
+  const dangerousChars = /[)(;"'\n\r]/
+  if (avatar_url && dangerousChars.test(avatar_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
+  if (banner_url && dangerousChars.test(banner_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
 
   if (nickname && nickname.length > 50) {
     return NextResponse.json({ error: 'nicknameTooLong' }, { status: 400 })

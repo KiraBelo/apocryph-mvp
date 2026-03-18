@@ -48,12 +48,22 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
   const filtered: MyRequest[] = filter === 'all' ? requests : requests.filter(r => r.status === filter)
 
   async function changeStatus(id: string, status: string) {
+    const oldStatus = requests.find(r => r.id === id)?.status
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
-    fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
+    try {
+      const res = await fetch(`/api/requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) {
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status: oldStatus ?? r.status } : r))
+        alert(t('errors.networkError') as string)
+      }
+    } catch {
+      setRequests(prev => prev.map(r => r.id === id ? { ...r, status: oldStatus ?? r.status } : r))
+      alert(t('errors.networkError') as string)
+    }
   }
 
   async function deleteRequest(id: string) {
@@ -62,8 +72,10 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
       const res = await fetch(`/api/requests/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setRequests(prev => prev.filter(r => r.id !== id))
+      } else {
+        alert(t('errors.networkError') as string)
       }
-    } catch { /* network error */ }
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   return (

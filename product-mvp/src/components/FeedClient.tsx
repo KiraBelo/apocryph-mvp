@@ -93,6 +93,7 @@ export default function FeedClient({ user }: Props) {
   const [isBlacklistOpen, setIsBlacklistOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [error, setError] = useState(false)
 
   const [showSavePreset, setShowSavePreset] = useState(false)
   const [presetName, setPresetName] = useState('')
@@ -102,6 +103,7 @@ export default function FeedClient({ user }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(false)
     try {
       const params = new URLSearchParams()
       if (q)          params.set('q', q)
@@ -116,7 +118,7 @@ export default function FeedClient({ user }: Props) {
       setRequests(data.requests ?? [])
       setTotalPages(data.totalPages ?? 1)
     } catch {
-      setRequests([])
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -131,36 +133,40 @@ export default function FeedClient({ user }: Props) {
     if (!user) return
     fetch('/api/bookmarks').then(r => r.json()).then((rows: { id: string }[]) => {
       setBookmarked(new Set(rows.map(r => r.id)))
-    })
+    }).catch(() => {})
   }, [user])
 
   useEffect(() => {
     if (!user) return
     fetch('/api/blacklist').then(r => r.json()).then((t: string[]) => {
       setBlacklist(t)
-    })
+    }).catch(() => {})
   }, [user])
 
   async function addToBlacklist(raw?: string) {
     const parts = (raw ?? blacklistInput).split(',').map(t => t.trim().replace(/^#/, '').toLowerCase()).filter(Boolean)
     const unique = parts.filter(t => !blacklist.includes(t))
     if (!unique.length) { setBlacklistInput(''); return }
-    for (const tag of unique) {
-      await fetch('/api/blacklist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag }),
-      })
-    }
-    setBlacklist(prev => [...prev, ...unique].sort())
-    setBlacklistInput('')
-    load()
+    try {
+      for (const tag of unique) {
+        await fetch('/api/blacklist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag }),
+        })
+      }
+      setBlacklist(prev => [...prev, ...unique].sort())
+      setBlacklistInput('')
+      load()
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   async function removeFromBlacklist(tag: string) {
-    await fetch(`/api/blacklist/${encodeURIComponent(tag)}`, { method: 'DELETE' })
-    setBlacklist(prev => prev.filter(t => t !== tag))
-    load()
+    try {
+      await fetch(`/api/blacklist/${encodeURIComponent(tag)}`, { method: 'DELETE' })
+      setBlacklist(prev => prev.filter(t => t !== tag))
+      load()
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   function handleTagSearch(tag: string) {
@@ -176,13 +182,15 @@ export default function FeedClient({ user }: Props) {
 
   async function handleTagBlacklist(tag: string) {
     if (blacklist.includes(tag)) return
-    await fetch('/api/blacklist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tag }),
-    })
-    setBlacklist(prev => [...prev, tag].sort())
-    load()
+    try {
+      await fetch('/api/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      })
+      setBlacklist(prev => [...prev, tag].sort())
+      load()
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   function openSavePreset() {
@@ -396,9 +404,11 @@ export default function FeedClient({ user }: Props) {
             {isBlacklistOpen && blacklist.length > 0 && (
               <button
                 onClick={async () => {
-                  await fetch('/api/blacklist', { method: 'DELETE' })
-                  setBlacklist([])
-                  load()
+                  try {
+                    await fetch('/api/blacklist', { method: 'DELETE' })
+                    setBlacklist([])
+                    load()
+                  } catch { alert(t('errors.networkError') as string) }
                 }}
                 className="bg-transparent border-none cursor-pointer font-mono text-[0.6rem] tracking-[0.1em] uppercase text-ink-2 p-0 opacity-50 hover:opacity-100"
               >
@@ -444,6 +454,10 @@ export default function FeedClient({ user }: Props) {
       {/* Results */}
       {loading ? (
         <p className="text-ink-2 italic font-heading">{t('feed.loading') as string}</p>
+      ) : error ? (
+        <p className="text-ink-2 italic font-heading text-[1.1rem]">
+          {t('errors.networkError') as string}
+        </p>
       ) : requests.length === 0 ? (
         <p className="text-ink-2 italic font-heading text-[1.1rem]">
           {t('feed.noResults') as string}

@@ -57,12 +57,20 @@ export default function SettingsModal({
   const t = useT()
 
   async function saveSettings() {
-    await fetch(`/api/games/${gameId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ banner_url: bannerUrl, banner_pref: bannerPref, nickname, avatar_url: avatarUrl, ooc_enabled: oocEnabled }),
-    })
-    onSettingsSaved(nickname, avatarUrl)
+    try {
+      const res = await fetch(`/api/games/${gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ banner_url: bannerUrl, banner_pref: bannerPref, nickname, avatar_url: avatarUrl, ooc_enabled: oocEnabled }),
+      })
+      if (!res.ok) {
+        alert(t('errors.networkError') as string)
+        return
+      }
+      onSettingsSaved(nickname, avatarUrl)
+    } catch {
+      alert(t('errors.networkError') as string)
+    }
   }
 
   return (

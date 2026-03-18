@@ -68,19 +68,20 @@ export function useGameChat({ gameId, participantId, activeTab, t }: {
   async function saveEdit() {
     if (!editingId || editSaving) return
     setEditSaving(true)
-    const res = await fetch(`/api/games/${gameId}/messages/${editingId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    })
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/games/${gameId}/messages/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
       const updated = await res.json()
       const updater = (prev: Message[]) => prev.map(m => m.id === editingId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m)
       setIcMessages(updater)
       setOocMessages(updater)
       cancelEdit()
-    }
-    setEditSaving(false)
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setEditSaving(false) }
   }
 
   async function goToPage(type: 'ic' | 'ooc', page: number) {
@@ -88,6 +89,7 @@ export function useGameChat({ gameId, participantId, activeTab, t }: {
     try {
       const pageLimit = type === 'ooc' ? 100 : 30
       const res = await fetch(`/api/games/${gameId}/messages?type=${type}&page=${page}&limit=${pageLimit}`)
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
       const data = await res.json()
       if (type === 'ic') {
         setIcMessages(data.messages)
@@ -99,7 +101,8 @@ export function useGameChat({ gameId, participantId, activeTab, t }: {
         setOocTotalPages(data.totalPages)
       }
       scrollRef.current?.scrollTo({ top: 0 })
-    } finally {
+    } catch { alert(t('errors.networkError') as string) }
+    finally {
       setPageLoading(false)
     }
   }
@@ -108,13 +111,14 @@ export function useGameChat({ gameId, participantId, activeTab, t }: {
     if (oocLoaded) return
     setPageLoading(true)
     fetch(`/api/games/${gameId}/messages?type=ooc&limit=100`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error('fetch failed'); return r.json() })
       .then(data => {
         setOocMessages(data.messages)
         setOocPage(data.page)
         setOocTotalPages(data.totalPages)
         setOocLoaded(true)
       })
+      .catch(() => { alert(t('errors.networkError') as string) })
       .finally(() => setPageLoading(false))
   }
 

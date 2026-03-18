@@ -39,23 +39,33 @@ export default function AdminReports() {
   useEffect(() => { load() }, [load])
 
   async function handleAction(reportId: string, status: 'resolved' | 'dismissed') {
-    const res = await fetch(`/api/admin/reports/${reportId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
-    if (res.ok) {
-      setReports(prev => prev.filter(r => r.id !== reportId))
-    }
+    try {
+      const res = await fetch(`/api/admin/reports/${reportId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (res.ok) {
+        setReports(prev => prev.filter(r => r.id !== reportId))
+      } else {
+        alert(t('errors.networkError') as string)
+      }
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   async function handleGameStatus(gameId: string, moderationStatus: string) {
-    await fetch(`/api/admin/games/${gameId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ moderation_status: moderationStatus }),
-    })
-    load()
+    try {
+      const res = await fetch(`/api/admin/games/${gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moderation_status: moderationStatus }),
+      })
+      if (res.ok) {
+        load()
+      } else {
+        alert(t('errors.networkError') as string)
+      }
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   const tabLabels: Record<string, string> = {

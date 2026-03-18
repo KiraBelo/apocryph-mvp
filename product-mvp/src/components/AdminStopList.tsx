@@ -83,18 +83,30 @@ export default function AdminStopList() {
   }
 
   async function toggleActive(id: number, isActive: boolean) {
-    await fetch(`/api/admin/stop-list/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !isActive }),
-    })
-    loadPhrases()
+    try {
+      const res = await fetch(`/api/admin/stop-list/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !isActive }),
+      })
+      if (res.ok) {
+        loadPhrases()
+      } else {
+        alert(t('errors.networkError') as string)
+      }
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   async function deletePhrase(id: number) {
     if (!confirm(t('admin.stopConfirmDelete') as string)) return
-    await fetch(`/api/admin/stop-list/${id}`, { method: 'DELETE' })
-    loadPhrases()
+    try {
+      const res = await fetch(`/api/admin/stop-list/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        loadPhrases()
+      } else {
+        alert(t('errors.networkError') as string)
+      }
+    } catch { alert(t('errors.networkError') as string) }
   }
 
   const tabLabels: Record<string, string> = {
