@@ -17,9 +17,17 @@ export default async function AdminDashboard() {
   const [violations7d] = await query<{ cnt: string }>(
     `SELECT COUNT(*) as cnt FROM stop_violations WHERE created_at > NOW() - INTERVAL '7 days'`
   )
+  const [moderationQueue] = await query<{ cnt: string }>(
+    `SELECT COUNT(*) as cnt FROM games WHERE status = 'moderation'`
+  )
+  const [pendingComments] = await query<{ cnt: string }>(
+    `SELECT COUNT(*) as cnt FROM game_comments WHERE approved_at IS NULL`
+  )
 
   const stats = [
     { label: 'Жалобы (ожидают)', value: pendingReports?.cnt || '0', href: '/admin/reports' },
+    { label: 'На модерации', value: moderationQueue?.cnt || '0', href: '/admin/moderation' },
+    { label: 'Комментарии', value: pendingComments?.cnt || '0', href: '/admin/moderation' },
     { label: 'Пользователей', value: totalUsers?.cnt || '0', href: '/admin/users' },
     { label: 'Забанено', value: bannedUsers?.cnt || '0', href: '/admin/users' },
     { label: 'Скрытых игр', value: hiddenGames?.cnt || '0', href: '/admin/reports' },
@@ -37,8 +45,11 @@ export default async function AdminDashboard() {
           </Link>
         ))}
       </div>
-      <div className="mt-8 flex gap-4">
-        <Link href="/admin/reports" className="btn-primary px-6 py-2 inline-block no-underline">
+      <div className="mt-8 flex gap-4 flex-wrap">
+        <Link href="/admin/moderation" className="btn-primary px-6 py-2 inline-block no-underline">
+          Модерация
+        </Link>
+        <Link href="/admin/reports" className="btn-ghost px-6 py-2 inline-block no-underline">
           Жалобы
         </Link>
         <Link href="/admin/users" className="btn-ghost px-6 py-2 inline-block no-underline">

@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Message } from '../game/types'
 
-export function useGameChat({ gameId, participantId, activeTab, t }: {
+export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentReset }: {
   gameId: string
   participantId: string
-  activeTab: 'ic' | 'ooc' | 'notes'
+  activeTab: 'ic' | 'ooc' | 'notes' | 'prepare'
   t: (key: string) => unknown
+  onMyConsentReset?: () => void
 }, initial: {
   messages: Message[]
   page: number
@@ -116,6 +117,7 @@ export function useGameChat({ gameId, participantId, activeTab, t }: {
       const updater = (prev: Message[]) => prev.map(m => m.id === editingId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m)
       setIcMessages(updater)
       setOocMessages(updater)
+      onMyConsentReset?.()
       cancelEdit()
     } catch { alert(t('errors.networkError') as string) }
     finally { setEditSaving(false) }

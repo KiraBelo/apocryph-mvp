@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne } from '@/lib/db'
+import { queryOne, withTransaction } from '@/lib/db'
+
 import { requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
@@ -19,21 +20,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!sanitized?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
 
   try {
-    // Проверяем: сообщение принадлежит текущему пользователю
-    const existing = await queryOne<{ id: string; participant_id: string }>(
-      `SELECT m.id, m.participant_id
+    const existing = await queryOne<{ id: string; participant_id: string; type: string; status: string; published_at: string | null }>(
+      `SELECT m.id, m.participant_id, m.type, g.status, g.published_at
        FROM messages m
        JOIN game_participants gp ON gp.id = m.participant_id
+       JOIN games g ON g.id = m.game_id
        WHERE m.id = $1 AND m.game_id = $2 AND gp.user_id = $3`,
       [msgId, gameId, user!.id]
     )
     if (!existing) return NextResponse.json({ error: 'notFound' }, { status: 404 })
+    if (existing.published_at || existing.status === 'moderation' || existing.status === 'published') return NextResponse.json({ error: 'gameAlreadyPublished' }, { status: 403 })
+    if (existing.type === 'dice') return NextResponse.json({ error: 'cannotEditDice' }, { status: 400 })
 
-    const updated = await queryOne(
-      `UPDATE messages SET content = $1, edited_at = NOW() WHERE id = $2
-       RETURNING id, content, edited_at`,
-      [sanitized, msgId]
-    )
+    const updated = await withTransaction(async (client) => {
+      const result = await client.query(
+        `UPDATE messages SET content = $1, edited_at = NOW() WHERE id = $2 RETURNING id, content, edited_at`,
+        [sanitized, msgId]
+      )
+      // Сбрасываем только своё согласие на публикацию
+      await client.query(
+        `DELETE FROM game_publish_consent WHERE game_id = $1 AND participant_id = $2`,
+        [gameId, existing.participant_id]
+      )
+      return result.rows[0]
+    })
 
     notifyGame(gameId, { _type: 'edit', ...(updated as object) })
 
@@ -43,3 +53,4 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'serverError' }, { status: 500 })
   }
 }
+

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useT } from './SettingsContext'
 
 interface GameRow {
@@ -26,9 +27,7 @@ interface GameRow {
   request_pairing: string | null
   request_content_level: string | null
   status: string
-  finished_at: string | null
   published_at: string | null
-  partner_finish_consent: boolean
   partner_publish_consent: boolean
 }
 
@@ -37,10 +36,11 @@ interface Props {
   userId: string
 }
 
-type MainTab = 'active' | 'finished' | 'inactive' | 'starred' | 'published'
+type MainTab = 'active' | 'inactive' | 'starred' | 'published'
 
 export default function MyGamesClient({ games: initialGames, userId }: Props) {
   const t = useT()
+  const router = useRouter()
   const [games, setGames] = useState(initialGames)
   const [mainTab, setMainTab] = useState<MainTab>('active')
   const [subTab, setSubTab] = useState<'waiting-them' | 'waiting-me'>('waiting-me')
@@ -58,15 +58,14 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
   const visible = games.filter(g => !g.hidden_at)
 
   // Tab filters
-  const active = visible.filter(g => g.status === 'active' && !g.left_at)
-  const finished = visible.filter(g => g.status === 'finished')
-  const inactive = visible.filter(g => !!g.left_at && g.status !== 'finished')
+  const active = visible.filter(g => !g.left_at && g.status !== 'published')
+  const inactive = visible.filter(g => !!g.left_at && g.status !== 'published')
   const starred = visible.filter(g => g.starred_at).sort((a, b) => {
     const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
     const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
     return bTime - aTime
   })
-  const published = visible.filter(g => !!g.published_at)
+  const published = visible.filter(g => g.status === 'published')
 
   const waitingMe = active.filter(g => g.last_message_user_id !== userId)
   const waitingThem = active.filter(g => g.last_message_user_id === userId)
@@ -120,8 +119,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
     ${isActive ? 'text-accent border-b border-accent' : 'text-ink-2 border-b border-transparent'}`
 
   const currentGames =
-    mainTab === 'finished' ? finished
-    : mainTab === 'inactive' ? inactive
+    mainTab === 'inactive' ? inactive
     : mainTab === 'starred' ? starred
     : mainTab === 'published' ? published
     : subTab === 'waiting-me' ? waitingMe
@@ -135,9 +133,6 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
       <div className="flex gap-8 mb-1 border-b border-edge flex-wrap">
         <button onClick={() => setMainTab('active')} className={tabCls(mainTab === 'active')}>
           {t('myGames.active') as string} <span className="opacity-60">({active.length})</span>
-        </button>
-        <button onClick={() => setMainTab('finished')} className={tabCls(mainTab === 'finished')}>
-          {t('myGames.finished') as string} <span className="opacity-60">({finished.length})</span>
         </button>
         <button onClick={() => setMainTab('inactive')} className={tabCls(mainTab === 'inactive')}>
           {t('myGames.inactive') as string} <span className="opacity-60">({inactive.length})</span>
@@ -170,13 +165,13 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
           {currentGames.map(g => {
             const tags = g.request_tags ?? []
             const activeCount = parseInt(g.active_participants) || 0
-            const isGameFinished = g.status === 'finished'
             const isInactive = !!g.left_at
 
             return (
               <article
                 key={g.id}
-                className="card p-7 relative"
+                className="card p-7 relative cursor-pointer"
+                onClick={() => router.push(`/games/${g.id}`)}
                 style={{
                   opacity: isInactive ? 0.7 : 1,
                   borderLeft: parseInt(g.ic_unread) > 0
@@ -186,14 +181,8 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                     : '3px solid transparent',
                 }}
               >
-                {/* Proposal banners */}
-                {!isGameFinished && !isInactive && g.partner_finish_consent && (
-                  <div className="flex items-center gap-2 -mx-7 -mt-7 mb-4 px-5 py-2 font-mono text-[0.65rem] tracking-[0.08em]"
-                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', borderBottom: '1px solid var(--accent)' }}>
-                    {t('myGames.finishProposed') as string}
-                  </div>
-                )}
-                {isGameFinished && g.partner_publish_consent && !g.published_at && (
+                {/* Publish proposal banner */}
+                {!isInactive && g.partner_publish_consent && g.status === 'active' && (
                   <div className="flex items-center gap-2 -mx-7 -mt-7 mb-4 px-5 py-2 font-mono text-[0.65rem] tracking-[0.08em]"
                     style={{ background: 'var(--accent-dim)', color: 'var(--accent)', borderBottom: '1px solid var(--accent)' }}>
                     {t('myGames.publishProposed') as string}
@@ -202,15 +191,28 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
 
                 {/* Header row */}
                 <div className="flex items-center justify-between gap-4 mb-3">
-                  <Link href={`/games/${g.id}`}>
-                    <h3 className="font-heading text-[1.2rem] font-normal text-ink leading-tight break-words">
-                      {g.request_title ?? t('nav.untitled') as string}
-                    </h3>
-                  </Link>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <h3 className="font-heading text-[1.2rem] font-normal text-ink leading-tight break-words">
+                    {g.request_title ?? t('nav.untitled') as string}
+                  </h3>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {g.status === 'preparing' && (
+                      <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase text-accent">
+                        {t('game.chipPreparing') as string}
+                      </span>
+                    )}
+                    {g.status === 'moderation' && (
+                      <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase text-accent">
+                        {t('game.chipModeration') as string}
+                      </span>
+                    )}
+                    {g.status === 'published' && (
+                      <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase text-accent">
+                        {t('game.chipPublished') as string}
+                      </span>
+                    )}
                     {isInactive && (
                       <button
-                        onClick={() => hideGame(g.id)}
+                        onClick={e => { e.stopPropagation(); hideGame(g.id) }}
                         title={t('myGames.hideFromList') as string}
                         className="bg-transparent border-none cursor-pointer text-ink-2 text-[0.85rem] leading-none opacity-50 hover:opacity-100 hover:text-accent p-[0.2rem_0.3rem]"
                       >
@@ -218,7 +220,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                       </button>
                     )}
                     <button
-                      onClick={() => toggleStar(g.id)}
+                      onClick={e => { e.stopPropagation(); toggleStar(g.id) }}
                       title={g.starred_at ? t('myGames.removeFromStarred') as string : t('myGames.addToStarred') as string}
                       className={`bg-transparent border-none cursor-pointer text-[1.1rem] p-0 leading-none ${g.starred_at ? 'text-accent' : 'text-ink-2'}`}
                     >
@@ -233,8 +235,6 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                   {g.request_fandom_type && <span className="badge badge-fandom">{fandomTypeLabels[g.request_fandom_type] ?? g.request_fandom_type}</span>}
                   {g.request_pairing && g.request_pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[g.request_pairing] ?? g.request_pairing}</span>}
                   {g.request_content_level && <span className="badge badge-content">{contentLabels[g.request_content_level] ?? g.request_content_level}</span>}
-                  {isGameFinished && <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>{t('myGames.finished') as string}</span>}
-                  {g.published_at && <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>{t('game.published') as string}</span>}
                   {tags.map(tg => (
                     <span key={tg} className="badge badge-tag">#{tg.toLowerCase()}</span>
                   ))}
@@ -248,7 +248,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                   {g.ooc_enabled && (
                     <Link
                       href={`/games/${g.id}?tab=ooc`}
-                      onClick={e => e.stopPropagation()}
+                      onClick={e => { e.stopPropagation() }}
                       className={`font-mono text-[0.58rem] tracking-[0.06em] py-[0.05rem] px-1.5 rounded-sm no-underline
                       ${parseInt(g.ooc_unread) > 0
                         ? 'text-white bg-accent border-none'
@@ -263,12 +263,6 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
                   )}
                 </div>
 
-                {/* Footer */}
-                <div className="mt-5">
-                  <Link href={`/games/${g.id}`} className="link-accent no-underline">
-                    {t('myGames.open') as string}
-                  </Link>
-                </div>
               </article>
             )
           })}

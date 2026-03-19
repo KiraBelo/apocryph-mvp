@@ -25,6 +25,7 @@ interface MessageFeedProps {
   onCancelEdit: () => void
   onQuotePost: (msg: Message) => void
   onGoToPage: (type: 'ic' | 'ooc', page: number) => void
+  isPrePublish: boolean
 }
 
 export default function MessageFeed({
@@ -33,6 +34,7 @@ export default function MessageFeed({
   currentPage, totalPages,
   scrollRef, onScroll, onSpoilerClick,
   onStartEdit, onCancelEdit, onQuotePost, onGoToPage,
+  isPrePublish,
 }: MessageFeedProps) {
   const t = useT()
   const { gameLayout } = useSettings()
@@ -69,20 +71,24 @@ export default function MessageFeed({
           </p>
         )}
         <div className={!isOoc && gameLayout === 'feed' ? 'max-w-[1050px] mx-auto w-full flex flex-col' : 'contents'} style={!isOoc && gameLayout === 'feed' ? { gap: 'var(--game-gap, 1.5rem)' } : undefined}>
-          {messages.map(msg => (
-            <MessageBubble
-              key={msg.id}
-              msg={msg}
-              userId={userId}
-              isOoc={isOoc}
-              isLeft={isLeft}
-              editingId={editingId}
-              notesEnabled={notesEnabled}
-              onStartEdit={onStartEdit}
-              onCancelEdit={onCancelEdit}
-              onQuotePost={onQuotePost}
-            />
-          ))}
+          {messages.map(msg => {
+            const isDimmed = isPrePublish && msg.user_id !== userId && !isOoc
+            return (
+              <div key={msg.id} style={isDimmed ? { opacity: 0.38, transition: 'opacity 0.2s' } : undefined}>
+                <MessageBubble
+                  msg={msg}
+                  userId={userId}
+                  isOoc={isOoc}
+                  isLeft={isLeft}
+                  editingId={editingId}
+                  notesEnabled={notesEnabled}
+                  onStartEdit={onStartEdit}
+                  onCancelEdit={onCancelEdit}
+                  onQuotePost={onQuotePost}
+                />
+              </div>
+            )
+          })}
         </div>
         <div ref={bottomRef} />
       </div>

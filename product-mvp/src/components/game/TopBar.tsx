@@ -3,33 +3,48 @@ import Link from 'next/link'
 import { useSettings, useT } from '../SettingsContext'
 import { tabBtnCls } from './utils'
 import type { Participant } from './types'
+import StatusChip from './StatusChip'
 
 interface TopBarProps {
   requestTitle: string | null
   effectiveBanner: string | null
-  activeTab: 'ic' | 'ooc' | 'notes'
-  setActiveTab: (tab: 'ic' | 'ooc' | 'notes') => void
+  activeTab: 'ic' | 'ooc' | 'notes' | 'prepare'
+  setActiveTab: (tab: 'ic' | 'ooc' | 'notes' | 'prepare') => void
   oocEnabled: boolean
   fullscreen: boolean
   isLeft: boolean
+  gameStatus: string
+  isFrozen: boolean
+  isPreparing: boolean
+  partnerWantsPublish: boolean
   participants: Participant[]
   userId: string
   notesCount: number
+  publishLoading: boolean
   onSearchToggle: () => void
   onExport: () => void
   onSettings: () => void
   onReport: () => void
   onLeave: () => void
   onFullscreenToggle: () => void
+  onProposePublish: () => void
+  onPublishResponse: (choice: 'publish_as_is' | 'edit_first' | 'decline') => void
+  onRevoke: () => void
+  onSubmitToModeration: () => void
 }
 
 export default function TopBar({
   requestTitle, effectiveBanner, activeTab, setActiveTab,
-  oocEnabled, fullscreen, isLeft, participants, userId, notesCount,
+  oocEnabled, fullscreen, isLeft, gameStatus, isFrozen, isPreparing, partnerWantsPublish,
+  participants, userId, notesCount,
+  publishLoading,
   onSearchToggle, onExport, onSettings, onReport, onLeave, onFullscreenToggle,
+  onProposePublish, onPublishResponse, onRevoke, onSubmitToModeration,
 }: TopBarProps) {
   const { notesEnabled } = useSettings()
   const t = useT()
+
+  const showPrepareTab = isPreparing && !isLeft
 
   return (
     <div className="px-4 py-[0.35rem] border-b border-edge flex items-center shrink-0 bg-surface-2 gap-[0.4rem]">
@@ -39,7 +54,7 @@ export default function TopBar({
       {requestTitle && !effectiveBanner && (
         <span className="font-heading italic text-[0.9rem] text-ink-3 whitespace-nowrap overflow-hidden text-ellipsis min-w-0">{requestTitle}</span>
       )}
-      {(oocEnabled || notesEnabled) && (
+      {(oocEnabled || notesEnabled || showPrepareTab) && (
         <>
           {requestTitle && !effectiveBanner && <span className="w-px h-4 bg-ink-3 shrink-0" />}
           <div className="flex items-center gap-0 shrink-0">
@@ -56,11 +71,29 @@ export default function TopBar({
                 {t('game.notes') as string} {notesCount > 0 && <span className="ml-[0.3em] opacity-60">{notesCount}</span>}
               </button>
             )}
+            {showPrepareTab && (
+              <button onClick={() => setActiveTab('prepare')} className={tabBtnCls(activeTab === 'prepare', 'prepare')}>
+                {t('game.prepareTab') as string}
+              </button>
+            )}
           </div>
         </>
       )}
 
       <div className="ml-auto flex gap-[0.35rem] items-center">
+        {/* StatusChip */}
+        <StatusChip
+          gameStatus={gameStatus}
+          isFrozen={isFrozen}
+          isLeft={isLeft}
+          partnerWantsPublish={partnerWantsPublish}
+          publishLoading={publishLoading}
+          onProposePublish={onProposePublish}
+          onPublishResponse={onPublishResponse}
+          onRevoke={onRevoke}
+          onSubmitToModeration={onSubmitToModeration}
+        />
+
         {!fullscreen && (
           <div className="flex gap-1 mr-[0.15rem]">
             {participants.filter(p => !p.left_at).map(p => (

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const q = sp.get('q')
 
   const conditions: string[] = [
-    'g.published_at IS NOT NULL',
+    "g.status = 'published'",
     "g.moderation_status = 'visible'",
   ]
   const params: unknown[] = []
@@ -68,13 +68,14 @@ export async function GET(req: NextRequest) {
       request_title: string | null; request_type: string | null;
       request_fandom_type: string | null; request_pairing: string | null;
       request_content_level: string | null; request_tags: string[] | null;
-      ic_count: string; participants: string
+      ic_count: string; likes_count: string; participants: string
     }>(
       `SELECT g.id, g.published_at, g.banner_url,
               r.title as request_title, r.type as request_type,
               r.fandom_type as request_fandom_type, r.pairing as request_pairing,
               r.content_level as request_content_level, r.tags as request_tags,
               (SELECT COUNT(*) FROM messages m WHERE m.game_id = g.id AND m.type = 'ic')::text as ic_count,
+              (SELECT COUNT(*) FROM game_likes gl WHERE gl.game_id = g.id)::text as likes_count,
               (SELECT json_agg(json_build_object('nickname', gp.nickname, 'avatar_url', gp.avatar_url))
                 FROM game_participants gp WHERE gp.game_id = g.id)::text as participants
        FROM games g

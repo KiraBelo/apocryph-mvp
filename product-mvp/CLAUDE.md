@@ -38,30 +38,64 @@ product-mvp/
       my/                 # /my/requests, /my/games
       bookmarks/          # /bookmarks
       invite/[token]/     # принятие инвайт-ссылки
+      feed/               # /feed — лента заявок (альтернативный вход)
+      library/            # /library, /library/[id] — публичная библиотека игр
+      admin/              # /admin — панель администратора
+        reports/          # модерация жалоб
+        stop-list/        # стоп-лист
+        users/            # управление пользователями
       api/
         auth/             # register, login, logout
         requests/         # CRUD заявок, /[id]/respond
-        games/            # CRUD игр, messages, notes, leave, report, dice, SSE stream
+        games/            # CRUD игр, messages, notes, leave, report, dice, SSE, unread-count
+                          # + publish-consent (POST/DELETE), publish-response (POST),
+                          # + submit-to-moderation (POST)
         bookmarks/        # добавление/удаление закладок
         blacklist/        # чёрный список тегов пользователя
         invites/          # создание/принятие инвайтов
         tags/             # GET автокомплит, POST создание тегов
+        public-games/     # публичный API библиотеки + /[id]/likes (GET/POST toggle), /[id]/comments
+        admin/            # API админки (games, reports, stop-list, users, violations)
+                          # + games/[id]/moderate (POST approve/reject), comments/[id] (POST approve / DELETE)
+        __tests__/        # тесты API (admin-users, auth, messages, requests)
     components/
       Nav.tsx             # навигация
+      Landing.tsx         # лендинг (+ Landing.module.css)
       FeedClient.tsx      # лента заявок с фильтрами и тег-чипами
       RequestCard.tsx     # карточка заявки
       RequestForm.tsx     # форма создания/редактирования заявки
+      RequestFormWrapper.tsx  # обёртка формы заявки
       RequestDetailClient.tsx  # просмотр заявки
       MyRequestsClient.tsx     # мои заявки
+      MyRequestsHeader.tsx     # заголовок «мои заявки»
       GameDialogClient.tsx     # игровой диалог (IC/OOC/Dice, SSE)
       MyGamesClient.tsx        # мои игры
+      BookmarksClient.tsx      # закладки
+      LibraryClient.tsx        # лента библиотеки
+      PublicGameViewer.tsx     # просмотр опубликованной игры
       RichEditor.tsx      # TipTap-редактор для постов
       OocEditor.tsx       # редактор OOC-сообщений
+      TagAutocomplete.tsx # автокомплит тегов с fuzzy-search
       InviteClient.tsx    # страница принятия инвайта
-      TagAutocomplete.tsx  # автокомплит тегов с fuzzy-search
+      InvalidInviteClient.tsx  # невалидный инвайт
+      BanBanner.tsx       # баннер бана
+      AdminReports.tsx    # админка: жалобы
+      AdminStopList.tsx   # админка: стоп-лист
+      AdminUsers.tsx      # админка: пользователи
       SettingsContext.tsx  # контекст настроек (тема, шрифт, пресеты тегов)
       SettingsPanel.tsx   # панель настроек
       ThemeProvider.tsx    # провайдер темы
+      NotFoundClient.tsx  # страница 404
+      game/               # субкомпоненты игрового диалога
+        MessageBubble.tsx, MessageEditor.tsx, MessageFeed.tsx
+        SearchPanel.tsx, SettingsModal.tsx, TopBar.tsx
+        StatusBanners.tsx, StatusChip.tsx, NotesTab.tsx, MsgContent.tsx
+        PrepareTab.tsx, PublishConsentModal.tsx, ModerationSentModal.tsx
+        EpilogueModal.tsx, ExportModal.tsx, exportUtils.ts
+        Modal.tsx, types.ts, utils.ts
+      hooks/              # хуки игрового диалога
+        useGameChat.ts, useGameSSE.ts, useGameSearch.ts
+        useGameNotes.ts, useDiceRoller.ts
     lib/
       db.ts               # Pool + query/queryOne/withTransaction хелперы
       session.ts          # getSession/getUser (iron-session)
@@ -69,11 +103,15 @@ product-mvp/
       sanitize.ts         # настройки sanitize-html
       fonts.ts            # конфиг шрифтов
       sse.ts              # Server-Sent Events хелперы
+      rate-limit.ts       # антиспам (rate limiting)
+      stoplist.ts         # стоп-лист слов
+      game-utils.ts       # утилиты игр
+      __tests__/          # тесты lib (auth, rate-limit, sanitize, stoplist)
 ```
 
 ## База данных
 
-Таблицы: `users`, `requests`, `games`, `game_participants`, `messages`, `bookmarks`, `invites`, `user_tag_blacklist`, `game_notes`, `reports`, `tags`, `tag_i18n`, `tag_aliases`, `request_tags`
+Таблицы: `users`, `requests`, `games`, `game_participants`, `messages`, `bookmarks`, `invites`, `user_tag_blacklist`, `game_notes`, `reports`, `tags`, `tag_i18n`, `tag_aliases`, `request_tags`, `game_publish_consent`, `game_likes`, `game_comments`, `notifications`
 
 - UUID первичные ключи (pgcrypto)
 - Теги заявок: dual-write — `request_tags` (junction, нормализованные) + `requests.tags TEXT[]` (кэш для отображения)
@@ -136,16 +174,26 @@ CSS-переменные маппятся на Tailwind через `@theme`:
 - 3 раскладки постов: **dialog** (мой справа, чужой слева), **feed** (аватары чередуются по сторонам), **book** (без аватарок, только имя + текст)
 - Вкладки: IC (история), OOC (оффтоп, выключен по умолчанию), Notes (заметки)
 - Поиск по IC/OOC/Notes: результаты в панели, клик → скролл к сообщению + подсветка, панель не закрывается
-- Настройки: 4 группы — Персонаж (никнейм, аватар), Оформление (раскладка, баннер), Вкладки (OOC, заметки), Управление (завершение, публикация)
+- Настройки: 4 группы — Персонаж (никнейм, аватар), Оформление (раскладка, баннер), Вкладки (OOC, заметки), Управление (публикация — через StatusChip в TopBar)
 - Click-outside в дропдаунах: использовать `skipCloseRef` (ref-флаг), а не `e.stopPropagation()` — React synthetic events не блокируют native document listeners
 
 ## Жизненный цикл игр
 
-- **Статусы:** `active` (по умолчанию) → `finished` (оба поставили `finish_consent`)
-- **Завершение:** Флажок «Готов завершить» в настройках. Когда все активные участники согласны → `status='finished'`, IC замораживается, OOC остаётся.
-- **Переоткрытие:** Любой участник может вернуть `status='active'` — сбрасывает все consent и publish.
-- **Публикация:** После завершения появляется флажок «Опубликовать в Библиотеку» (требуется ≥20 IC-постов). Когда оба согласны → `published_at = NOW()`, игра в Библиотеке.
-- **Уведомления:** Циферка на «Игры» в Nav + баннер на карточке + баннер внутри игры.
+- **Статусы:** `active` → `preparing` → `moderation` → `published`
+- **Инициация публикации:** Любой участник (≥20 IC-постов) отправляет запрос через `POST /api/games/[id]/publish-consent`. Партнёр получает баннер и выбирает через `POST /api/games/[id]/publish-response { choice }`:
+  - `publish_as_is` → сразу `status = 'moderation'`
+  - `edit_first` → `status = 'preparing'`
+  - `decline` → инициатор сохраняет consent, игра остаётся `active`
+- **`preparing`:** IC заморожен (нельзя писать новые посты), OOC работает. Участники редактируют посты в PrepareTab. Кнопка «Отправить на публикацию» → `POST .../submit-to-moderation` → `status = 'moderation'`.
+- **`moderation`:** Всё заморожено. Администратор одобряет/отклоняет через `POST /api/admin/games/[id]/moderate { action }`.
+- **`published`:** Игра в Библиотеке, read-only. Лайки (`game_likes`) и комментарии с премодерацией (`game_comments`).
+- **Отзыв:** `DELETE /api/games/[id]/publish-consent` — `status = 'active'`, consent обоих сбрасывается. Из `published` — лайки удаляются.
+- **IC блокируется** если `status !== 'active'` (не только на `finished`).
+- **Статус `finished` удалён.** `finish_consent` удалён.
+
+### ⚠️ Критичная ловушка — game_publish_consent
+
+Таблица `game_publish_consent` имеет составной PK `(game_id, participant_id)` — **колонки `id` нет**. Запросы `SELECT c.id` или `COUNT(c.id)` сломаются с ошибкой «column c.id does not exist». Использовать `SELECT 1` и `COUNT(c.participant_id)`.
 
 ## Библиотека
 
@@ -153,6 +201,11 @@ CSS-переменные маппятся на Tailwind через `@theme`:
 - `/library/[id]` — read-only просмотр IC-сообщений (3 раскладки), без OOC/notes/user_id
 - API: `GET /api/public-games` (лента с фильтрами), `GET /api/public-games/[id]` (одна игра)
 - Фильтры: type, fandom_type, pairing, content_level, tags, текстовый поиск, blacklist
+
+## Админка
+
+- `/admin` — панель администратора (reports, stop-list, users)
+- API: `/api/admin/games`, `/api/admin/reports`, `/api/admin/stop-list`, `/api/admin/users`, `/api/admin/violations`
 
 ## Антиспам заявок
 

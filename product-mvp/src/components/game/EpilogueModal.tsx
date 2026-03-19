@@ -8,12 +8,13 @@ interface EpilogueModalProps {
   icPostCount: number
   publishLoading: boolean
   onPublish: () => void
+  onPrepare: () => void
   onSkip: () => void
 }
 
 export default function EpilogueModal({
   requestTitle, participants, icPostCount,
-  publishLoading, onPublish, onSkip,
+  publishLoading, onPublish, onPrepare, onSkip,
 }: EpilogueModalProps) {
   const t = useT()
   const canPublish = icPostCount >= MIN_IC_POSTS
@@ -51,34 +52,45 @@ export default function EpilogueModal({
         {/* Decorative line */}
         <div className="mx-auto mb-8 w-16 border-t border-edge" />
 
-        {/* Publish question */}
-        {canPublish && (
-          <p className="font-body text-[0.85rem] text-ink-2 mb-6 italic">
-            {t('game.epilogueQuestion') as string}
-          </p>
-        )}
-
         {/* Buttons */}
         <div className="flex flex-col gap-3">
-          {canPublish && (
-            <button
-              onClick={onPublish}
-              disabled={publishLoading}
-              className="btn-primary w-full p-[0.65rem] text-[0.9rem]"
-            >
-              {t('game.publishToLibrary') as string}
-            </button>
-          )}
-          <button
-            onClick={onSkip}
-            className="btn-ghost w-full p-[0.5rem] text-[0.75rem]"
-          >
-            {canPublish ? t('game.keepPrivate') as string : t('game.epilogueContinue') as string}
-          </button>
-          {!canPublish && (
-            <p className="font-mono text-[0.5rem] text-ink-2 tracking-wide">
-              {t('game.tooFewMessages') as string} ({icPostCount}/{MIN_IC_POSTS})
-            </p>
+          {canPublish ? (
+            <>
+              <p className="font-body text-[0.85rem] text-ink-2 mb-2 italic">
+                {t('game.epiloguePrepareQuestion') as string}
+              </p>
+              <button
+                onClick={onPrepare}
+                className="btn-primary w-full p-[0.65rem] text-[0.9rem]"
+              >
+                {t('game.epiloguePrepare') as string}
+              </button>
+              <button
+                onClick={onPublish}
+                disabled={publishLoading}
+                className="btn-ghost w-full p-[0.5rem] text-[0.8rem]"
+              >
+                {t('game.epiloguePublishAsIs') as string}
+              </button>
+              <button
+                onClick={onSkip}
+                className="btn-ghost w-full p-[0.4rem] text-[0.65rem] opacity-50"
+              >
+                {t('game.keepPrivate') as string}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onSkip}
+                className="btn-ghost w-full p-[0.5rem] text-[0.75rem]"
+              >
+                {t('game.epilogueContinue') as string}
+              </button>
+              <p className="font-mono text-[0.5rem] text-ink-2 tracking-wide">
+                {t('game.tooFewMessages') as string} ({icPostCount}/{MIN_IC_POSTS})
+              </p>
+            </>
           )}
         </div>
       </div>

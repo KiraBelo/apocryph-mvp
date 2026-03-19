@@ -26,11 +26,14 @@ interface Props {
   onTagSubscribe?: (tag: string) => void
   onTagBlacklist?: (tag: string) => void
   isOwn?: boolean
+  statusLabel?: string
+  statusActive?: boolean
 }
 
 export default function RequestCard({
   request, isBookmarked, onBookmark, showRespond = true,
   onTagSearch, onTagSubscribe, onTagBlacklist, isOwn,
+  statusLabel, statusActive,
 }: Props) {
   const t = useT()
 
@@ -128,6 +131,11 @@ export default function RequestCard({
     <article className="card p-7 relative">
       {/* Action icons row */}
       <div className="flex items-center justify-end gap-2 mb-3">
+        {statusLabel && (
+          <span className={`font-mono text-[0.6rem] tracking-[0.1em] uppercase mr-auto ${statusActive ? 'text-accent' : 'text-ink-2 opacity-60'}`}>
+            {statusLabel}
+          </span>
+        )}
         {isOwn && (
           <>
             <button

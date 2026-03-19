@@ -165,22 +165,26 @@ export async function POST(req: NextRequest) {
       )
       const request = res.rows[0]
 
-      // Dual-write: insert into request_tags
+      // Dual-write: insert into request_tags (batch to avoid N+1)
       if (structuredTags.length > 0) {
-        for (const tag of structuredTags) {
-          let tagId = tag.id
-          if (!tagId) {
-            const found = await client.query(
-              'SELECT id FROM tags WHERE slug = $1', [tag.slug]
-            )
-            tagId = found.rows[0]?.id
-          }
-          if (tagId) {
-            await client.query(
-              'INSERT INTO request_tags (request_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-              [request.id, tagId]
-            )
-          }
+        // Collect ids we already know, and slugs we need to look up
+        const knownIds: number[] = structuredTags.filter(t => t.id).map(t => t.id!)
+        const unknownSlugs = structuredTags.filter(t => !t.id).map(t => t.slug)
+
+        let lookedUpIds: number[] = []
+        if (unknownSlugs.length > 0) {
+          const found = await client.query<{ id: number }>(
+            'SELECT id FROM tags WHERE slug = ANY($1)', [unknownSlugs]
+          )
+          lookedUpIds = found.rows.map(r => r.id)
+        }
+
+        const allTagIds = [...knownIds, ...lookedUpIds]
+        if (allTagIds.length > 0) {
+          await client.query(
+            'INSERT INTO request_tags (request_id, tag_id) SELECT $1, unnest($2::int[]) ON CONFLICT DO NOTHING',
+            [request.id, allTagIds]
+          )
         }
       }
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, memo } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
 import { feedPostBg } from '@/lib/game-utils'
+import PublicComments from './game/PublicComments'
 
 const MsgContent = memo(function MsgContent({ html, className, style }: { html: string; className?: string; style?: React.CSSProperties }) {
   return <div className={className} style={style} dangerouslySetInnerHTML={{ __html: html }} />
@@ -25,7 +26,7 @@ interface Message {
 }
 
 interface GameData {
-  game: { id: string; banner_url: string | null; published_at: string }
+  game: { id: string; banner_url: string | null; published_at: string; author_user_ids?: string[] }
   request: {
     title: string | null; type: string | null; fandom_type: string | null
     pairing: string | null; content_level: string | null
@@ -40,13 +41,16 @@ interface GameData {
 
 type Layout = 'dialog' | 'feed' | 'book'
 
-export default function PublicGameViewer({ gameId }: { gameId: string }) {
+export default function PublicGameViewer({ gameId, userId }: { gameId: string; userId: string | null }) {
   const t = useT()
   const [data, setData] = useState<GameData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [page, setPage] = useState(1)
   const [layout, setLayout] = useState<Layout>('feed')
+  const [likesCount, setLikesCount] = useState(0)
+  const [liked, setLiked] = useState(false)
+  const [likeLoading, setLikeLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -60,6 +64,28 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
       setLoading(false)
     }
   }, [gameId, page])
+
+  useEffect(() => {
+    fetch(`/api/public-games/${gameId}/likes`)
+      .then(r => r.ok ? r.json() : { count: 0, liked: false })
+      .then(d => { setLikesCount(d.count ?? 0); setLiked(d.liked ?? false) })
+      .catch(() => {})
+  }, [gameId])
+
+  async function toggleLike() {
+    if (!userId || likeLoading) return
+    setLikeLoading(true)
+    try {
+      const res = await fetch(`/api/public-games/${gameId}/likes`, { method: 'POST' })
+      if (res.ok) {
+        const d = await res.json()
+        setLikesCount(d.count ?? 0)
+        setLiked(d.liked ?? false)
+      }
+    } finally {
+      setLikeLoading(false)
+    }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -83,6 +109,7 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
   }
 
   const { game, request, participants, messages, totalPages } = data
+  const authorUserIds = game.author_user_ids ?? []
   const participantMap = new Map(participants.map(p => [p.id, p]))
 
   const contentLabels: Record<string, string> = {
@@ -150,6 +177,26 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
             <span className="font-body text-[0.85rem] text-ink">{p.nickname}</span>
           </span>
         ))}
+      </div>
+
+      {/* Like button */}
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={toggleLike}
+          disabled={!userId || likeLoading}
+          className="flex items-center gap-1.5 font-mono text-[0.65rem] tracking-[0.08em] border border-edge px-3 py-1.5 cursor-pointer transition-colors duration-150"
+          style={{
+            background: liked ? 'var(--accent-dim)' : 'transparent',
+            color: liked ? 'var(--accent)' : 'var(--text-2)',
+            borderColor: liked ? 'var(--accent)' : 'var(--border)',
+            cursor: userId ? 'pointer' : 'default',
+          }}
+          title={!userId ? (t('game.likeLoginHint') as string) : undefined}
+        >
+          <span>{liked ? '♥' : '♡'}</span>
+          <span>{t('game.likeButton') as string}</span>
+          {likesCount > 0 && <span className="opacity-60">({likesCount})</span>}
+        </button>
       </div>
 
       {/* Layout switcher */}
@@ -278,6 +325,8 @@ export default function PublicGameViewer({ gameId }: { gameId: string }) {
           </button>
         </div>
       )}
+
+      <PublicComments gameId={gameId} userId={userId} authorUserIds={authorUserIds} />
     </div>
   )
 }
