@@ -10,14 +10,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const game = await queryOne<{
-      id: string; published_at: string | null; banner_url: string | null;
+      id: string; status: string; published_at: string | null; banner_url: string | null;
       moderation_status: string; request_id: string | null
     }>(
-      'SELECT id, published_at, banner_url, moderation_status, request_id FROM games WHERE id=$1',
+      'SELECT id, status, published_at, banner_url, moderation_status, request_id FROM games WHERE id=$1',
       [gameId]
     )
 
-    if (!game || !game.published_at || game.moderation_status !== 'visible') {
+    if (!game || game.status !== 'published' || game.moderation_status !== 'visible') {
       return NextResponse.json({ error: 'notFound' }, { status: 404 })
     }
 
@@ -35,6 +35,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       'SELECT id, nickname, avatar_url FROM game_participants WHERE game_id=$1 ORDER BY id',
       [gameId]
     )
+
+    // Author user IDs (for comment reply permissions — not exposing nicknames/emails)
+    const authorRows = await query<{ user_id: string }>(
+      'SELECT user_id FROM game_participants WHERE game_id=$1',
+      [gameId]
+    )
+    const authorUserIds = authorRows.map(r => r.user_id)
 
     // IC messages count
     const countRes = await queryOne<{ count: string }>(
@@ -70,6 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         id: game.id,
         banner_url: game.banner_url,
         published_at: game.published_at,
+        author_user_ids: authorUserIds,
       },
       request: request ? {
         title: request.title,

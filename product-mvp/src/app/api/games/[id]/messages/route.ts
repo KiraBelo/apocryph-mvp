@@ -133,8 +133,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (content.length > 200_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
     const msgType = type === 'ooc' ? 'ooc' : 'ic'
 
-    // Block IC posts in finished games (OOC still allowed)
-    if (game && game.status === 'finished' && msgType === 'ic') {
+    // Block IC posts when game is not active (preparing/moderation/published); OOC still allowed
+    if (game && game.status !== 'active' && msgType === 'ic') {
       return NextResponse.json({ error: 'gameFinished' }, { status: 403 })
     }
 

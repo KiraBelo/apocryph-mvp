@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
         'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
         [user.id, token, expiresAt.toISOString()]
       )
+
+      // TODO: send email with reset link
+      // await sendEmail(user.email, `${process.env.NEXT_PUBLIC_BASE_URL}/auth/reset-password?token=${token}`)
     }
   } catch (error) {
     console.error('[API /api/auth/forgot-password] POST:', error)

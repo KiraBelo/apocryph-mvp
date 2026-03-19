@@ -10,9 +10,11 @@ import SearchPanel from './game/SearchPanel'
 import StatusBanners from './game/StatusBanners'
 import ExportModal from './game/ExportModal'
 import SettingsModal from './game/SettingsModal'
-import EpilogueModal from './game/EpilogueModal'
 import TopBar from './game/TopBar'
 import NotesTab from './game/NotesTab'
+import PrepareTab from './game/PrepareTab'
+import PublishConsentModal from './game/PublishConsentModal'
+import ModerationSentModal from './game/ModerationSentModal'
 import { useGameSSE } from './hooks/useGameSSE'
 import { useGameChat } from './hooks/useGameChat'
 import { useGameNotes } from './hooks/useGameNotes'
@@ -27,10 +29,10 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
 
   // ── Tab state ──
   const initialTab = searchParams.get('tab') === 'ooc' ? 'ooc' as const : searchParams.get('tab') === 'notes' ? 'notes' as const : 'ic' as const
-  const [activeTab, setActiveTab] = useState<'ic' | 'ooc' | 'notes'>(initialTab)
+  const [activeTab, setActiveTab] = useState<'ic' | 'ooc' | 'notes' | 'prepare'>(initialTab)
 
   // ── Hooks ──
-  const chat = useGameChat({ gameId, participantId: me.id, activeTab, t }, { messages: initialMessages, page: initialPage, totalPages: initTotalPages })
+  const chat = useGameChat({ gameId, participantId: me.id, activeTab, t, onMyConsentReset: () => resetMyConsent() }, { messages: initialMessages, page: initialPage, totalPages: initTotalPages })
   const notesHook = useGameNotes({ gameId, t })
   const search = useGameSearch({ gameId, icMessages: chat.icMessages, oocMessages: chat.oocMessages, notes: notesHook.notes })
   const dice = useDiceRoller({ gameId, participantId: me.id, t })
@@ -45,6 +47,8 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const [showReport, setShowReport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showExport, setShowExport] = useState(false)
+  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [showModerationSent, setShowModerationSent] = useState(false)
   const [leaveReason, setLeaveReason] = useState('')
   const [reportReason, setReportReason] = useState('')
 
@@ -59,29 +63,32 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const isLeft = !!me.left_at
   const isFrozen = !!(game.moderation_status && game.moderation_status !== 'visible')
   const [gameStatus, setGameStatus] = useState(game.status || 'active')
-  const isFinished = gameStatus === 'finished'
+  const isPreparing = gameStatus === 'preparing'
+  const isIcFrozen = gameStatus !== 'active'
   const partner = participants.find(p => p.user_id !== userId)
-  const [myFinishConsent, setMyFinishConsent] = useState(!!me.finish_consent)
-  const [partnerFinishConsent, setPartnerFinishConsent] = useState(!!partner?.finish_consent)
-  const [finishLoading, setFinishLoading] = useState(false)
+
+  // Publish consent state
   const [myPublishConsent, setMyPublishConsent] = useState(false)
   const [partnerPublishConsent, setPartnerPublishConsent] = useState(false)
+  const [partnerWantsPublish, setPartnerWantsPublish] = useState(false)
   const [publishLoading, setPublishLoading] = useState(false)
   const [publishLoaded, setPublishLoaded] = useState(false)
   const [icPostCount, setIcPostCount] = useState(0)
-  const [showEpilogue, setShowEpilogue] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
 
   // ── Scroll collapse refs ──
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ignoreScrollRef = useRef(false)
 
-  // ── Derived ──
   const isOoc = activeTab === 'ooc'
-  const isNotes = activeTab === 'notes'
   const visibleMessages = isOoc ? chat.oocMessages : chat.icMessages
   const activePartner = participants.find(p => p.user_id !== userId && !p.left_at)
   const effectiveBanner = bannerPref === 'none' ? null : bannerPref === 'partner' ? (activePartner?.banner_url ?? null) : (bannerUrl || null)
+
+  function resetMyConsent() {
+    setMyPublishConsent(false)
+  }
 
   // ── Effects ──
   useEffect(() => {
@@ -92,8 +99,11 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         const otherP = data.participants.find((p: { participant_id: string }) => p.participant_id !== me.id)
         setMyPublishConsent(!!myP?.consented)
         setPartnerPublishConsent(!!otherP?.consented)
+        // Partner wants to publish = partner consented but I haven't yet
+        setPartnerWantsPublish(!!otherP?.consented && !myP?.consented && gameStatus === 'active')
       }
       if (data.icPostCount != null) setIcPostCount(data.icPostCount)
+      if (data.status) setGameStatus(data.status)
       setPublishLoaded(true)
     }).catch(() => {})
   }, [publishLoaded, gameId, me.id])
@@ -121,6 +131,8 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   useEffect(() => { if (activeTab === 'notes' && notesEnabled && !notesHook.notesLoaded) notesHook.loadNotes() }, [activeTab, notesEnabled, notesHook.notesLoaded])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (activeTab === 'ooc' && !chat.oocLoaded) chat.loadOocHistory() }, [activeTab, chat.oocLoaded])
+  // Auto-switch away from prepare tab if no longer in preparing status
+  useEffect(() => { if (activeTab === 'prepare' && !isPreparing) setActiveTab('ic') }, [isPreparing, activeTab])
 
   useEffect(() => {
     if (!chat.scrollToMsgId) return
@@ -137,6 +149,21 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
     onNewMessage: (msg) => { msg.type === 'ooc' ? chat.appendOocMessage(msg) : chat.appendIcMessage(msg) },
     onEditMessage: (data) => chat.updateMessage(data),
     onDiceMessage: (data) => dice.enqueueDice(data),
+    onStatusChanged: (data) => {
+      setGameStatus(data.status)
+      setPublishLoaded(false) // refresh consent state
+      if (data.status === 'preparing') setActiveTab('prepare')
+    },
+    onPublishRequest: () => {
+      setPartnerWantsPublish(true)
+      setPublishLoaded(false)
+    },
+    onPublishRevoked: () => {
+      setPartnerWantsPublish(false)
+      setMyPublishConsent(false)
+      setPartnerPublishConsent(false)
+      setGameStatus('active')
+    },
   })
 
   // ── Handlers ──
@@ -152,36 +179,58 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
 
   function handleSpoilerClick(e: React.MouseEvent) { const el = e.target as HTMLElement; if (el.classList.contains('ooc-spoiler')) el.classList.toggle('ooc-spoiler-open') }
 
-  async function handleFinishConsent(consent: boolean) {
-    setFinishLoading(true)
-    try {
-      const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent }) })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-      const data = await res.json()
-      if (data.ok) { setMyFinishConsent(consent); if (data.finished) { setGameStatus('finished'); setShowEpilogue(true) } }
-    } catch { alert(t('errors.networkError') as string) }
-    finally { setFinishLoading(false) }
-  }
-
-  async function handleReopen() {
-    setFinishLoading(true)
-    try {
-      const res = await fetch(`/api/games/${gameId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reopen' }) })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-      const data = await res.json()
-      if (data.ok) { setGameStatus('active'); setMyFinishConsent(false); setMyPublishConsent(false); setPartnerPublishConsent(false); setPublishLoaded(false) }
-    } catch { alert(t('errors.networkError') as string) }
-    finally { setFinishLoading(false) }
-  }
-
-  async function handlePublishConsent(consent: boolean) {
+  async function handleProposePublish() {
     setPublishLoading(true)
     try {
-      const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent }) })
+      const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'POST' })
       if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-      setMyPublishConsent(consent)
+      setMyPublishConsent(true)
     } catch { alert(t('errors.networkError') as string) }
     finally { setPublishLoading(false) }
+  }
+
+  async function handlePublishResponse(choice: 'publish_as_is' | 'edit_first' | 'decline') {
+    setPublishLoading(true)
+    try {
+      const res = await fetch(`/api/games/${gameId}/publish-response`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ choice })
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      const data = await res.json()
+      setPartnerWantsPublish(false)
+      setShowPublishModal(false)
+      if (data.status) {
+        setGameStatus(data.status)
+        if (data.status === 'preparing') setActiveTab('prepare')
+      }
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setPublishLoading(false) }
+  }
+
+  async function handleRevoke() {
+    setPublishLoading(true)
+    try {
+      const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'DELETE' })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      setGameStatus('active')
+      setMyPublishConsent(false)
+      setPartnerPublishConsent(false)
+      setPartnerWantsPublish(false)
+      setPublishLoaded(false)
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setPublishLoading(false) }
+  }
+
+  async function handleSubmitToModeration() {
+    setSubmitLoading(true)
+    try {
+      const res = await fetch(`/api/games/${gameId}/submit-to-moderation`, { method: 'POST' })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      setGameStatus('moderation')
+      setShowModerationSent(true)
+    } catch { alert(t('errors.networkError') as string) }
+    finally { setSubmitLoading(false) }
   }
 
   // ── Render ──
@@ -202,11 +251,18 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         requestTitle={requestTitle} effectiveBanner={effectiveBanner}
         activeTab={activeTab} setActiveTab={setActiveTab}
         oocEnabled={oocEnabled} fullscreen={fullscreen} isLeft={isLeft}
+        gameStatus={gameStatus} isFrozen={isFrozen} isPreparing={isPreparing}
+        partnerWantsPublish={partnerWantsPublish}
         participants={participants} userId={userId} notesCount={notesHook.notes.length}
+        publishLoading={publishLoading}
         onSearchToggle={() => { search.setSearchOpen(s => !s); search.setSearchQuery(''); search.setSearchScope(activeTab === 'notes' ? 'notes' : activeTab === 'ooc' ? 'ooc' : 'ic') }}
         onExport={() => setShowExport(true)} onSettings={() => setShowSettings(true)}
         onReport={() => setShowReport(true)} onLeave={() => setShowLeave(true)}
         onFullscreenToggle={() => setFullscreen(f => { const next = !f; setEditorCollapsed(next); return next })}
+        onProposePublish={handleProposePublish}
+        onPublishResponse={handlePublishResponse}
+        onRevoke={handleRevoke}
+        onSubmitToModeration={handleSubmitToModeration}
       />
 
       {search.searchOpen && (
@@ -220,14 +276,15 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         />
       )}
 
-      <StatusBanners gameStatus={gameStatus} isLeft={isLeft} isFrozen={isFrozen} moderationStatus={game.moderation_status}
-        myFinishConsent={myFinishConsent} partnerFinishConsent={partnerFinishConsent}
-        myPublishConsent={myPublishConsent} partnerPublishConsent={partnerPublishConsent}
-        icPostCount={icPostCount} finishLoading={finishLoading} publishLoading={publishLoading} publishLoaded={publishLoaded}
-        onFinishConsent={handleFinishConsent} onReopen={handleReopen} onPublishConsent={handlePublishConsent}
+      <StatusBanners
+        isFrozen={isFrozen} moderationStatus={game.moderation_status}
+        isLeft={isLeft}
+        partnerWantsPublish={partnerWantsPublish}
+        publishLoading={publishLoading}
+        onOpenPublishModal={() => setShowPublishModal(true)}
       />
 
-      {isNotes ? (
+      {activeTab === 'notes' ? (
         <NotesTab
           notes={notesHook.notes} notesLoading={notesHook.notesLoading} isLeft={isLeft} isFrozen={isFrozen}
           fullscreen={fullscreen} editorCollapsed={editorCollapsed} setEditorCollapsed={setEditorCollapsed}
@@ -242,17 +299,30 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
           onStartNoteEdit={notesHook.startNoteEdit} onSaveNoteEdit={notesHook.saveNoteEdit}
           onDeleteNote={notesHook.deleteNote} onToggleExpand={notesHook.toggleNoteExpand} onSubmitNote={notesHook.submitNote}
         />
+      ) : activeTab === 'prepare' ? (
+        <PrepareTab
+          messages={chat.icMessages} userId={userId} gameId={gameId}
+          currentPage={chat.icPage} totalPages={chat.icTotalPages} pageLoading={chat.pageLoading}
+          fullscreen={fullscreen}
+          submitLoading={submitLoading}
+          onGoToPage={(page) => chat.goToPage('ic', page)}
+          onUpdateMessage={chat.updateMessage}
+          onMyConsentReset={resetMyConsent}
+          onSubmitToModeration={handleSubmitToModeration}
+        />
       ) : (
         <>
           <MessageFeed
-            messages={visibleMessages} userId={userId} isOoc={isOoc} isLeft={isLeft} isFinished={isFinished} isFrozen={isFrozen}
+            messages={visibleMessages} userId={userId} isOoc={isOoc} isLeft={isLeft} isFinished={isIcFrozen} isFrozen={isFrozen}
             fullscreen={fullscreen} editingId={chat.editingId} notesEnabled={notesEnabled} pageLoading={chat.pageLoading}
             currentPage={isOoc ? chat.oocPage : chat.icPage} totalPages={isOoc ? chat.oocTotalPages : chat.icTotalPages}
             scrollRef={chat.scrollRef} onScroll={handleMessagesScroll} onSpoilerClick={handleSpoilerClick}
             onStartEdit={chat.startEdit} onCancelEdit={chat.cancelEdit} onQuotePost={(msg) => notesHook.quotePost(msg, setActiveTab)} onGoToPage={chat.goToPage}
+            isPrePublish={false}
           />
+
           <MessageEditor
-            isOoc={isOoc} isLeft={isLeft} isFrozen={isFrozen} isFinished={isFinished} fullscreen={fullscreen}
+            isOoc={isOoc} isLeft={isLeft} isFrozen={isFrozen} isFinished={isIcFrozen} fullscreen={fullscreen}
             editingId={chat.editingId} editorCollapsed={editorCollapsed} setEditorCollapsed={setEditorCollapsed}
             editorPinned={editorPinned} setEditorPinned={setEditorPinned}
             content={chat.content} setContent={chat.setContent} sendKey={chat.sendKey}
@@ -303,26 +373,16 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         </Modal>
       )}
 
-      {showEpilogue && (
-        <EpilogueModal
-          requestTitle={requestTitle}
-          participants={participants.filter(p => !p.left_at).map(p => ({ nickname: p.nickname }))}
-          icPostCount={icPostCount}
-          publishLoading={publishLoading}
-          onPublish={async () => {
-            setPublishLoading(true)
-            try {
-              const res = await fetch(`/api/games/${gameId}/publish-consent`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ consent: true })
-              })
-              if (res.ok) setMyPublishConsent(true)
-            } catch { /* ignore */ }
-            finally { setPublishLoading(false) }
-            setShowEpilogue(false)
-          }}
-          onSkip={() => setShowEpilogue(false)}
+      {showPublishModal && (
+        <PublishConsentModal
+          loading={publishLoading}
+          onChoice={handlePublishResponse}
+          onClose={() => setShowPublishModal(false)}
         />
+      )}
+
+      {showModerationSent && (
+        <ModerationSentModal onClose={() => setShowModerationSent(false)} />
       )}
 
       {showSettings && (
@@ -331,12 +391,6 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
           nickname={nickname} setNickname={setNickname} avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
           bannerUrl={bannerUrl} setBannerUrl={setBannerUrl} bannerPref={bannerPref} setBannerPref={setBannerPref}
           oocEnabled={oocEnabled} setOocEnabled={setOocEnabled}
-          isFinished={isFinished} isLeft={isLeft} gameStatus={gameStatus} setGameStatus={setGameStatus}
-          myFinishConsent={myFinishConsent} setMyFinishConsent={setMyFinishConsent} partnerFinishConsent={partnerFinishConsent}
-          myPublishConsent={myPublishConsent} setMyPublishConsent={setMyPublishConsent}
-          partnerPublishConsent={partnerPublishConsent} setPartnerPublishConsent={setPartnerPublishConsent}
-          publishLoaded={publishLoaded} setPublishLoaded={setPublishLoaded} icPostCount={icPostCount}
-          finishLoading={finishLoading} setFinishLoading={setFinishLoading} publishLoading={publishLoading} setPublishLoading={setPublishLoading}
           onSettingsSaved={(n, a) => { chat.updateLocalNickname(userId, n, a || null); router.refresh() }}
           onClose={() => setShowSettings(false)}
         />

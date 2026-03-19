@@ -133,6 +133,7 @@ ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_url TEXT;
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_pref TEXT NOT NULL DEFAULT 'own' CHECK (banner_pref IN ('own','partner','none'));
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS starred_at TIMESTAMPTZ;
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;
+ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS prepare_for_publish BOOLEAN NOT NULL DEFAULT false;
 
 -- ── STRUCTURED TAGS (Фаза 3) ───────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -278,6 +279,15 @@ CREATE TABLE IF NOT EXISTS stop_violations (
 CREATE INDEX IF NOT EXISTS idx_stop_violations_game ON stop_violations (game_id);
 CREATE INDEX IF NOT EXISTS idx_stop_violations_created ON stop_violations (created_at DESC);
 
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id         SERIAL PRIMARY KEY,
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token      TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens (user_id);
+
 -- ================================================================
 -- SEED DATA — 16 заявок для холодного старта
 -- Seed-пользователи для разработки (пароли задаются через .env)
@@ -382,3 +392,46 @@ CREATE INDEX IF NOT EXISTS idx_messages_game_type ON messages(game_id, type, cre
 
 -- Seed: luna = admin
 UPDATE users SET role = 'admin' WHERE email = 'luna@apocryph.test';
+
+-- ── NEW LIFECYCLE MIGRATION (v3) ─────────────────────────────
+-- Update status constraint: remove 'finished', add 'preparing', 'moderation', 'published'
+ALTER TABLE games DROP CONSTRAINT IF EXISTS games_status_check;
+ALTER TABLE games ADD CONSTRAINT games_status_check
+  CHECK (status IN ('active', 'preparing', 'moderation', 'published'));
+-- Migrate existing finished games → active
+UPDATE games SET status = 'active' WHERE status = 'finished';
+-- Drop per-participant prepare flag (now game-level status)
+ALTER TABLE game_participants DROP COLUMN IF EXISTS prepare_for_publish;
+
+-- ── GAME LIKES ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS game_likes (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id    UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(game_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_game_likes_game ON game_likes(game_id);
+
+-- ── GAME COMMENTS ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS game_comments (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id     UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content     TEXT NOT NULL,
+  parent_id   UUID REFERENCES game_comments(id) ON DELETE CASCADE,
+  approved_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_game_comments_game ON game_comments(game_id, approved_at);
+
+-- ── IN-APP NOTIFICATIONS ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type       TEXT NOT NULL,
+  payload    JSONB NOT NULL DEFAULT '{}',
+  read_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read_at);

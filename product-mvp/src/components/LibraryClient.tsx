@@ -68,6 +68,7 @@ interface PublicGame {
   request_content_level: string | null
   request_tags: string[] | null
   ic_count: string
+  likes_count: string
   participants: { nickname: string; avatar_url: string | null }[]
 }
 
@@ -250,6 +251,9 @@ export default function LibraryClient() {
                   {g.participants.map(p => p.nickname).join(', ')}
                   &nbsp;·&nbsp;
                   {g.ic_count} {t('library.messages') as string}
+                  {parseInt(g.likes_count) > 0 && (
+                    <>&nbsp;·&nbsp;<span>♥ {g.likes_count}</span></>
+                  )}
                 </p>
               </div>
 
