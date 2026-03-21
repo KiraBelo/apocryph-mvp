@@ -57,7 +57,23 @@ export default function NotesTab({
     <div className="flex-1 flex flex-col bg-surface overflow-hidden">
       <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col" style={{ gap: 'var(--game-gap, 1.5rem)' }}>
         {notesLoading && (
-          <p className="font-mono text-[0.75rem] text-ink-2 text-center mt-8">{t('game.loading') as string}</p>
+          <div className="flex flex-col" style={{ gap: 'var(--game-gap, 1.5rem)' }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} className="bg-surface-2 border border-edge" style={{ animation: `fadeInUp 0.3s ease ${i * 0.1}s both` }}>
+                <div className="px-3 py-[0.4rem] border-b border-edge bg-surface-3 flex justify-between items-center">
+                  <div className="flex flex-col gap-[0.25rem]">
+                    <div className="skeleton-block" style={{ width: '120px', height: '0.8rem' }} />
+                    <div className="skeleton-block" style={{ width: '80px', height: '0.55rem' }} />
+                  </div>
+                </div>
+                <div className="p-[0.75rem_0.9rem] flex flex-col gap-2">
+                  <div className="skeleton-block" style={{ width: '100%', height: '0.8rem' }} />
+                  <div className="skeleton-block" style={{ width: '85%', height: '0.8rem' }} />
+                  <div className="skeleton-block" style={{ width: '55%', height: '0.8rem' }} />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         {!notesLoading && notes.length === 0 && (
           <p className="font-heading italic text-ink-2 text-center mt-8 text-[1rem]">{t('game.noNotes') as string}</p>
@@ -104,7 +120,7 @@ export default function NotesTab({
                   <RichEditor content={noteEditContent} onChange={setNoteEditContent} minHeight="100px" />
                   <div className="flex gap-2 justify-end px-3 py-[0.4rem] border-t border-edge">
                     <button onClick={() => setNoteEditingId(null)} className="btn-ghost text-[0.7rem] p-[0.3rem_0.7rem]">{t('game.cancel') as string}</button>
-                    <button onClick={() => onSaveNoteEdit(note.id)} disabled={noteEditSaving} className="bg-accent-2 text-white font-heading italic text-[0.85rem] border-none p-[0.3rem_0.9rem] cursor-pointer">{noteEditSaving ? '...' : t('game.save') as string}</button>
+                    <button onClick={() => onSaveNoteEdit(note.id)} disabled={noteEditSaving} className="bg-accent-2 text-white font-heading italic text-[0.85rem] border-none p-[0.3rem_0.9rem] cursor-pointer">{noteEditSaving ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.save') as string}</button>
                   </div>
                 </div>
               ) : (
@@ -142,7 +158,7 @@ export default function NotesTab({
                 <button onClick={() => setEditorCollapsed(true)} title={t('game.collapseEditor') as string} className="bg-transparent border-none text-ink-2 cursor-pointer font-mono text-[0.75rem] p-[0.2rem_0.5rem]">{t('game.collapseEditor') as string}</button>
               )}
               <button onClick={onSubmitNote} disabled={newNoteSending || !newNoteContent.trim() || newNoteContent === '<p></p>'} className="bg-accent-2 text-white font-heading italic text-[0.95rem] border-none p-[0.55rem_1.5rem] cursor-pointer" style={{ opacity: (newNoteSending || !newNoteContent.trim() || newNoteContent === '<p></p>') ? 0.6 : 1 }}>
-                {newNoteSending ? '...' : t('game.addNoteButton') as string}
+                {newNoteSending ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.addNoteButton') as string}
               </button>
             </div>
           </>

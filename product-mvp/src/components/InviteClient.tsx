@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
 
 interface Props {
   token: string
@@ -11,6 +12,7 @@ interface Props {
 export default function InviteClient({ token, invite }: Props) {
   const router = useRouter()
   const t = useT()
+  const { addToast } = useToast()
   const [loading, setLoading] = useState(false)
 
   async function accept() {
@@ -19,9 +21,9 @@ export default function InviteClient({ token, invite }: Props) {
       const res = await fetch(`/api/invites/${token}`, { method: 'POST' })
       const d = await res.json()
       if (res.ok) router.push(`/games/${d.gameId}`)
-      else { alert(t(`errors.${d.error}`) as string || d.error); setLoading(false) }
+      else { addToast(t(`errors.${d.error}`) as string || d.error, 'error'); setLoading(false) }
     } catch {
-      alert(t('errors.networkError') as string)
+      addToast(t('errors.networkError') as string, 'error')
       setLoading(false)
     }
   }
@@ -40,7 +42,7 @@ export default function InviteClient({ token, invite }: Props) {
         </p>
         <button onClick={accept} disabled={loading}
           className="btn-primary text-[1.05rem] py-3 px-8">
-          {loading ? '...' : t('invite.accept') as string}
+          {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('invite.accept') as string}
         </button>
       </div>
     </div>

@@ -4,6 +4,7 @@ import Nav from '@/components/Nav'
 import BanBanner from '@/components/BanBanner'
 import { SettingsProvider } from '@/components/SettingsContext'
 import SettingsPanel from '@/components/SettingsPanel'
+import ToastProvider from '@/components/ToastProvider'
 import { getUser } from '@/lib/session'
 import { queryOne } from '@/lib/db'
 
@@ -37,12 +38,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <SettingsProvider>
-          <Nav user={user} />
-          {isBanned && <BanBanner reason={banReason} />}
-          <SettingsPanel />
-          <main className="min-h-screen pt-[60px]">
-            {children}
-          </main>
+          <ToastProvider>
+            <Nav user={user} />
+            {isBanned && <BanBanner reason={banReason} />}
+            <SettingsPanel />
+            <main className="min-h-screen pt-[60px]">
+              {children}
+            </main>
+          </ToastProvider>
         </SettingsProvider>
       </body>
     </html>

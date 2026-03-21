@@ -61,6 +61,17 @@ export async function GET(req: NextRequest) {
         conditions.push(`NOT (r.tags && $${p++})`)
         params.push(blacklist.map(r => r.tag))
       }
+
+      // Hide requests where user already participates in an active game (not author's own)
+      conditions.push(`NOT EXISTS (
+        SELECT 1 FROM games g
+        JOIN game_participants gp ON gp.game_id = g.id
+        WHERE g.request_id = r.id
+          AND gp.user_id = $${p++}
+          AND gp.left_at IS NULL
+          AND r.author_id != $${p++}
+      )`)
+      params.push(user.id, user.id)
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -100,7 +111,12 @@ export async function POST(req: NextRequest) {
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
   if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
-  const body = await req.json()
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
   const { title, description, type, content_level, fandom_type, pairing, tags, is_public, status } = body
 
   if (!title || !type || !content_level) {

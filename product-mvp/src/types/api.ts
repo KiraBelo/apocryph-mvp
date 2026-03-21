@@ -1,0 +1,7 @@
+export type GameStatus = 'active' | 'preparing' | 'moderation' | 'published'
+export type RequestStatus = 'draft' | 'active' | 'inactive'
+export type MessageType = 'ic' | 'ooc' | 'dice'
+export type ModerationStatus = 'visible' | 'auto_hidden' | 'hidden' | 'resolved'
+export type UserRole = 'user' | 'moderator' | 'admin'
+export type PublishChoice = 'publish_as_is' | 'edit_first' | 'decline'
+export type BannerPref = 'own' | 'partner' | 'none'

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
+import { requireParticipant } from '@/lib/auth'
+import { rateLimit } from '@/lib/rate-limit'
 
 // GET — загрузить все свои заметки к игре (новые сверху)
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -10,7 +12,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { id: gameId } = await params
 
   try {
-    const member = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
+    const member = await requireParticipant(gameId, user.id)
     if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const notes = await query<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
@@ -28,8 +30,17 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const { allowed } = rateLimit(`notes:${user.id}`, 20, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
+
   const { id: gameId } = await params
-  const { title, content } = await req.json()
+  let title: string | undefined, content: string | undefined
+  try {
+    ({ title, content } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
 
   if (title && title.length > 200) {
     return NextResponse.json({ error: 'noteTitleTooLong' }, { status: 400 })
@@ -39,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   try {
-    const member = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
+    const member = await requireParticipant(gameId, user.id)
     if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const note = await queryOne<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(

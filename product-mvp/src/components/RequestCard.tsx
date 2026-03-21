@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
 
 export interface Request {
   id: string
@@ -36,6 +37,7 @@ export default function RequestCard({
   statusLabel, statusActive,
 }: Props) {
   const t = useT()
+  const { addToast } = useToast()
 
   const contentLabels: Record<string, string> = {
     none: t('filters.noNsfw') as string,
@@ -112,7 +114,7 @@ export default function RequestCard({
         setBookmarked(b => !b)
         onBookmark?.(request.id, !bookmarked)
       }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
     setLoadingBm(false)
   }
 
@@ -145,7 +147,7 @@ export default function RequestCard({
               className={`bg-transparent border-none cursor-pointer p-0 leading-none flex items-center transition-[color,opacity] duration-150
                 ${inviteLink ? 'text-accent' : 'text-ink-2 opacity-65 hover:opacity-100'}`}
             >
-              {inviteLoading ? '...' : inviteLink ? '✓' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
+              {inviteLoading ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : inviteLink ? '✓' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
             </button>
             <Link href={`/requests/${request.id}/edit`} title={t('card.edit') as string}
               className="text-ink-2 text-[0.9rem] leading-none no-underline opacity-50 hover:opacity-100 inline-block scale-x-[-1]"

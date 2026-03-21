@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, withTransaction } from '@/lib/db'
 import { getUser } from '@/lib/session'
+import { rateLimit } from '@/lib/rate-limit'
 
 // GET — like count + whether current user liked
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -40,6 +41,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const { allowed } = rateLimit(`likes:${user.id}`, 30, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
 
   const { id: gameId } = await params
 

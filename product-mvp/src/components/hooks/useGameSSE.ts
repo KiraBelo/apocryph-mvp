@@ -48,6 +48,9 @@ export function useGameSSE({ gameId, isLeft, onNewMessage, onEditMessage, onDice
         onNewMessageRef.current(msg as Message)
       }
     }
+    es.onerror = () => {
+      console.warn('[SSE] Connection error, EventSource will auto-reconnect')
+    }
     return () => es.close()
   }, [gameId, isLeft])
 }

@@ -24,7 +24,13 @@ export async function POST(req: NextRequest) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const { tag } = await req.json()
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
+  const { tag } = body
   const normalized = tag?.trim().toLowerCase()
   if (!normalized) return NextResponse.json({ error: 'invalidTag' }, { status: 400 })
   if (normalized.length > 50) return NextResponse.json({ error: 'invalidTag' }, { status: 400 })

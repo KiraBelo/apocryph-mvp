@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
+import ConfirmDialog from './ConfirmDialog'
 
 interface UserRow {
   id: string
@@ -14,11 +16,13 @@ interface UserRow {
 
 export default function AdminUsers() {
   const t = useT()
+  const { addToast } = useToast()
   const [search, setSearch] = useState('')
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
   const [banModal, setBanModal] = useState<string | null>(null)
   const [banReason, setBanReason] = useState('')
+  const [confirmState, setConfirmState] = useState<{ action: () => void; message: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,7 +53,7 @@ export default function AdminUsers() {
       load()
     } else {
       const data = await res.json()
-      alert(data.error || 'Error')
+      addToast(data.error || 'Error', 'error')
     }
   }
 
@@ -62,22 +66,24 @@ export default function AdminUsers() {
     if (res.ok) load()
   }
 
-  async function handleRole(userId: string, role: string) {
+  function handleRole(userId: string, role: string) {
     const target = users.find(u => u.id === userId)
-    if (!confirm(`Изменить роль ${target?.email ?? userId} на "${role}"?`)) {
-      load() // revert select to current value
-      return
-    }
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'set_role', role }),
+    setConfirmState({
+      action: async () => {
+        const res = await fetch(`/api/admin/users/${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'set_role', role }),
+        })
+        if (res.ok) load()
+        else {
+          const data = await res.json()
+          addToast(data.error || 'Error', 'error')
+          load() // revert select to current value
+        }
+      },
+      message: `Изменить роль ${target?.email ?? userId} на "${role}"?`,
     })
-    if (res.ok) load()
-    else {
-      const data = await res.json()
-      alert(data.error || 'Error')
-    }
   }
 
   const roleBadge = (role: string) => {
@@ -106,7 +112,7 @@ export default function AdminUsers() {
       {loading ? (
         <p className="meta-text">...</p>
       ) : users.length === 0 ? (
-        <p className="meta-text">Нет результатов</p>
+        <p className="meta-text">{t('admin.noResults') as string}</p>
       ) : (
         <div className="flex flex-col gap-2">
           {users.map(u => (
@@ -169,12 +175,12 @@ export default function AdminUsers() {
               maxLength={500}
               rows={3}
               className="input-base w-full mb-4 text-[0.85rem] p-2"
-              placeholder="Причина бана..."
+              placeholder={t('admin.banReasonPlaceholder') as string}
               autoFocus
             />
             <div className="flex gap-2 justify-end">
               <button onClick={() => setBanModal(null)} className="btn-ghost text-[0.8rem] px-4 py-1.5">
-                Отмена
+                {t('admin.cancel') as string}
               </button>
               <button
                 onClick={() => handleBan(banModal)}
@@ -187,6 +193,15 @@ export default function AdminUsers() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={t('admin.confirm') as string}
+        message={confirmState?.message ?? ''}
+        danger
+        onConfirm={() => { confirmState?.action(); setConfirmState(null) }}
+        onCancel={() => { setConfirmState(null); load() }}
+      />
     </div>
   )
 }

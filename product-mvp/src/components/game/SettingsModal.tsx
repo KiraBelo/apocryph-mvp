@@ -1,6 +1,7 @@
 'use client'
 import { useSettings, useT } from '../SettingsContext'
 import Modal from './Modal'
+import { useToast } from '../ToastProvider'
 import type { Participant } from './types'
 
 interface SettingsModalProps {
@@ -31,6 +32,7 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const { notesEnabled, gameLayout, set } = useSettings()
   const t = useT()
+  const { addToast } = useToast()
 
   async function saveSettings() {
     try {
@@ -40,13 +42,13 @@ export default function SettingsModal({
         body: JSON.stringify({ banner_url: bannerUrl, banner_pref: bannerPref, nickname, avatar_url: avatarUrl, ooc_enabled: oocEnabled }),
       })
       if (!res.ok) {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
         return
       }
       onSettingsSaved(nickname, avatarUrl)
       onClose()
     } catch {
-      alert(t('errors.networkError') as string)
+      addToast(t('errors.networkError') as string, 'error')
     }
   }
 

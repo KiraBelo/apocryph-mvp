@@ -10,7 +10,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: requestId } = await params
-  const { nickname } = await req.json()
+  let nickname: string | undefined
+  try {
+    ({ nickname } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
 
   if (nickname && nickname.length > 50) {
     return NextResponse.json({ error: 'nicknameTooLong' }, { status: 400 })
@@ -23,6 +28,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!request || request.status !== 'active') {
       return NextResponse.json({ error: 'requestNotActive' }, { status: 404 })
+    }
+
+    // Author cannot respond to their own request
+    if (request.author_id === user.id) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
     }
 
     // Wrap in transaction to prevent race conditions (two simultaneous responds creating duplicate games)

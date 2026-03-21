@@ -58,7 +58,13 @@ export async function POST(req: NextRequest) {
   if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
   if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
 
-  const { phrase, note } = await req.json()
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
+  const { phrase, note } = body
   const cleaned = (phrase || '').trim().toLowerCase()
   if (cleaned.length < 3) {
     return NextResponse.json({ error: 'phraseTooShort' }, { status: 400 })

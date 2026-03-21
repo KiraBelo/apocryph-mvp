@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withTransaction } from '@/lib/db'
-import { requireUser } from '@/lib/session'
+import { requireMod } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 
 // POST — admin approves or rejects a game in moderation queue
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
+  const { error, user } = await requireMod()
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
-  if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-  }
+  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
+  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
 
   const { id: gameId } = await params
   let action: string
   try {
     ({ action } = await req.json())
   } catch {
-    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
   }
   if (!['approve', 'reject'].includes(action)) {
     return NextResponse.json({ error: 'invalidData' }, { status: 400 })

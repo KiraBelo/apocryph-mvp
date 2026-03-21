@@ -1,16 +1,18 @@
 -- ================================================================
--- Апокриф — схема базы данных + seed data
+-- Апокриф — схема базы данных
 -- Запуск: psql -U postgres -d apocryph < schema.sql
+-- Seed data: psql -U postgres -d apocryph < seed-dev.sql (DEV ONLY)
 -- ================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ── USERS ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email       TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email           TEXT UNIQUE NOT NULL,
+  password_hash   TEXT NOT NULL,
+  session_version INTEGER NOT NULL DEFAULT 1,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── REQUESTS (заявки) ────────────────────────────────────────────
@@ -92,6 +94,10 @@ CREATE TABLE IF NOT EXISTS invites (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   used_at    TIMESTAMPTZ
 );
+
+-- Migration: invite expiration
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+UPDATE invites SET expires_at = created_at + INTERVAL '7 days' WHERE expires_at IS NULL;
 
 -- ── TAG BLACKLIST ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_tag_blacklist (
@@ -237,9 +243,10 @@ ALTER TABLE games ADD COLUMN IF NOT EXISTS moderation_status TEXT NOT NULL DEFAU
 
 -- ── GAME LIFECYCLE ───────────────────────────────────────────
 ALTER TABLE games ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
-  CHECK (status IN ('active', 'finished'));
-ALTER TABLE games ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
-ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS finish_consent BOOLEAN DEFAULT false;
+  CHECK (status IN ('active', 'preparing', 'moderation', 'published'));
+-- Phase 4 cleanup: drop dead columns from removed 'finished' lifecycle
+ALTER TABLE games DROP COLUMN IF EXISTS finished_at;
+ALTER TABLE game_participants DROP COLUMN IF EXISTS finish_consent;
 CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
 
 -- ── PUBLIC GAMES (Библиотека) ─────────────────────────────────
@@ -288,110 +295,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens (user_id);
 
--- ================================================================
--- SEED DATA — 16 заявок для холодного старта
--- Seed-пользователи для разработки (пароли задаются через .env)
--- ================================================================
-
-INSERT INTO users (id, email, password_hash) VALUES
-  ('11111111-1111-1111-1111-111111111111', 'luna@apocryph.test',   '$2b$10$K7L1OJ45/4Y2nIvhRVpCe.FCtAtmNU5.aMdqspmHSNxL0/xUKv8Vy'),
-  ('22222222-2222-2222-2222-222222222222', 'wolf@apocryph.test',   '$2b$10$K7L1OJ45/4Y2nIvhRVpCe.FCtAtmNU5.aMdqspmHSNxL0/xUKv8Vy'),
-  ('33333333-3333-3333-3333-333333333333', 'ember@apocryph.test',  '$2b$10$K7L1OJ45/4Y2nIvhRVpCe.FCtAtmNU5.aMdqspmHSNxL0/xUKv8Vy'),
-  ('44444444-4444-4444-4444-444444444444', 'starfall@apocryph.test','$2b$10$K7L1OJ45/4Y2nIvhRVpCe.FCtAtmNU5.aMdqspmHSNxL0/xUKv8Vy')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO requests (author_id, title, body, type, content_level, fandom_type, pairing, tags, is_public, status) VALUES
-
--- Фандом
-('11111111-1111-1111-1111-111111111111',
- 'Детективное AU — Шерлок/Ватсон',
- '<p>Ищу партнёра для игры в <strong>детективном AU</strong>. Хочу исследовать динамику Шерлок/Ватсон в современном Лондоне. Готова играть обоих по очереди или одного.</p><p>Темп — без спешки, жду вдумчивых постов. Приветствуется атмосфера и внимание к деталям.</p>',
- 'duo', 'none', 'fandom', 'gt', ARRAY['Шерлок','BBC','детектив','AU','флафф'], true, 'active'),
-
-('22222222-2222-2222-2222-222222222222',
- 'Ведьмак — after canon, что было дальше?',
- '<p>После финала третьего сезона не могу отпустить историю. Хочу исследовать, что происходит после.</p><p>Готов играть Геральта или OC. Ищу партнёра на <em>Цирилью или Йеннифэр</em>.</p>',
- 'duo', 'rare', 'fandom', 'gt', ARRAY['Ведьмак','Геральт','после канона','адвенчур'], true, 'active'),
-
-('33333333-3333-3333-3333-333333333333',
- 'Genshin Impact — мультиплеер-квест',
- '<p>Собираю группу для исследования Тейвата в текстовом формате. Играем в своих OC или канонных персонажей.</p><p>Мульт, поэтому место для нескольких! Открыт набор.</p>',
- 'multiplayer', 'none', 'fandom', 'any', ARRAY['Genshin','фэнтези','приключение','OC','группа'], true, 'active'),
-
-('44444444-4444-4444-4444-444444444444',
- 'Апокалипсис — выжившие. Дуэт.',
- '<p>Постапокалиптика, двое выживших в мире, который рухнул три года назад. Не романтика в центре — но если вырастет, не против.</p><p>Хочу медленное развитие характеров, моральные дилеммы, настоящую дружбу под давлением обстоятельств.</p>',
- 'duo', 'rare', 'original', 'any', ARRAY['постапок','выживание','оригинал','медленный бёрн'], true, 'active'),
-
--- Оригинальные
-('11111111-1111-1111-1111-111111111111',
- 'Академия магии — первый год',
- '<p>Классика: академия магии, первый год, новые знакомства. Ищу партнёра для совместного строительства мира и персонажей.</p><p>Оригинальная вселенная, придумываем вместе. Никакого гарри поттера — своё.</p>',
- 'duo', 'none', 'original', 'any', ARRAY['магия','академия','оригинал','фэнтези','флафф'], true, 'active'),
-
-('22222222-2222-2222-2222-222222222222',
- 'Корпоративный триллер — кто предал?',
- '<p>Современный детектив внутри крупной корпорации. Утечка данных, внутренние расследования, доверие под вопросом.</p><p>Хочу напряжённую атмосферу и неоднозначных персонажей. Романтика не обязательна.</p>',
- 'duo', 'rare', 'original', 'any', ARRAY['детектив','современность','оригинал','интрига','триллер'], true, 'active'),
-
-('33333333-3333-3333-3333-333333333333',
- 'Вампиры в современном городе — медленный бёрн',
- '<p>Ищу партнёра для игры про вампира и человека. Классическая динамика, но хочу сделать её глубже и менее романтизированной.</p><p>Медленный бёрн, сложные отношения, философские вопросы о смертности.</p>',
- 'duo', 'often', 'original', 'gt', ARRAY['вампиры','городское фэнтези','оригинал','медленный бёрн','ужас'], true, 'active'),
-
-('44444444-4444-4444-4444-444444444444',
- 'Космическая станция — последние дни',
- '<p>На станции что-то пошло не так. Двое остались. Связь с Землёй потеряна.</p><p>Хочу исследовать изоляцию, страх и человеческую связь в экстремальных условиях. Sci-fi, оригинальные персонажи.</p>',
- 'duo', 'rare', 'original', 'any', ARRAY['sci-fi','выживание','психология','оригинал','изоляция'], true, 'active'),
-
--- Быстрые сцены / одиночные
-('11111111-1111-1111-1111-111111111111',
- 'Одна сцена: встреча врагов спустя годы',
- '<p>Хочу отыграть именно эту сцену — <em>enemies to lovers</em>, встреча после многолетней разлуки. Можем придумать предысторию вместе или я набросаю.</p><p>Одна встреча, одна сцена, конец истории. Никаких долгосрочных обязательств.</p>',
- 'duo', 'rare', 'original', 'gt', ARRAY['короткая игра','enemies to lovers','одна сцена','романтика'], true, 'active'),
-
-('22222222-2222-2222-2222-222222222222',
- 'Мир Стар Варс — Орден 66, два выживших падавана',
- '<p>Хочу исследовать один из самых болезненных моментов лора. Два падавана, которым удалось выжить, находят друг друга.</p>',
- 'duo', 'rare', 'fandom', 'sl', ARRAY['Star Wars','фандом','орден 66','ангст','выживание'], true, 'active'),
-
-('33333333-3333-3333-3333-333333333333',
- 'Наруто — Акацуки, пропавшие ниндзя',
- '<p>Хочу исследовать жизнь персонажей до вступления в Акацуки. Что привело их туда? OC или канон — договоримся.</p>',
- 'duo', 'rare', 'fandom', 'any', ARRAY['Наруто','Акацуки','предыстория','ангст','фандом'], true, 'active'),
-
-('44444444-4444-4444-4444-444444444444',
- 'Фэнтези — торговый путь через проклятый лес',
- '<p>Двое путников, торговый маршрут, лес с нехорошей репутацией. Что пошло не так — решим по ходу.</p><p>Легко, атмосферно, без тяжёлой предыстории. Хочу поиграть в приключение.</p>',
- 'duo', 'none', 'original', 'any', ARRAY['фэнтези','приключение','короткая игра','оригинал'], true, 'active'),
-
--- Мультиплеер
-('11111111-1111-1111-1111-111111111111',
- 'Таверна у дороги — открытый мультиплеер',
- '<p>Классическое место встречи: таверна. Каждый играет своего персонажа. Можно приходить и уходить когда угодно.</p><p>Открытый набор, расслабленная атмосфера, никакого обязательного сюжета.</p>',
- 'multiplayer', 'none', 'original', 'any', ARRAY['таверна','мультиплеер','фэнтези','расслабленная','OC'], true, 'active'),
-
-('22222222-2222-2222-2222-222222222222',
- 'Отряд наёмников — ищем 3-4 участников',
- '<p>Формируем отряд наёмников в фэнтези-мире. У нас уже есть следопыт и маг. Нужны другие роли.</p><p>Будет активный сюжет, общие квесты и место для личных арок.</p>',
- 'multiplayer', 'rare', 'original', 'any', ARRAY['фэнтези','мультиплеер','наёмники','приключение','сюжет'], true, 'active'),
-
-('33333333-3333-3333-3333-333333333333',
- 'Аниме клуб после занятий — слайс оф лайф',
- '<p>Школьный клуб, современность, обычная жизнь. Хочу лёгкую игру без драмы и ставок — просто персонажи, которые существуют рядом.</p>',
- 'multiplayer', 'none', 'fandom', 'any', ARRAY['современность','школа','слайс оф лайф','лёгкая','мультиплеер'], true, 'active'),
-
-('44444444-4444-4444-4444-444444444444',
- 'Детективное агентство — все мы немного сломаны',
- '<p>Частное детективное агентство, современность. Каждый персонаж пришёл сюда со своим грузом. Случайные дела, непростые клиенты.</p><p>Ищу 2-3 партнёров. Готова быть мастером или играть наравне.</p>',
- 'multiplayer', 'rare', 'original', 'any', ARRAY['детектив','современность','мультиплеер','психология','оригинал'], true, 'active')
-
-ON CONFLICT DO NOTHING;
-
 CREATE INDEX IF NOT EXISTS idx_messages_game_type ON messages(game_id, type, created_at);
-
--- Seed: luna = admin
-UPDATE users SET role = 'admin' WHERE email = 'luna@apocryph.test';
 
 -- ── NEW LIFECYCLE MIGRATION (v3) ─────────────────────────────
 -- Update status constraint: remove 'finished', add 'preparing', 'moderation', 'published'
@@ -435,3 +339,6 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read_at);
+
+-- ── SESSION VERSIONING ───────────────────────────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1;

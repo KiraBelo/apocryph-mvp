@@ -4,6 +4,8 @@ import { getUser, requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
 import { getActiveStopPhrases, checkStopList, VIOLATION_THRESHOLD } from '@/lib/stoplist'
+import { requireParticipant } from '@/lib/auth'
+import { rateLimit } from '@/lib/rate-limit'
 
 const PAGE_SIZE = 30
 
@@ -15,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // Verify caller is a participant (moderators can read any game)
   const isMod = user.role === 'moderator' || user.role === 'admin'
-  const participant = await queryOne('SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2', [gameId, user.id])
+  const participant = await requireParticipant(gameId, user.id, { includeLeft: true })
   if (!participant && !isMod) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   const sp = req.nextUrl.searchParams
@@ -120,6 +122,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
   if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
+  const { allowed } = rateLimit(`messages:${user!.id}`, 30, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
+
   const { id: gameId } = await params
 
   try {
@@ -128,7 +133,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (game && game.moderation_status !== 'visible') {
       return NextResponse.json({ error: 'gameFrozen' }, { status: 403 })
     }
-    const { content, type = 'ic' } = await req.json()
+    let msgBody
+    try {
+      msgBody = await req.json()
+    } catch {
+      return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+    }
+    const { content, type = 'ic' } = msgBody
     if (!content?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
     if (content.length > 200_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
     const msgType = type === 'ooc' ? 'ooc' : 'ic'
@@ -163,12 +174,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    // Найти participant
-    const participant = await queryOne<{ id: string; left_at: string | null }>(
-      'SELECT id, left_at FROM game_participants WHERE game_id=$1 AND user_id=$2',
-      [gameId, user.id]
-    )
-    if (!participant || participant.left_at) {
+    // Найти participant (kept at same position — after stop-list check)
+    const participant = await requireParticipant(gameId, user.id)
+    if (!participant) {
       return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
     }
 

@@ -26,6 +26,9 @@ const en: Translations = {
     proposals: 'Proposals',
     proposalFinish: 'Finish the story?',
     proposalPublish: 'Game can be published',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
+    notifications: 'Notifications',
   },
 
   // ── Auth ──
@@ -131,6 +134,7 @@ const en: Translations = {
     newTitle: 'Create request',
     editSectionLabel: '§ Editing',
     editTitle: 'Edit request',
+    editBreadcrumb: 'Edit',
     titleLabel: 'Request title *',
     titlePlaceholder: 'Short and catchy...',
     gameType: 'Game type *',
@@ -145,6 +149,7 @@ const en: Translations = {
     saveDraft: 'Save as draft',
     errorNoTitle: 'Please enter a request title',
     errorMinTags: 'At least 3 tags required to publish',
+    draftSaved: 'Draft saved',
   },
 
   // ── Request Detail ──
@@ -177,6 +182,7 @@ const en: Translations = {
     inactive: 'Inactive',
     allRequests: 'All requests',
     noRequests: 'No requests yet.',
+    createFirst: 'Create a request',
     deleteConfirm: 'Delete request?',
     yes: 'Yes',
     no: 'No',
@@ -198,6 +204,7 @@ const en: Translations = {
     waitingMyPost: 'Waiting for my post',
     waitingTheirPost: 'Waiting for partner',
     empty: 'Empty.',
+    goToFeed: 'Go to feed',
     hideFromList: 'Hide from list',
     removeFromStarred: 'Remove from starred',
     addToStarred: 'Add to starred',
@@ -490,6 +497,10 @@ const en: Translations = {
     unhideGame: 'Unhide game',
     hideGame: 'Hide game',
     searchUsers: 'Search by email...',
+    noResults: 'No results',
+    banReasonPlaceholder: 'Ban reason...',
+    cancel: 'Cancel',
+    confirm: 'Confirmation',
     noReports: 'No reports',
     reportCount: 'reports',
     setRole: 'Set role',
@@ -511,6 +522,21 @@ const en: Translations = {
     stopContext: 'Context',
     stopConfirmDelete: 'Delete phrase from stop-list?',
     stopViolations7d: 'Violations (7d)',
+    // Moderation queue
+    moderationTitle: 'Moderation',
+    gamesForPublish: 'Games for publication',
+    queueEmpty: 'Queue is empty',
+    untitled: 'Untitled',
+    posts: 'posts',
+    approve: 'Approve',
+    reject: 'Reject',
+    rejectReasonPlaceholder: 'Rejection reason (optional)',
+    commentsQueue: 'Comments pending review',
+    noComments: 'No comments',
+    authorReply: 'Author reply',
+    readerComment: 'Reader',
+    gameFallback: 'Game',
+    deleteComment: 'Delete',
   },
 
   // ── Ban Banner ──
@@ -542,6 +568,10 @@ const en: Translations = {
     forbidden: 'Access denied',
     networkError: 'Network error',
     generic: 'Error',
+    errorPageLabel: '§ error',
+    errorPageTitle: 'Something went wrong',
+    errorPageDescription: 'An unexpected error occurred. Try refreshing the page.',
+    errorPageRetry: 'Try again',
     savingNote: 'Error saving note',
     sendingMessage: 'Error sending message',
     selectLeaveReason: 'Please select a reason for leaving',
@@ -590,6 +620,7 @@ const en: Translations = {
     requestLimitReached: 'Request limit reached (5/day)',
     requestCooldown: 'Wait 2 minutes before next request',
     duplicateRequest: 'A similar request already exists today',
+    sessionExpired: 'Session expired. Please log in again.',
   },
 }
 

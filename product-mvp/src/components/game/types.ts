@@ -1,11 +1,11 @@
 export interface Message {
   id: string; participant_id: string; content: string; created_at: string;
   edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string;
-  type: string
+  type: 'ic' | 'ooc' | 'dice'
 }
 
 export interface Participant {
-  id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: string; left_at: string | null; finish_consent?: boolean
+  id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: 'own' | 'partner' | 'none'; left_at: string | null
 }
 
 export interface NoteEntry {
@@ -28,4 +28,3 @@ export interface GameDialogProps {
   requestTitle: string | null
 }
 
-export const MIN_IC_POSTS = 20

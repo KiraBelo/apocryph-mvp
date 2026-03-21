@@ -9,7 +9,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
 
   const { id: gameId } = await params
-  const { moderation_status } = await req.json()
+
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
+  const { moderation_status } = body
 
   if (!moderation_status || !['visible', 'hidden', 'under_review'].includes(moderation_status)) {
     return NextResponse.json({ error: 'invalidStatus' }, { status: 400 })

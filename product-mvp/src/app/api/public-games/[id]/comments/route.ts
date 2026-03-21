@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
+import { rateLimit } from '@/lib/rate-limit'
 
 // GET — approved comments + author replies
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -36,6 +37,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
+  const { allowed } = rateLimit(`comment:${user.id}`, 10, 60 * 1000)
+  if (!allowed) {
+    return NextResponse.json({ error: 'limitReached' }, { status: 429 })
+  }
+
   const { id: gameId } = await params
   let content: string, parent_id: string | null = null
   try {
@@ -43,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     content = body.content
     parent_id = body.parent_id ?? null
   } catch {
-    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
   }
 
   const sanitized = sanitizeBody(content)

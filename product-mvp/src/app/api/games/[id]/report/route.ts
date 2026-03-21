@@ -1,23 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { requireUser } from '@/lib/session'
+import { requireParticipant } from '@/lib/auth'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
   if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
+  const { allowed } = rateLimit(`report:${user!.id}`, 3, 60 * 60_000)
+  if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
+
   const { id: gameId } = await params
-  const { reason } = await req.json()
+  let reason: string | undefined
+  try {
+    ({ reason } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
 
   if (reason && reason.length > 2000) return NextResponse.json({ error: 'reportTooLong' }, { status: 400 })
 
   try {
     // Verify reporter is a participant of this game
-    const participant = await queryOne(
-      'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2',
-      [gameId, user!.id]
-    )
+    const participant = await requireParticipant(gameId, user!.id)
     if (!participant) return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
 
     // Prevent duplicate pending reports from the same user

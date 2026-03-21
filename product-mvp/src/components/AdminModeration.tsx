@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useSettings, useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
 
 interface GameRow {
   id: string
@@ -27,6 +29,9 @@ export default function AdminModerationClient({
   games: GameRow[]
   comments: CommentRow[]
 }) {
+  const t = useT()
+  const { lang } = useSettings()
+  const { addToast } = useToast()
   const [games, setGames] = useState(initialGames)
   const [comments, setComments] = useState(initialComments)
   const [loading, setLoading] = useState<string | null>(null)
@@ -44,7 +49,7 @@ export default function AdminModerationClient({
       if (res.ok) {
         setGames(prev => prev.filter(g => g.id !== gameId))
       } else {
-        alert('Ошибка')
+        addToast(t('errors.generic') as string, 'error')
       }
     } finally {
       setLoading(null)
@@ -56,7 +61,7 @@ export default function AdminModerationClient({
     try {
       const res = await fetch(`/api/admin/comments/${commentId}`, { method: 'POST' })
       if (res.ok) setComments(prev => prev.filter(c => c.id !== commentId))
-      else alert('Ошибка')
+      else addToast(t('errors.generic') as string, 'error')
     } finally {
       setLoading(null)
     }
@@ -67,7 +72,7 @@ export default function AdminModerationClient({
     try {
       const res = await fetch(`/api/admin/comments/${commentId}`, { method: 'DELETE' })
       if (res.ok) setComments(prev => prev.filter(c => c.id !== commentId))
-      else alert('Ошибка')
+      else addToast(t('errors.generic') as string, 'error')
     } finally {
       setLoading(null)
     }
@@ -75,15 +80,15 @@ export default function AdminModerationClient({
 
   return (
     <div className="max-w-[900px] mx-auto py-12 px-6">
-      <h1 className="page-title mb-8">Модерация</h1>
+      <h1 className="page-title mb-8">{t('admin.moderationTitle') as string}</h1>
 
       {/* Games queue */}
       <section className="mb-12">
         <h2 className="font-mono text-[0.7rem] tracking-[0.15em] uppercase text-ink-2 mb-4 border-b border-edge pb-2">
-          Игры на публикацию ({games.length})
+          {t('admin.gamesForPublish') as string} ({games.length})
         </h2>
         {games.length === 0 ? (
-          <p className="text-ink-2 font-heading italic">Очередь пуста</p>
+          <p className="text-ink-2 font-heading italic">{t('admin.queueEmpty') as string}</p>
         ) : (
           <div className="flex flex-col gap-4">
             {games.map(g => (
@@ -91,12 +96,12 @@ export default function AdminModerationClient({
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div>
                     <Link href={`/games/${g.id}`} target="_blank" className="font-heading text-[1.1rem] text-ink link-accent no-underline">
-                      {g.request_title ?? 'Без названия'}
+                      {g.request_title ?? (t('admin.untitled') as string)}
                     </Link>
                     <p className="meta-text mt-1">
                       {g.participants.map(p => p.nickname).join(', ')}
-                      &nbsp;·&nbsp;{g.ic_count} постов
-                      &nbsp;·&nbsp;{new Date(g.created_at).toLocaleDateString('ru')}
+                      &nbsp;·&nbsp;{g.ic_count} {t('admin.posts') as string}
+                      &nbsp;·&nbsp;{new Date(g.created_at).toLocaleDateString(lang)}
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0 items-start flex-wrap">
@@ -105,7 +110,7 @@ export default function AdminModerationClient({
                       disabled={loading === g.id}
                       className="btn-primary font-mono text-[0.65rem] p-[0.35rem_1rem]"
                     >
-                      {loading === g.id ? '...' : 'Одобрить'}
+                      {loading === g.id ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : (t('admin.approve') as string)}
                     </button>
                     <button
                       onClick={() => moderateGame(g.id, 'reject')}
@@ -113,14 +118,14 @@ export default function AdminModerationClient({
                       className="btn-ghost font-mono text-[0.65rem] p-[0.35rem_1rem]"
                       style={{ color: '#c0392b', borderColor: '#c0392b' }}
                     >
-                      {loading === g.id ? '...' : 'Отклонить'}
+                      {loading === g.id ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : (t('admin.reject') as string)}
                     </button>
                   </div>
                 </div>
                 <input
                   value={rejectReason[g.id] ?? ''}
                   onChange={e => setRejectReason(prev => ({ ...prev, [g.id]: e.target.value }))}
-                  placeholder="Причина отклонения (необязательно)"
+                  placeholder={t('admin.rejectReasonPlaceholder') as string}
                   className="bg-surface-2 border border-edge text-ink font-mono text-[0.7rem] p-[0.3rem_0.6rem] w-full outline-none"
                 />
               </div>
@@ -132,10 +137,10 @@ export default function AdminModerationClient({
       {/* Comments queue */}
       <section>
         <h2 className="font-mono text-[0.7rem] tracking-[0.15em] uppercase text-ink-2 mb-4 border-b border-edge pb-2">
-          Комментарии на проверке ({comments.length})
+          {t('admin.commentsQueue') as string} ({comments.length})
         </h2>
         {comments.length === 0 ? (
-          <p className="text-ink-2 font-heading italic">Комментариев нет</p>
+          <p className="text-ink-2 font-heading italic">{t('admin.noComments') as string}</p>
         ) : (
           <div className="flex flex-col gap-3">
             {comments.map(c => (
@@ -148,13 +153,13 @@ export default function AdminModerationClient({
                 <p className="font-body text-[0.9rem] text-ink mb-2">{c.content}</p>
                 <div className="flex items-center justify-between gap-4">
                   <p className="meta-text">
-                    {c.is_author_reply ? 'Ответ автора' : 'Читатель'}
+                    {c.is_author_reply ? (t('admin.authorReply') as string) : (t('admin.readerComment') as string)}
                     &nbsp;·&nbsp;
                     <Link href={`/library/${c.game_id}`} target="_blank" className="link-accent no-underline">
-                      {c.request_title ?? 'Игра'}
+                      {c.request_title ?? (t('admin.gameFallback') as string)}
                     </Link>
                     &nbsp;·&nbsp;
-                    {new Date(c.created_at).toLocaleDateString('ru')}
+                    {new Date(c.created_at).toLocaleDateString(lang)}
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -162,7 +167,7 @@ export default function AdminModerationClient({
                       disabled={loading === c.id}
                       className="btn-primary font-mono text-[0.6rem] p-[0.25rem_0.7rem]"
                     >
-                      {loading === c.id ? '...' : 'Одобрить'}
+                      {loading === c.id ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : (t('admin.approve') as string)}
                     </button>
                     <button
                       onClick={() => deleteComment(c.id)}
@@ -170,7 +175,7 @@ export default function AdminModerationClient({
                       className="btn-ghost font-mono text-[0.6rem] p-[0.25rem_0.7rem]"
                       style={{ color: '#c0392b', borderColor: '#c0392b' }}
                     >
-                      Удалить
+                      {t('admin.deleteComment') as string}
                     </button>
                   </div>
                 </div>

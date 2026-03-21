@@ -4,5 +4,6 @@ import { getSession } from '@/lib/session'
 export async function POST() {
   const session = await getSession()
   session.destroy()
+  await session.save()
   return NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'))
 }

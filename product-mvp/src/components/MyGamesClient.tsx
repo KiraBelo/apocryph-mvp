@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
 
 interface GameRow {
   id: string
@@ -40,6 +41,7 @@ type MainTab = 'active' | 'inactive' | 'starred' | 'published'
 
 export default function MyGamesClient({ games: initialGames, userId }: Props) {
   const t = useT()
+  const { addToast } = useToast()
   const router = useRouter()
   const [games, setGames] = useState(initialGames)
   const [mainTab, setMainTab] = useState<MainTab>('active')
@@ -84,11 +86,11 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
       })
       if (!res.ok) {
         setGames(prev => prev.map(x => x.id === gameId ? { ...x, starred_at: oldVal } : x))
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
     } catch {
       setGames(prev => prev.map(x => x.id === gameId ? { ...x, starred_at: oldVal } : x))
-      alert(t('errors.networkError') as string)
+      addToast(t('errors.networkError') as string, 'error')
     }
   }
 
@@ -102,11 +104,11 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
       })
       if (!res.ok) {
         setGames(prev => prev.map(x => x.id === gameId ? { ...x, hidden_at: null } : x))
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
     } catch {
       setGames(prev => prev.map(x => x.id === gameId ? { ...x, hidden_at: null } : x))
-      alert(t('errors.networkError') as string)
+      addToast(t('errors.networkError') as string, 'error')
     }
   }
 
@@ -159,7 +161,12 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
       {mainTab !== 'active' && <div className="mb-8" />}
 
       {currentGames.length === 0 ? (
-        <p className="text-ink-2 font-heading italic">{t('myGames.empty') as string}</p>
+        <div className="text-center py-12">
+          <p className="text-ink-2 font-heading italic mb-4">{t('myGames.empty') as string}</p>
+          <Link href="/feed" className="btn-primary inline-block no-underline py-2.5 px-6 text-[0.9rem]">
+            {t('myGames.goToFeed') as string}
+          </Link>
+        </div>
       ) : (
         <div className="flex flex-col gap-[var(--game-gap,1rem)]">
           {currentGames.map(g => {

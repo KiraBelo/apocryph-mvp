@@ -6,11 +6,14 @@ import { getUser } from '@/lib/session'
 export async function GET(_: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   try {
-    const invite = await queryOne<{ request_id: string; used_at: string | null }>(
-      'SELECT i.token, i.request_id, i.used_at, r.title, r.type FROM invites i JOIN requests r ON r.id=i.request_id WHERE i.token=$1',
+    const invite = await queryOne<{ request_id: string; used_at: string | null; expires_at: string | null }>(
+      'SELECT i.token, i.request_id, i.used_at, i.expires_at, r.title, r.type FROM invites i JOIN requests r ON r.id=i.request_id WHERE i.token=$1',
       [token]
     )
     if (!invite) return NextResponse.json({ error: 'inviteInvalid' }, { status: 404 })
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+      return NextResponse.json({ error: 'inviteExpired' }, { status: 410 })
+    }
     return NextResponse.json(invite)
   } catch (error) {
     console.error('[API /api/invites/[token]] GET:', error)
@@ -35,12 +38,18 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ token
 
       if (!invite) return { error: 'inviteInvalid', status: 404 }
       if (invite.used_at) return { error: 'inviteUsed', status: 410 }
+      if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+        return { error: 'inviteExpired', status: 410 }
+      }
 
       const reqRes = await client.query(
         'SELECT * FROM requests WHERE id=$1', [invite.request_id]
       )
       const request = reqRes.rows[0]
       if (!request) return { error: 'requestNotActive', status: 404 }
+
+      // Author cannot accept their own invite
+      if (request.author_id === user.id) return { error: 'forbidden', status: 403 }
 
       // Создаём или находим игру
       const gameRes = await client.query(

@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     session.userId = user.id
     session.email = user.email
     session.role = 'user'
+    session.sessionVersion = user.session_version
     await session.save()
     return NextResponse.json({ ok: true })
   } catch (error) {

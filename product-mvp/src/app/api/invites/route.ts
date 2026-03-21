@@ -9,7 +9,12 @@ export async function POST(req: NextRequest) {
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
   if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
-  const { requestId } = await req.json()
+  let requestId: string
+  try {
+    ({ requestId } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
 
   try {
     // Verify ownership
@@ -22,7 +27,7 @@ export async function POST(req: NextRequest) {
     const token = randomBytes(16).toString('hex')
 
     await query(
-      'INSERT INTO invites (token, request_id) VALUES ($1,$2)',
+      "INSERT INTO invites (token, request_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '7 days')",
       [token, requestId]
     )
 

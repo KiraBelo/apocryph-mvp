@@ -73,13 +73,23 @@ export default function PrepareTab({
         className="flex-1 overflow-y-auto bg-surface"
         style={{ padding: fullscreen ? '1.5rem 6rem' : '1.5rem' }}
       >
-        {pageLoading && (
-          <div className="flex items-center justify-center py-8">
-            <span className="font-mono text-[0.75rem] text-ink-2">{t('game.loading') as string}</span>
+        {pageLoading ? (
+          <div className="flex flex-col">
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="border-b border-edge py-4" style={{ animation: `fadeInUp 0.3s ease ${i * 0.08}s both` }}>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <div className="skeleton-block" style={{ width: '80px', height: '0.9rem' }} />
+                  <div className="skeleton-block" style={{ width: '50px', height: '0.55rem' }} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="skeleton-block" style={{ width: '100%', height: '0.8rem' }} />
+                  <div className="skeleton-block" style={{ width: '90%', height: '0.8rem' }} />
+                  <div className="skeleton-block" style={{ width: '65%', height: '0.8rem' }} />
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-
-        {messages.map(msg => {
+        ) : messages.map(msg => {
           const isMine = msg.user_id === userId
           const canEdit = isMine && msg.type !== 'dice'
 
@@ -137,7 +147,7 @@ export default function PrepareTab({
                       disabled={editSaving}
                       className="btn-primary font-mono text-[0.7rem] p-[0.3rem_0.9rem]"
                     >
-                      {editSaving ? '...' : t('game.save') as string}
+                      {editSaving ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.save') as string}
                     </button>
                     <button
                       onClick={() => { setEditingId(null); setEditContent(''); setErrorMsg(null) }}
@@ -165,7 +175,7 @@ export default function PrepareTab({
           disabled={submitLoading}
           className="btn-primary font-mono text-[0.7rem] p-[0.4rem_1.2rem]"
         >
-          {submitLoading ? '...' : t('game.submitToModeration') as string}
+          {submitLoading ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.submitToModeration') as string}
         </button>
       </div>
 

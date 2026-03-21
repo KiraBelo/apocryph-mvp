@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
 import { getUser, requireUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
-
-const MIN_IC_POSTS = 20
+import { MIN_IC_POSTS } from '@/lib/constants'
 
 // GET — consent status + game state for the client
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {

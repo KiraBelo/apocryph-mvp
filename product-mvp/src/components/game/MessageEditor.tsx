@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useRef } from 'react'
 import { useT } from '../SettingsContext'
 import RichEditor from '../RichEditor'
 
@@ -46,6 +47,19 @@ export default function MessageEditor({
   showDicePanel, setShowDicePanel, diceSides, setDiceSides, diceRolling, onRollDice,
 }: MessageEditorProps) {
   const t = useT()
+
+  // Warn before leaving with unsaved content (ref pattern to avoid re-registering on every keystroke)
+  const hasContentRef = useRef(false)
+  useEffect(() => {
+    hasContentRef.current = content.trim().length > 0 || oocContent.trim().length > 0
+  }, [content, oocContent])
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasContentRef.current) e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
 
   // Don't render if not allowed to post
   if (isLeft || isFrozen || (isFinished && !isOoc)) return null
@@ -103,7 +117,7 @@ export default function MessageEditor({
                 className="bg-accent text-white font-heading italic text-[0.85rem] border-none p-[0.25rem_0.9rem] cursor-pointer"
                 style={{ opacity: (diceRolling || isNaN(parseInt(diceSides)) || parseInt(diceSides) < 2 || parseInt(diceSides) > 100) ? 0.4 : 1 }}
               >
-                {diceRolling ? '...' : t('game.roll') as string}
+                {diceRolling ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.roll') as string}
               </button>
             </div>
           )}
@@ -144,7 +158,7 @@ export default function MessageEditor({
                 opacity: isDisabled ? 0.6 : 1,
               }}
             >
-              {(sending || editSaving) ? '...' : editingId && !isOoc ? t('game.sendSave') as string : isOoc ? t('game.sendOoc') as string : t('game.sendIc') as string}
+              {(sending || editSaving) ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : editingId && !isOoc ? t('game.sendSave') as string : isOoc ? t('game.sendOoc') as string : t('game.sendIc') as string}
             </button>
           </div>
         </div>

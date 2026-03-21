@@ -99,7 +99,7 @@ describe('POST /api/games/[id]/publish-consent', () => {
   it('returns 400 invalidStatus when game is not active', async () => {
     mockClient.query
       .mockResolvedValueOnce({ rows: [{ id: 'participant-id' }] }) // participant
-      .mockResolvedValueOnce({ rows: [{ status: 'finished' }] })   // game status
+      .mockResolvedValueOnce({ rows: [{ status: 'published' }] })   // game status (not active)
 
     const res = await POST(makePostReq(), { params: Promise.resolve({ id: GAME_ID }) })
 

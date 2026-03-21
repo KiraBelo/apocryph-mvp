@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
+import ConfirmDialog from './ConfirmDialog'
 
 interface Phrase {
   id: number
@@ -28,6 +30,7 @@ const TABS = ['phrases', 'violations'] as const
 
 export default function AdminStopList() {
   const t = useT()
+  const { addToast } = useToast()
   const [tab, setTab] = useState<string>('phrases')
   const [phrases, setPhrases] = useState<Phrase[]>([])
   const [violations, setViolations] = useState<Violation[]>([])
@@ -35,6 +38,7 @@ export default function AdminStopList() {
   const [newPhrase, setNewPhrase] = useState('')
   const [newNote, setNewNote] = useState('')
   const [adding, setAdding] = useState(false)
+  const [confirmState, setConfirmState] = useState<{ action: () => void; message: string } | null>(null)
 
   const loadPhrases = useCallback(async () => {
     setLoading(true)
@@ -77,7 +81,7 @@ export default function AdminStopList() {
       loadPhrases()
     } else {
       const data = await res.json()
-      alert(data.error || 'Error')
+      addToast(data.error || 'Error', 'error')
     }
     setAdding(false)
   }
@@ -92,21 +96,27 @@ export default function AdminStopList() {
       if (res.ok) {
         loadPhrases()
       } else {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
-  async function deletePhrase(id: number) {
-    if (!confirm(t('admin.stopConfirmDelete') as string)) return
+  async function doDeletePhrase(id: number) {
     try {
       const res = await fetch(`/api/admin/stop-list/${id}`, { method: 'DELETE' })
       if (res.ok) {
         loadPhrases()
       } else {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
+  }
+
+  function deletePhrase(id: number) {
+    setConfirmState({
+      action: () => doDeletePhrase(id),
+      message: t('admin.stopConfirmDelete') as string,
+    })
   }
 
   const tabLabels: Record<string, string> = {
@@ -166,7 +176,7 @@ export default function AdminStopList() {
                 disabled={adding || newPhrase.trim().length < 3}
                 className="btn-primary text-[0.75rem] px-4 py-2 shrink-0"
               >
-                {adding ? '...' : t('admin.stopAddPhrase') as string}
+                {adding ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('admin.stopAddPhrase') as string}
               </button>
             </div>
           </div>
@@ -260,6 +270,15 @@ export default function AdminStopList() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title="Подтверждение"
+        message={confirmState?.message ?? ''}
+        danger
+        onConfirm={() => { confirmState?.action(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

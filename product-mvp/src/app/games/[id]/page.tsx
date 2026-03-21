@@ -16,9 +16,9 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   const isMod = user.role === 'moderator' || user.role === 'admin'
 
   const rawParticipants = await query<{
-    id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: string; left_at: string | null; leave_reason: string | null; finish_consent: boolean
+    id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: 'own' | 'partner' | 'none'; left_at: string | null; leave_reason: string | null
   }>(
-    'SELECT id, user_id, nickname, avatar_url, banner_url, banner_pref, left_at, leave_reason, finish_consent FROM game_participants WHERE game_id=$1 ORDER BY id',
+    'SELECT id, user_id, nickname, avatar_url, banner_url, banner_pref, left_at, leave_reason FROM game_participants WHERE game_id=$1 ORDER BY id',
     [gameId]
   )
 
@@ -50,7 +50,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
 
   const messages = await query<{
     id: string; game_id: string; participant_id: string; content: string; created_at: string;
-    edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string; type: string
+    edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string; type: 'ic' | 'ooc' | 'dice'
   }>(
     `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
      FROM messages m

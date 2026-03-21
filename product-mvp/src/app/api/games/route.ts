@@ -11,11 +11,17 @@ export async function GET() {
     const rows = await query(
       `SELECT g.*, gp.left_at, gp.nickname as my_nickname,
               r.title as request_title,
-              (SELECT COUNT(*) FROM messages m WHERE m.game_id = g.id) as message_count,
-              (SELECT COUNT(*) FROM game_participants gp2 WHERE gp2.game_id = g.id AND gp2.left_at IS NULL) as active_participants
+              COALESCE(mc.message_count, 0)::text as message_count,
+              COALESCE(ap.active_participants, 0)::text as active_participants
        FROM games g
        JOIN game_participants gp ON gp.game_id = g.id AND gp.user_id = $1
        LEFT JOIN requests r ON r.id = g.request_id
+       LEFT JOIN (
+         SELECT game_id, COUNT(*) as message_count FROM messages GROUP BY game_id
+       ) mc ON mc.game_id = g.id
+       LEFT JOIN (
+         SELECT game_id, COUNT(*) as active_participants FROM game_participants WHERE left_at IS NULL GROUP BY game_id
+       ) ap ON ap.game_id = g.id
        ORDER BY g.created_at DESC`,
       [user.id]
     )

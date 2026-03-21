@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
 
 interface Report {
   id: string
@@ -21,6 +22,7 @@ const TABS = ['pending', 'resolved', 'dismissed'] as const
 
 export default function AdminReports() {
   const t = useT()
+  const { addToast } = useToast()
   const [tab, setTab] = useState<string>('pending')
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,9 +50,9 @@ export default function AdminReports() {
       if (res.ok) {
         setReports(prev => prev.filter(r => r.id !== reportId))
       } else {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   async function handleGameStatus(gameId: string, moderationStatus: string) {
@@ -63,9 +65,9 @@ export default function AdminReports() {
       if (res.ok) {
         load()
       } else {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   const tabLabels: Record<string, string> = {

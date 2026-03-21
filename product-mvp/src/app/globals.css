@@ -438,6 +438,46 @@ a.link-accent::after {
 }
 a.link-accent:hover::after { width: 100%; }
 
+/* ── Mobile nav ──────────────────────────────── */
+.mobile-nav-overlay {
+  position: fixed;
+  inset: 0;
+  top: 60px;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 199;
+  animation: fadeIn 0.2s ease;
+}
+
+.mobile-nav-menu {
+  position: fixed;
+  top: 60px;
+  right: 0;
+  bottom: 0;
+  width: 260px;
+  max-width: 80vw;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  z-index: 200;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow-y: auto;
+}
+.mobile-nav-menu--open {
+  transform: translateX(0);
+}
+
+.mobile-nav-menu .link-accent {
+  font-size: 0.82rem;
+  padding: 0.2rem 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* ── Nav accent stripe ───────────────────────── */
 nav::after {
   content: '';
@@ -571,6 +611,26 @@ nav::after {
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-2); }
+
+/* ── Touch targets (coarse pointer = touchscreens) */
+@media (pointer: coarse) {
+  .icon-action-btn,
+  nav button:not(.btn-primary):not(.btn-ghost) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ── Skeleton loading blocks ──────────────────── */
+.skeleton-block {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 3px;
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
 
 /* ── Fade-in for cards ────────────────────────── */
 @keyframes fadeInUp {

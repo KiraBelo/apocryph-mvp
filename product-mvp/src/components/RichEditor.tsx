@@ -140,7 +140,9 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
   const [embedError, setEmbedError] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [translating, setTranslating] = useState(false)
+  const [fontMenuOpen, setFontMenuOpen] = useState(false)
   const emojiRef = useRef<HTMLDivElement>(null)
+  const fontMenuRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -187,6 +189,16 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [emojiOpen])
+
+  // Close font menu on click outside
+  useEffect(() => {
+    if (!fontMenuOpen) return
+    function close(e: MouseEvent) {
+      if (fontMenuRef.current && !fontMenuRef.current.contains(e.target as globalThis.Node)) setFontMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [fontMenuOpen])
 
   async function translateContent() {
     if (!editor || translating) return
@@ -306,21 +318,53 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
         {sep()}
 
         {/* Font family */}
-        <select
-          onChange={e => {
-            if (e.target.value) editor.chain().focus().setFontFamily(e.target.value).run()
-            else editor.chain().focus().unsetFontFamily().run()
-          }}
-          className="select-base text-[0.68rem] p-[0.2rem_0.4rem] !w-auto"
-          title={t('editor.font') as string}
-        >
-          <option value="">{t('editor.fontDefault') as string}</option>
-          {FONT_GROUPS.map((g, gi) => (
-            <optgroup key={gi} label={t(`editor.${g.key}`) as string}>
-              {g.fonts.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-            </optgroup>
-          ))}
-        </select>
+        <div className="relative" ref={fontMenuRef}>
+          <button
+            type="button"
+            onClick={() => setFontMenuOpen(!fontMenuOpen)}
+            title={t('editor.font') as string}
+            className="text-[0.68rem] border border-edge p-[0.2rem_0.4rem] cursor-pointer rounded-[2px] leading-none
+              hover:bg-accent-dim/20 transition-colors max-w-[100px] truncate"
+            style={{ fontFamily: editor.getAttributes('textStyle')?.fontFamily || 'var(--site-font)' }}
+          >
+            {FONT_GROUPS.flatMap(g => g.fonts).find(f => f.value === editor.getAttributes('textStyle')?.fontFamily)?.label || 'шрифт'}
+          </button>
+          {fontMenuOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-surface-2 border border-edge rounded shadow-lg z-10 max-h-80 overflow-y-auto min-w-[180px]">
+              <button
+                type="button"
+                onClick={() => {
+                  editor.chain().focus().unsetFontFamily().run()
+                  setFontMenuOpen(false)
+                }}
+                className="w-full text-left px-3 py-2 text-[0.7rem] transition-colors text-ink hover:bg-accent-dim/30"
+              >
+                {t('editor.fontDefault') as string}
+              </button>
+              {FONT_GROUPS.map((g, gi) => (
+                <div key={gi}>
+                  <div className="sticky top-0 px-3 py-1.5 bg-surface-3 font-mono text-[0.55rem] tracking-[0.08em] uppercase text-accent-2">
+                    {t(`editor.${g.key}`) as string}
+                  </div>
+                  {g.fonts.map(f => (
+                    <button
+                      type="button"
+                      key={f.value}
+                      onClick={() => {
+                        editor.chain().focus().setFontFamily(f.value).run()
+                        setFontMenuOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-[0.7rem] transition-colors text-ink hover:bg-accent-dim/30"
+                      style={{ fontFamily: f.value }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {sep()}
 

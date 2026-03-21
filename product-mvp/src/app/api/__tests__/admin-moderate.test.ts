@@ -15,7 +15,12 @@ vi.mock('@/lib/session', () => ({
     user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
     banReason: null,
   }),
+  requireMod: vi.fn().mockResolvedValue({
+    error: null,
+    user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
+  }),
   getUser: vi.fn().mockResolvedValue({ id: 'user-id', email: 'a@b.com', role: 'user' }),
+  getSession: vi.fn().mockResolvedValue({ userId: 'user-id', email: 'a@b.com', role: 'user', save: vi.fn() }),
 }))
 
 vi.mock('@/lib/sse', () => ({
@@ -23,12 +28,13 @@ vi.mock('@/lib/sse', () => ({
 }))
 
 import { queryOne, withTransaction } from '@/lib/db'
-import { requireUser, getUser } from '@/lib/session'
+import { requireUser, requireMod, getUser } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { POST as moderateGame } from '@/app/api/admin/games/[id]/moderate/route'
 import { GET as getLikes, POST as toggleLike } from '@/app/api/public-games/[id]/likes/route'
 
 const mockRequireUser = vi.mocked(requireUser)
+const mockRequireMod = vi.mocked(requireMod)
 const mockGetUser = vi.mocked(getUser)
 const mockWithTransaction = vi.mocked(withTransaction)
 const mockQueryOne = vi.mocked(queryOne)
@@ -42,6 +48,10 @@ const mockClient = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockRequireMod.mockResolvedValue({
+    error: null,
+    user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
+  })
   mockRequireUser.mockResolvedValue({
     error: null,
     user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
@@ -77,7 +87,7 @@ function makeLikesPostReq() {
 
 describe('POST /api/admin/games/[id]/moderate', () => {
   it('returns 401 when user is not authenticated', async () => {
-    mockRequireUser.mockResolvedValueOnce({ error: 'unauthorized', user: null, banReason: null })
+    mockRequireMod.mockResolvedValueOnce({ error: 'unauthorized', user: null })
 
     const res = await moderateGame(makeModerateReq('approve'), { params: Promise.resolve({ id: GAME_ID }) })
 
@@ -87,7 +97,7 @@ describe('POST /api/admin/games/[id]/moderate', () => {
   })
 
   it('returns 403 when user is banned', async () => {
-    mockRequireUser.mockResolvedValueOnce({ error: 'banned', user: null, banReason: null })
+    mockRequireMod.mockResolvedValueOnce({ error: 'banned', user: null })
 
     const res = await moderateGame(makeModerateReq('approve'), { params: Promise.resolve({ id: GAME_ID }) })
 
@@ -97,11 +107,7 @@ describe('POST /api/admin/games/[id]/moderate', () => {
   })
 
   it('returns 403 when user role is not admin or moderator', async () => {
-    mockRequireUser.mockResolvedValueOnce({
-      error: null,
-      user: { id: 'user-id', email: 'a@b.com', role: 'user' },
-      banReason: null,
-    })
+    mockRequireMod.mockResolvedValueOnce({ error: 'forbidden', user: null })
 
     const res = await moderateGame(makeModerateReq('approve'), { params: Promise.resolve({ id: GAME_ID }) })
 
@@ -111,10 +117,9 @@ describe('POST /api/admin/games/[id]/moderate', () => {
   })
 
   it('allows moderator role to approve', async () => {
-    mockRequireUser.mockResolvedValueOnce({
+    mockRequireMod.mockResolvedValueOnce({
       error: null,
       user: { id: 'user-id', email: 'a@b.com', role: 'moderator' },
-      banReason: null,
     })
     mockClient.query
       .mockResolvedValueOnce({ rows: [{ status: 'moderation' }] }) // game status

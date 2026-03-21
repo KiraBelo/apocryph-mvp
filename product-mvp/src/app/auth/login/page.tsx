@@ -40,7 +40,7 @@ export default function LoginPage() {
           {t('auth.loginTitle') as string}
         </h1>
         <p className="text-ink-2 mb-10 font-body">
-          {t('auth.testAccount') as string} <code className="font-mono text-[0.85rem]">test@test.com</code> / <code className="font-mono text-[0.85rem]">apocryph123</code>
+          &nbsp;
         </p>
 
         <form onSubmit={submit} className="flex flex-col gap-5">
@@ -80,7 +80,7 @@ export default function LoginPage() {
           {error && <p className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
 
           <button type="submit" disabled={loading} className="btn-primary text-[1rem] p-[0.7rem_1.4rem] mt-1">
-            {loading ? '...' : t('auth.loginButton') as string}
+            {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('auth.loginButton') as string}
           </button>
         </form>
 

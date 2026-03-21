@@ -38,8 +38,24 @@ export async function POST(req: NextRequest) {
     }
 
     const hash = await bcrypt.hash(password, 10)
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, row.user_id])
+    await query(
+      'UPDATE users SET password_hash = $1, session_version = session_version + 1 WHERE id = $2',
+      [hash, row.user_id]
+    )
     await query('DELETE FROM password_reset_tokens WHERE id = $1', [row.id])
+
+    // Update current session with new version so this session stays valid
+    const { getSession } = await import('@/lib/session')
+    const session = await getSession()
+    if (session.userId === row.user_id) {
+      const updated = await queryOne<{ session_version: number }>(
+        'SELECT session_version FROM users WHERE id = $1', [row.user_id]
+      )
+      if (updated) {
+        session.sessionVersion = updated.session_version
+        await session.save()
+      }
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSettings, useT } from './SettingsContext'
 import type { Message, GameDialogProps } from './game/types'
+import type { GameStatus } from '@/types/api'
 import Modal from './game/Modal'
 import MessageFeed from './game/MessageFeed'
 import MessageEditor from './game/MessageEditor'
@@ -20,22 +21,19 @@ import { useGameChat } from './hooks/useGameChat'
 import { useGameNotes } from './hooks/useGameNotes'
 import { useGameSearch } from './hooks/useGameSearch'
 import { useDiceRoller } from './hooks/useDiceRoller'
+import usePublishFlow from './hooks/usePublishFlow'
+import { useToast } from './ToastProvider'
 
 export default function GameDialogClient({ gameId, game, initialMessages, initialPage, totalPages: initTotalPages, participants, me, userId, requestTitle }: GameDialogProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { notesEnabled } = useSettings()
   const t = useT()
+  const { addToast } = useToast()
 
   // ── Tab state ──
   const initialTab = searchParams.get('tab') === 'ooc' ? 'ooc' as const : searchParams.get('tab') === 'notes' ? 'notes' as const : 'ic' as const
   const [activeTab, setActiveTab] = useState<'ic' | 'ooc' | 'notes' | 'prepare'>(initialTab)
-
-  // ── Hooks ──
-  const chat = useGameChat({ gameId, participantId: me.id, activeTab, t, onMyConsentReset: () => resetMyConsent() }, { messages: initialMessages, page: initialPage, totalPages: initTotalPages })
-  const notesHook = useGameNotes({ gameId, t })
-  const search = useGameSearch({ gameId, icMessages: chat.icMessages, oocMessages: chat.oocMessages, notes: notesHook.notes })
-  const dice = useDiceRoller({ gameId, participantId: me.id, t })
 
   // ── Layout state ──
   const [fullscreen, setFullscreen] = useState(false)
@@ -62,19 +60,29 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   // ── Game lifecycle ──
   const isLeft = !!me.left_at
   const isFrozen = !!(game.moderation_status && game.moderation_status !== 'visible')
-  const [gameStatus, setGameStatus] = useState(game.status || 'active')
+  const [gameStatus, setGameStatus] = useState<GameStatus>((game.status as GameStatus) || 'active')
   const isPreparing = gameStatus === 'preparing'
   const isIcFrozen = gameStatus !== 'active'
   const partner = participants.find(p => p.user_id !== userId)
 
-  // Publish consent state
-  const [myPublishConsent, setMyPublishConsent] = useState(false)
-  const [partnerPublishConsent, setPartnerPublishConsent] = useState(false)
-  const [partnerWantsPublish, setPartnerWantsPublish] = useState(false)
-  const [publishLoading, setPublishLoading] = useState(false)
-  const [publishLoaded, setPublishLoaded] = useState(false)
-  const [icPostCount, setIcPostCount] = useState(0)
-  const [submitLoading, setSubmitLoading] = useState(false)
+  // ── Publish flow ──
+  const publishFlow = usePublishFlow({
+    gameId, gameStatus, participantId: me.id, t, addToast,
+    setGameStatus, setActiveTab, setShowPublishModal, setShowModerationSent,
+  })
+  const {
+    partnerWantsPublish,
+    publishLoading, icPostCount, submitLoading,
+    handleProposePublish, handlePublishResponse, handleRevoke, handleSubmitToModeration,
+    onSsePublishRequest, onSsePublishRevoked, onSseStatusChanged,
+    resetMyConsent,
+  } = publishFlow
+
+  // ── Hooks ──
+  const chat = useGameChat({ gameId, participantId: me.id, activeTab, t, onMyConsentReset: resetMyConsent, addToast }, { messages: initialMessages, page: initialPage, totalPages: initTotalPages })
+  const notesHook = useGameNotes({ gameId, t, addToast })
+  const search = useGameSearch({ gameId, icMessages: chat.icMessages, oocMessages: chat.oocMessages, notes: notesHook.notes })
+  const dice = useDiceRoller({ gameId, participantId: me.id, t, addToast })
 
   // ── Scroll collapse refs ──
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -86,28 +94,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const activePartner = participants.find(p => p.user_id !== userId && !p.left_at)
   const effectiveBanner = bannerPref === 'none' ? null : bannerPref === 'partner' ? (activePartner?.banner_url ?? null) : (bannerUrl || null)
 
-  function resetMyConsent() {
-    setMyPublishConsent(false)
-  }
-
   // ── Effects ──
-  useEffect(() => {
-    if (publishLoaded) return
-    fetch(`/api/games/${gameId}/publish-consent`).then(r => r.json()).then(data => {
-      if (data.participants) {
-        const myP = data.participants.find((p: { participant_id: string }) => p.participant_id === me.id)
-        const otherP = data.participants.find((p: { participant_id: string }) => p.participant_id !== me.id)
-        setMyPublishConsent(!!myP?.consented)
-        setPartnerPublishConsent(!!otherP?.consented)
-        // Partner wants to publish = partner consented but I haven't yet
-        setPartnerWantsPublish(!!otherP?.consented && !myP?.consented && gameStatus === 'active')
-      }
-      if (data.icPostCount != null) setIcPostCount(data.icPostCount)
-      if (data.status) setGameStatus(data.status)
-      setPublishLoaded(true)
-    }).catch(() => {})
-  }, [publishLoaded, gameId, me.id])
-
   useEffect(() => () => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
     if (scrollStopRef.current) clearTimeout(scrollStopRef.current)
@@ -150,20 +137,12 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
     onEditMessage: (data) => chat.updateMessage(data),
     onDiceMessage: (data) => dice.enqueueDice(data),
     onStatusChanged: (data) => {
-      setGameStatus(data.status)
-      setPublishLoaded(false) // refresh consent state
+      setGameStatus(data.status as GameStatus)
+      onSseStatusChanged()
       if (data.status === 'preparing') setActiveTab('prepare')
     },
-    onPublishRequest: () => {
-      setPartnerWantsPublish(true)
-      setPublishLoaded(false)
-    },
-    onPublishRevoked: () => {
-      setPartnerWantsPublish(false)
-      setMyPublishConsent(false)
-      setPartnerPublishConsent(false)
-      setGameStatus('active')
-    },
+    onPublishRequest: onSsePublishRequest,
+    onPublishRevoked: onSsePublishRevoked,
   })
 
   // ── Handlers ──
@@ -178,60 +157,6 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   }
 
   function handleSpoilerClick(e: React.MouseEvent) { const el = e.target as HTMLElement; if (el.classList.contains('ooc-spoiler')) el.classList.toggle('ooc-spoiler-open') }
-
-  async function handleProposePublish() {
-    setPublishLoading(true)
-    try {
-      const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'POST' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-      setMyPublishConsent(true)
-    } catch { alert(t('errors.networkError') as string) }
-    finally { setPublishLoading(false) }
-  }
-
-  async function handlePublishResponse(choice: 'publish_as_is' | 'edit_first' | 'decline') {
-    setPublishLoading(true)
-    try {
-      const res = await fetch(`/api/games/${gameId}/publish-response`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choice })
-      })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-      const data = await res.json()
-      setPartnerWantsPublish(false)
-      setShowPublishModal(false)
-      if (data.status) {
-        setGameStatus(data.status)
-        if (data.status === 'preparing') setActiveTab('prepare')
-      }
-    } catch { alert(t('errors.networkError') as string) }
-    finally { setPublishLoading(false) }
-  }
-
-  async function handleRevoke() {
-    setPublishLoading(true)
-    try {
-      const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'DELETE' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-      setGameStatus('active')
-      setMyPublishConsent(false)
-      setPartnerPublishConsent(false)
-      setPartnerWantsPublish(false)
-      setPublishLoaded(false)
-    } catch { alert(t('errors.networkError') as string) }
-    finally { setPublishLoading(false) }
-  }
-
-  async function handleSubmitToModeration() {
-    setSubmitLoading(true)
-    try {
-      const res = await fetch(`/api/games/${gameId}/submit-to-moderation`, { method: 'POST' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-      setGameStatus('moderation')
-      setShowModerationSent(true)
-    } catch { alert(t('errors.networkError') as string) }
-    finally { setSubmitLoading(false) }
-  }
 
   // ── Render ──
   return (
@@ -253,7 +178,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         oocEnabled={oocEnabled} fullscreen={fullscreen} isLeft={isLeft}
         gameStatus={gameStatus} isFrozen={isFrozen} isPreparing={isPreparing}
         partnerWantsPublish={partnerWantsPublish}
-        participants={participants} userId={userId} notesCount={notesHook.notes.length}
+        participants={participants} userId={userId} notesCount={notesHook.notes.length} icPostCount={icPostCount}
         publishLoading={publishLoading}
         onSearchToggle={() => { search.setSearchOpen(s => !s); search.setSearchQuery(''); search.setSearchScope(activeTab === 'notes' ? 'notes' : activeTab === 'ooc' ? 'ooc' : 'ic') }}
         onExport={() => setShowExport(true)} onSettings={() => setShowSettings(true)}
@@ -362,14 +287,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
               </label>
             ))}
           </div>
-          <button onClick={async () => { if (!leaveReason) { alert(t('errors.selectLeaveReason') as string); return }; try { const res = await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return } router.push('/my/games') } catch { alert(t('errors.networkError') as string) } }} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
+          <button onClick={async () => { if (!leaveReason) { addToast(t('errors.selectLeaveReason') as string, 'error'); return }; try { const res = await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } router.push('/my/games') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
         </Modal>
       )}
 
       {showReport && (
         <Modal onClose={() => setShowReport(false)} title={t('game.reportTitle') as string}>
           <textarea value={reportReason} onChange={e => setReportReason(e.target.value)} placeholder={t('game.reportPlaceholder') as string} rows={4} className="w-full font-body text-[1rem] bg-surface border border-edge text-ink p-[0.65rem] outline-none resize-y mb-4" />
-          <button onClick={async () => { try { const res = await fetch(`/api/games/${gameId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reportReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return } setShowReport(false); alert(t('game.reportSent') as string) } catch { alert(t('errors.networkError') as string) } }} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">{t('game.reportButton') as string}</button>
+          <button onClick={async () => { try { const res = await fetch(`/api/games/${gameId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reportReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } setShowReport(false); addToast(t('game.reportSent') as string, 'success') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">{t('game.reportButton') as string}</button>
         </Modal>
       )}
 

@@ -93,7 +93,7 @@ export default function RegisterPage() {
 
           <button type="submit" disabled={loading || !ageConfirmed} className="btn-primary text-[1rem] p-[0.7rem_1.4rem] mt-1"
             style={{ opacity: (loading || !ageConfirmed) ? 0.5 : 1, cursor: (loading || !ageConfirmed) ? 'not-allowed' : 'pointer' }}>
-            {loading ? '...' : t('auth.registerButton') as string}
+            {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('auth.registerButton') as string}
           </button>
         </form>
 

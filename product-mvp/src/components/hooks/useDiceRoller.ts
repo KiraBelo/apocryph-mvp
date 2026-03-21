@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import type { ToastType } from '../ToastProvider'
 
-export function useDiceRoller({ gameId, participantId, t }: {
+export function useDiceRoller({ gameId, participantId, t, addToast }: {
   gameId: string
   participantId: string
   t: (key: string) => unknown
+  addToast: (msg: string, type?: ToastType) => void
 }) {
   const [diceQueue, setDiceQueue] = useState<{ sides: number; result: number; roller: string }[]>([])
   const [showDicePanel, setShowDicePanel] = useState(false)
@@ -20,8 +22,8 @@ export function useDiceRoller({ gameId, participantId, t }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sides: s }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
-    } catch { alert(t('errors.networkError') as string) }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
     finally { setDiceRolling(false) }
   }
 

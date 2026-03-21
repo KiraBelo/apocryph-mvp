@@ -1,6 +1,6 @@
 'use client'
 import { useT } from '../SettingsContext'
-import { MIN_IC_POSTS } from './types'
+import { MIN_IC_POSTS } from '@/lib/constants'
 
 interface EpilogueModalProps {
   requestTitle: string | null

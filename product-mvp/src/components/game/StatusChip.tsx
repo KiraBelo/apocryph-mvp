@@ -1,9 +1,10 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useT } from '../SettingsContext'
+import type { GameStatus } from '@/types/api'
 
 interface StatusChipProps {
-  gameStatus: string
+  gameStatus: GameStatus
   isFrozen: boolean
   isLeft: boolean
   partnerWantsPublish: boolean
@@ -152,15 +153,18 @@ function DropdownMenu({ children, onClose, skipCloseRef }: {
   const ref = useRef<HTMLDivElement>(null)
 
   // Click-outside via document listener (skipCloseRef pattern per CLAUDE.md)
-  useState(() => {
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
     function handler(e: MouseEvent) {
       if (ref.current && ref.current.contains(e.target as Node)) return
       skipCloseRef.current = true
-      onClose()
+      onCloseRef.current()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  })
+  }, [])
 
   return (
     <div

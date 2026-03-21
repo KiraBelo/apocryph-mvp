@@ -467,6 +467,7 @@ export default function TagAutocomplete({
                 onClick={() => removeTag(tag.slug)}
                 className="ml-0.5 opacity-50 hover:opacity-100 cursor-pointer"
                 style={{ fontSize: '0.8rem', lineHeight: 1 }}
+                aria-label={`Удалить тег ${tag.name || tag.slug}`}
               >
                 ×
               </button>

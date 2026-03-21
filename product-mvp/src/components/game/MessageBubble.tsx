@@ -32,6 +32,7 @@ function MessageBubble({
     <button
       onClick={() => isEditing ? onCancelEdit() : onStartEdit(msg)}
       title={isEditing ? t('game.cancel') as string : t('game.editNote') as string}
+      aria-label={isEditing ? t('game.cancel') as string : t('game.editNote') as string}
       className={`bg-transparent border-none cursor-pointer p-0 leading-none align-middle${size === 10 ? ' ml-[0.5em]' : ''}`}
       style={{ color: isEditing ? 'var(--accent)' : 'var(--text-2)' }}
     >

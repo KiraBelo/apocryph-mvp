@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import RichEditor from './RichEditor'
 import TagAutocomplete, { type TagItem } from './TagAutocomplete'
@@ -24,8 +24,78 @@ export default function RequestForm({ initial }: Props) {
   const [tags, setTags] = useState<TagItem[]>(
     (initial?.tags ?? []).map(t => ({ slug: t, name: t }))
   )
-  const [error, setError] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [draftSaved, setDraftSaved] = useState(false)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const draftMsgTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const hasUnsavedRef = useRef(false)
+  const submittedRef = useRef(false)
+  const DRAFT_KEY = 'apocrif_request_draft'
+
+  // beforeunload warning for unsaved changes (ref-based, registered once)
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedRef.current && !submittedRef.current) e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  // Restore draft from localStorage (only for new requests)
+  useEffect(() => {
+    if (initial) return
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY)
+      if (!saved) return
+      const d = JSON.parse(saved)
+      if (d.title) setTitle(d.title)
+      if (d.body) setBody(d.body)
+      if (d.type) setType(d.type)
+      if (d.contentLevel) setContentLevel(d.contentLevel)
+      if (d.fandomType) setFandomType(d.fandomType)
+      if (d.pairing) setPairing(d.pairing)
+      if (d.tags?.length) setTags(d.tags)
+    } catch { /* corrupted draft */ }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- restore once on mount
+
+  // Autosave draft with debounce
+  const saveDraft = useCallback(() => {
+    if (initial) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          title, body, type, contentLevel, fandomType, pairing, tags,
+        }))
+        setDraftSaved(true)
+        if (draftMsgTimerRef.current) clearTimeout(draftMsgTimerRef.current)
+        draftMsgTimerRef.current = setTimeout(() => setDraftSaved(false), 2000)
+      } catch { /* storage full */ }
+    }, 1000)
+  }, [initial, title, body, type, contentLevel, fandomType, pairing, tags])
+
+  useEffect(() => {
+    saveDraft()
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      if (draftMsgTimerRef.current) clearTimeout(draftMsgTimerRef.current)
+    }
+  }, [saveDraft])
+
+  // Update unsaved ref when form content changes
+  useEffect(() => {
+    if (initial) {
+      const tagSlugs = tags.map(t => t.slug).sort().join(',')
+      const initialTagSlugs = (initial.tags ?? []).sort().join(',')
+      hasUnsavedRef.current = title !== initial.title || body !== (initial.body ?? '') ||
+        type !== initial.type || contentLevel !== initial.content_level ||
+        fandomType !== initial.fandom_type || pairing !== initial.pairing ||
+        tagSlugs !== initialTagSlugs
+    } else {
+      hasUnsavedRef.current = title.trim() !== '' || body.trim() !== ''
+    }
+  }, [initial, title, body, type, contentLevel, fandomType, pairing, tags])
 
   const CONTENT_LEVELS = [
     { value: 'none', label: t('filters.noNsfw') as string },
@@ -45,9 +115,11 @@ export default function RequestForm({ initial }: Props) {
   ]
 
   async function submit(statusArg: string) {
-    if (!title.trim()) { setError(t('form.errorNoTitle') as string); return }
-    if (statusArg === 'active' && tags.length < 3) { setError(t('form.errorMinTags') as string); return }
-    setLoading(true); setError('')
+    const errs: Record<string, string> = {}
+    if (!title.trim()) errs.title = t('form.errorNoTitle') as string
+    if (statusArg === 'active' && tags.length < 3) errs.tags = t('form.errorMinTags') as string
+    if (Object.keys(errs).length) { setErrors(errs); return }
+    setErrors({}); setLoading(true)
     const payload = {
       title, description: body, type, content_level: contentLevel,
       fandom_type: fandomType, pairing,
@@ -59,21 +131,31 @@ export default function RequestForm({ initial }: Props) {
     const url  = initial ? `/api/requests/${initial.id}` : '/api/requests'
     const method = initial ? 'PATCH' : 'POST'
 
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
 
-    if (!res.ok) {
-      const d = await res.json()
-      const errKey = `errors.${d.error}`
-      const translated = t(errKey)
-      setError((translated !== errKey ? translated : d.error ?? t('errors.generic')) as string)
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        const errKey = `errors.${d.error}`
+        const translated = t(errKey)
+        setErrors({ server: (translated !== errKey ? translated : d.error ?? t('errors.generic')) as string })
+        setLoading(false)
+        return
+      }
+    } catch {
+      setErrors({ server: t('errors.networkError') as string })
       setLoading(false)
       return
     }
 
+    if (!initial) {
+      try { localStorage.removeItem(DRAFT_KEY) } catch { /* ok */ }
+    }
+    submittedRef.current = true
     router.push(`/my/requests?tab=${statusArg === 'draft' ? 'draft' : 'active'}`)
     router.refresh()
   }
@@ -81,7 +163,7 @@ export default function RequestForm({ initial }: Props) {
   return (
     <form className="flex flex-col gap-7">
       {/* Title */}
-      <Field label={t('form.titleLabel') as string}>
+      <Field label={t('form.titleLabel') as string} error={errors.title}>
         <input
           type="text" value={title} onChange={e => setTitle(e.target.value)} required maxLength={200}
           placeholder={t('form.titlePlaceholder') as string}
@@ -152,7 +234,7 @@ export default function RequestForm({ initial }: Props) {
       </Field>
 
       {/* Tags */}
-      <Field label={`${t('form.tagsLabel') as string} (${tags.length}/20)`}>
+      <Field label={`${t('form.tagsLabel') as string} (${tags.length}/20)`} error={errors.tags}>
         <div className="flex flex-wrap gap-1.5 mb-2">
           <span className="badge badge-type">{type === 'duo' ? t('filters.duo') as string : t('filters.multiplayer') as string}</span>
           <span className="badge badge-fandom">{fandomType === 'fandom' ? t('filters.fandom') as string : t('filters.original') as string}</span>
@@ -173,27 +255,33 @@ export default function RequestForm({ initial }: Props) {
         <RichEditor content={body} onChange={setBody} placeholder={t('form.descriptionPlaceholder') as string} />
       </Field>
 
-      {error && <p className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
+      {errors.server && <p className="text-[#c0392b] font-mono text-[0.72rem]" role="alert" aria-live="polite">{errors.server}</p>}
+      {draftSaved && !initial && (
+        <p className="text-ink-3 font-mono text-[0.65rem] tracking-[0.08em]">&#10003; {t('form.draftSaved') as string}</p>
+      )}
 
       <div className="flex gap-4 flex-wrap items-center">
         <button type="button" onClick={() => submit('active')} disabled={loading}
           className="btn-primary text-[1rem] py-3 px-7">
-          {loading ? '...' : t('form.publish') as string}
+          {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('form.publish') as string}
         </button>
         <button type="button" onClick={() => submit('draft')} disabled={loading}
           className="btn-ghost font-heading italic text-[1rem] py-3 px-7">
-          {loading ? '...' : t('form.saveDraft') as string}
+          {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('form.saveDraft') as string}
         </button>
       </div>
     </form>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="section-label">{label}</span>
+      <label className="font-mono text-[0.62rem] tracking-[0.15em] uppercase text-ink-2">{label}</label>
       {children}
+      {error && (
+        <p className="text-[#c0392b] font-mono text-[0.72rem]" role="alert" aria-live="polite">{error}</p>
+      )}
     </div>
   )
 }

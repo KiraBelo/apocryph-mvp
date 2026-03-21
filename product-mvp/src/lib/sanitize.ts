@@ -1,5 +1,9 @@
 import sanitizeHtml from 'sanitize-html'
 
+export function sanitizeNickname(name: string): string {
+  return sanitizeHtml(name, { allowedTags: [], allowedAttributes: {} }).trim()
+}
+
 export function sanitizeBody(html: string | null | undefined): string | null {
   if (!html) return null
 
@@ -27,6 +31,7 @@ export function sanitizeBody(html: string | null | undefined): string | null {
         'color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)$/],
         'background-color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)$/],
         'text-align': [/^(left|right|center|justify)$/],
+        'font-family': [/^[a-zA-Z0-9\s,'-]+$/],
       },
     },
     allowedSchemes: ['https', 'http', 'mailto'],

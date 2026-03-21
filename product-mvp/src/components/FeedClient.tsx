@@ -4,6 +4,7 @@ import RequestCard, { Request } from './RequestCard'
 import Link from 'next/link'
 import { useSettings, useT } from './SettingsContext'
 import TagAutocomplete, { type TagItem } from './TagAutocomplete'
+import { useToast } from './ToastProvider'
 
 function FilterSelect({ value, onChange, options }: {
   value: string
@@ -69,6 +70,7 @@ interface Props {
 export default function FeedClient({ user }: Props) {
   const { tagPresets, setTagPreset } = useSettings()
   const t = useT()
+  const { addToast } = useToast()
 
   const CONTENT_LEVELS = [
     { value: '', label: t('filters.anyNsfw') as string },
@@ -158,7 +160,7 @@ export default function FeedClient({ user }: Props) {
       setBlacklist(prev => [...prev, ...unique].sort())
       setBlacklistInput('')
       load()
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   async function removeFromBlacklist(tag: string) {
@@ -166,7 +168,7 @@ export default function FeedClient({ user }: Props) {
       await fetch(`/api/blacklist/${encodeURIComponent(tag)}`, { method: 'DELETE' })
       setBlacklist(prev => prev.filter(t => t !== tag))
       load()
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   function handleTagSearch(tag: string) {
@@ -190,7 +192,7 @@ export default function FeedClient({ user }: Props) {
       })
       setBlacklist(prev => [...prev, tag].sort())
       load()
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   function openSavePreset() {
@@ -408,7 +410,7 @@ export default function FeedClient({ user }: Props) {
                     await fetch('/api/blacklist', { method: 'DELETE' })
                     setBlacklist([])
                     load()
-                  } catch { alert(t('errors.networkError') as string) }
+                  } catch { addToast(t('errors.networkError') as string, 'error') }
                 }}
                 className="bg-transparent border-none cursor-pointer font-mono text-[0.6rem] tracking-[0.1em] uppercase text-ink-2 p-0 opacity-50 hover:opacity-100"
               >
@@ -453,7 +455,26 @@ export default function FeedClient({ user }: Props) {
 
       {/* Results */}
       {loading ? (
-        <p className="text-ink-2 italic font-heading">{t('feed.loading') as string}</p>
+        <div className="grid gap-[var(--game-gap,1rem)]" aria-busy="true">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="card p-5" style={{ animation: `fadeInUp 0.3s ease ${i * 0.1}s both` }}>
+              <div className="flex justify-between items-start mb-3">
+                <div className="skeleton-block" style={{ width: '70%', height: '1.2rem' }} />
+                <div className="skeleton-block" style={{ width: '1.5rem', height: '1.5rem', borderRadius: '50%' }} />
+              </div>
+              <div className="flex gap-2 mb-3">
+                {[40, 55, 45, 50].map((w, j) => (
+                  <div key={j} className="skeleton-block" style={{ width: `${w}px`, height: '1.1rem', borderRadius: '2px' }} />
+                ))}
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="skeleton-block" style={{ width: '100%', height: '0.85rem' }} />
+                <div className="skeleton-block" style={{ width: '85%', height: '0.85rem' }} />
+                <div className="skeleton-block" style={{ width: '60%', height: '0.85rem' }} />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : error ? (
         <p className="text-ink-2 italic font-heading text-[1.1rem]">
           {t('errors.networkError') as string}

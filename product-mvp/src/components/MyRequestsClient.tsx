@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
 
 export interface MyRequest {
   id: string; title: string; body: string | null; type: string; content_level: string
@@ -11,6 +12,7 @@ export interface MyRequest {
 
 export default function MyRequestsClient({ requests: initial, initialTab = 'active' }: { requests: MyRequest[], initialTab?: 'all' | 'active' | 'draft' | 'inactive' }) {
   const t = useT()
+  const { addToast } = useToast()
   const [requests, setRequests] = useState(initial)
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'inactive'>(initialTab)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
@@ -32,7 +34,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: id }),
       })
-      if (!res.ok) { alert(t('errors.generic') as string); return }
+      if (!res.ok) { addToast(t('errors.generic') as string, 'error'); return }
       const { token } = await res.json()
       const url = `${window.location.origin}/invite/${token}`
       try {
@@ -42,7 +44,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
       } catch {
         setInviteUrlFor({ id, url })
       }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   const filtered: MyRequest[] = filter === 'all' ? requests : requests.filter(r => r.status === filter)
@@ -58,11 +60,11 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
       })
       if (!res.ok) {
         setRequests(prev => prev.map(r => r.id === id ? { ...r, status: oldStatus ?? r.status } : r))
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
     } catch {
       setRequests(prev => prev.map(r => r.id === id ? { ...r, status: oldStatus ?? r.status } : r))
-      alert(t('errors.networkError') as string)
+      addToast(t('errors.networkError') as string, 'error')
     }
   }
 
@@ -73,9 +75,9 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
       if (res.ok) {
         setRequests(prev => prev.filter(r => r.id !== id))
       } else {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   return (
@@ -97,7 +99,12 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
       </div>
 
       {filtered.length === 0 && (
-        <p className="text-ink-2 font-heading italic">{t('myRequests.noRequests') as string}</p>
+        <div className="text-center py-12">
+          <p className="text-ink-2 font-heading italic mb-4">{t('myRequests.noRequests') as string}</p>
+          <Link href="/requests/new" className="btn-primary inline-block no-underline py-2.5 px-6 text-[0.9rem]">
+            {t('myRequests.createFirst') as string}
+          </Link>
+        </div>
       )}
 
       <div className="flex flex-col gap-[var(--game-gap,1rem)]">
@@ -121,14 +128,14 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
                 <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase mr-1" style={{ color: statusColor[r.status] }}>
                   {statusLabel[r.status]}
                 </span>
-                <button onClick={() => copyInvite(r.id)} title={t('card.copyInvite') as string}
+                <button onClick={() => copyInvite(r.id)} title={t('card.copyInvite') as string} aria-label={t('card.copyInvite') as string}
                   className={`bg-transparent border-none p-0 leading-none cursor-pointer flex items-center transition-[color,opacity] duration-150
                     ${copied === r.id ? 'text-accent' : 'text-ink-2 icon-dim'}`}
-                >{copied === r.id ? '✓' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}</button>
-                <Link href={`/requests/${r.id}/edit`} title={t('card.edit') as string}
+                >{copied === r.id ? '✓' : <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}</button>
+                <Link href={`/requests/${r.id}/edit`} title={t('card.edit') as string} aria-label={t('card.edit') as string}
                   className="font-mono text-[0.9rem] text-ink-2 p-[0.2rem_0.3rem] leading-none icon-dim no-underline inline-block scale-x-[-1]"
                 >✎</Link>
-                <button onClick={() => setConfirmDelete(r.id)} title={t('detail.deleteButton') as string}
+                <button onClick={() => setConfirmDelete(r.id)} title={t('detail.deleteButton') as string} aria-label={t('detail.deleteButton') as string}
                   className="bg-transparent border-none font-mono text-[0.75rem] text-ink-2 p-[0.2rem_0.3rem] leading-none cursor-pointer opacity-50 hover:opacity-100 hover:text-accent"
                 >✕</button>
 
@@ -149,8 +156,8 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
               {/* Title + tags row */}
               <div className="flex items-start gap-3">
                 {r.status === 'active'
-                  ? <button onClick={() => changeStatus(r.id, 'inactive')} title={t('myRequests.unpublish') as string} className="icon-action-btn">⏸</button>
-                  : <button onClick={() => changeStatus(r.id, 'active')} title={t('myRequests.publishToFeed') as string} className="icon-action-btn text-accent border-accent-dim hover:border-accent">▶</button>
+                  ? <button onClick={() => changeStatus(r.id, 'inactive')} title={t('myRequests.unpublish') as string} aria-label={t('myRequests.unpublish') as string} className="icon-action-btn">⏸</button>
+                  : <button onClick={() => changeStatus(r.id, 'active')} title={t('myRequests.publishToFeed') as string} aria-label={t('myRequests.publishToFeed') as string} className="icon-action-btn text-accent border-accent-dim hover:border-accent">▶</button>
                 }
                 <div className="flex-1">
                   <div className="mb-1">

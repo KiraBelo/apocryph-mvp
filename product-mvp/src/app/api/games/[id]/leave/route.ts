@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
+import { query } from '@/lib/db'
 import { requireUser } from '@/lib/session'
+import { requireParticipant } from '@/lib/auth'
+import { notifyGame } from '@/lib/sse'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
@@ -8,25 +10,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: gameId } = await params
-  const { reason } = await req.json()
+  let reason: string
+  try {
+    ({ reason } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
 
   if (!reason) return NextResponse.json({ error: 'selectLeaveReason' }, { status: 400 })
   if (reason.length > 500) return NextResponse.json({ error: 'leaveTooLong' }, { status: 400 })
 
   try {
     // Check participant exists and hasn't already left
-    const participant = await queryOne<{ id: string; left_at: string | null }>(
-      'SELECT id, left_at FROM game_participants WHERE game_id=$1 AND user_id=$2',
-      [gameId, user!.id]
-    )
+    const participant = await requireParticipant(gameId, user!.id, { includeLeft: true })
     if (!participant) return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
     if (participant.left_at) return NextResponse.json({ error: 'alreadyLeft' }, { status: 400 })
 
     await query(
-      `UPDATE game_participants SET left_at=NOW(), leave_reason=$3, finish_consent=false
+      `UPDATE game_participants SET left_at=NOW(), leave_reason=$3
        WHERE game_id=$1 AND user_id=$2 AND left_at IS NULL`,
       [gameId, user!.id, reason]
     )
+
+    // Notify SSE subscribers about participant leaving
+    notifyGame(gameId, { _type: 'participantLeft', userId: user!.id })
 
     // Проверяем, не осталось ли активных участников
     await query(

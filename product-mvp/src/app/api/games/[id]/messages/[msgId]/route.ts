@@ -12,7 +12,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
 
   const { id: gameId, msgId } = await params
-  const { content } = await req.json()
+
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
+  const { content } = body
   if (!content?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
   if (content.length > 200_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
 

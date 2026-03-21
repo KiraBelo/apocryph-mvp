@@ -131,8 +131,8 @@ describe('POST /api/games/[id]/messages', () => {
   })
 
   describe('game status rules', () => {
-    it('returns 403 gameFinished when posting IC in a finished game', async () => {
-      mockQueryOne.mockResolvedValueOnce({ moderation_status: 'visible', status: 'finished' })
+    it('returns 403 gameFinished when posting IC in a preparing game', async () => {
+      mockQueryOne.mockResolvedValueOnce({ moderation_status: 'visible', status: 'preparing' })
 
       const req = makeRequest({ content: 'hello world', type: 'ic' })
       const res = await POST(req, { params: Promise.resolve({ id: GAME_ID }) })
@@ -142,8 +142,8 @@ describe('POST /api/games/[id]/messages', () => {
       expect(data.error).toBe('gameFinished')
     })
 
-    it('allows OOC messages in a finished game', async () => {
-      mockQueryOne.mockResolvedValueOnce({ moderation_status: 'visible', status: 'finished' }) // game
+    it('allows OOC messages in a preparing game', async () => {
+      mockQueryOne.mockResolvedValueOnce({ moderation_status: 'visible', status: 'preparing' }) // game
       mockQueryOne.mockResolvedValueOnce({ id: 'p-id', left_at: null }) // participant
       mockQueryOne.mockResolvedValueOnce({ id: 'msg-id', content: 'ooc message' }) // INSERT
       mockQueryOne.mockResolvedValueOnce({ id: 'msg-id', content: 'ooc message', nickname: 'Player' }) // full

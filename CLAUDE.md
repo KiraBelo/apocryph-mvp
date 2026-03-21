@@ -17,29 +17,33 @@ cd product-mvp
 npm run dev      # запуск dev-сервера (localhost:3000)
 npm run build    # production build
 npm run lint     # eslint
+npx vitest run   # запуск тестов (проект использует vitest, НЕ jest)
+npx vitest run src/lib/__tests__/game-utils.test.ts  # конкретный файл
 ```
 
 База данных: `psql -U postgres -d apocryph < schema.sql`
+Seed data (DEV ONLY): `psql -U postgres -d apocryph < seed-dev.sql`
 
 ## Структура проекта
 
 ```
 product-mvp/
-  schema.sql              # схема БД + seed data (16 заявок, 4 тестовых юзера)
+  schema.sql              # схема БД (без seed data)
+  seed-dev.sql            # seed data для разработки (DEV ONLY, 4 юзера + 16 заявок)
   .env.local              # DATABASE_URL, SESSION_SECRET
   src/
     app/
       page.tsx            # главная — лента заявок
       layout.tsx          # корневой layout (Nav, SettingsPanel, SettingsProvider)
-      globals.css         # дизайн-токены, темы, TipTap стили, CSS-классы компонентов
+      globals.css         # дизайн-токены, темы (light/dark), TipTap стили
       auth/               # /auth/login, /auth/register
       requests/           # /requests/new, /requests/[id], /requests/[id]/edit
       games/[id]/         # /games/[id] — игровой диалог
       my/                 # /my/requests, /my/games
       bookmarks/          # /bookmarks
+      invite/[token]/     # принятие инвайт-ссылки
       feed/               # /feed — лента заявок (альтернативный вход)
       library/            # /library, /library/[id] — публичная библиотека игр
-      invite/[token]/     # принятие инвайт-ссылки
       admin/              # /admin — панель администратора
         reports/          # модерация жалоб
         stop-list/        # стоп-лист
@@ -93,9 +97,12 @@ product-mvp/
         PrepareTab.tsx, PublishConsentModal.tsx, ModerationSentModal.tsx
         EpilogueModal.tsx, ExportModal.tsx, exportUtils.ts
         Modal.tsx, types.ts, utils.ts
+      ToastProvider.tsx    # Toast-уведомления (useToast хук)
+      ConfirmDialog.tsx    # стилизованный диалог подтверждения (замена window.confirm)
+      Breadcrumbs.tsx      # хлебные крошки
       hooks/              # хуки игрового диалога
         useGameChat.ts, useGameSSE.ts, useGameSearch.ts
-        useGameNotes.ts, useDiceRoller.ts
+        useGameNotes.ts, useDiceRoller.ts, usePublishFlow.ts
     lib/
       db.ts               # Pool + query/queryOne/withTransaction хелперы
       session.ts          # getSession/getUser (iron-session)
@@ -106,7 +113,9 @@ product-mvp/
       rate-limit.ts       # антиспам (rate limiting)
       stoplist.ts         # стоп-лист слов
       game-utils.ts       # утилиты игр
-      __tests__/          # тесты lib (auth, rate-limit, sanitize, stoplist)
+      __tests__/          # тесты lib (auth, rate-limit, sanitize, stoplist, game-utils)
+    types/
+      api.ts              # централизованные типы (GameStatus, MessageType, UserRole, BannerPref и др.)
 ```
 
 ## База данных
@@ -157,7 +166,7 @@ CSS-переменные маппятся на Tailwind через `@theme`:
 - Язык кода: английский (переменные, функции, комментарии)
 - Компоненты: функциональные, React hooks
 - API routes: Next.js App Router route handlers (route.ts)
-- SQL-запросы: прямые через `query()` / `queryOne()` / `withTransaction()` из `lib/db.ts`, параметризированные ($1, $2...)
+- SQL-запросы: прямые через `query()` / `queryOne()` из `lib/db.ts`, параметризированные ($1, $2...)
 - Без ORM — сырой SQL
 - Авторизация в API: `getUser()` из `lib/session.ts`, возвращает `null` если не авторизован
 
@@ -219,6 +228,87 @@ CSS-переменные маппятся на Tailwind через `@theme`:
 - ExecStart: `/usr/bin/node /opt/apocryph/node_modules/next/dist/bin/next start -p 3000`
 - Деплой: `tar -czf` → `scp` → `rsync --exclude=node_modules --exclude=.next` → `npm install` (если нужно) → `rm -rf .next && npx next build` → `systemctl restart apocryph`
 - `.env.local` бэкапится перед rsync и восстанавливается после
+
+## Правила качества кода (обязательны при разработке)
+
+Полный план: `../../BETA-PLAN.md` | UX-план: `../../ux-beta.md`
+
+### Безопасность API
+- **Self-action:** всегда проверять `author_id !== user.id` — автор не может откликаться на свою заявку, принимать свой инвайт, одобрять свою публикацию
+- **IDOR:** каждый эндпоинт игры — проверка `game_participants` на участие текущего пользователя. Нет участия → 403
+- **Left participants:** вышедший из игры (`left_at IS NOT NULL`) не может выполнять действия (report, dice, messages, read)
+- **Game status guard:** перед действием проверять `game.status` — dice/messages/notes только в `active`, редактирование постов только в `preparing`
+- **Banned check:** в админских эндпоинтах проверять `banned_at IS NULL` помимо роли — забаненный модератор не должен иметь доступ
+- **Session lifecycle:** после `session.destroy()` — обязательно `await session.save()`. После смены пароля — инвалидировать все активные сессии
+- **Rate limit:** на КАЖДЫЙ write-эндпоинт (не только auth и requests — также comments, reports, notes, dice)
+- **Sanitize everywhere:** санитизировать ВСЕ пользовательские данные в ответах, включая никнеймы в JSON (не только HTML-контент)
+- **Stub endpoints:** если фича не реализована (например, отправка email), эндпоинт должен возвращать 501, а не молча создавать записи в БД
+- **X-Forwarded-For:** не доверять напрямую — использовать IP только от доверенного reverse proxy (nginx `real_ip_header`)
+- **SSE cleanup:** при выходе из игры (`leave`) закрывать SSE-соединение для этого пользователя
+- **Инвайты:** устанавливать `expires_at` — бессрочные инвайты опасны
+
+### Функциональные правила
+- **Проверка инициатора:** пользователь, инициировавший действие (публикацию, жалобу), не может сам его одобрить/подтвердить — нужен другой участник
+- **DELETE несуществующего** → 404, не 200. Идемпотентность ≠ молчаливый успех
+- **Тесты актуальны:** если статус/поле удалены из схемы БД — удалить из тестов. Не оставлять тесты на `finished` если статус удалён
+- **Двойной cleanup:** при отключении SSE/WebSocket использовать флаг `cleaned` — `trackDisconnect` должен вызываться ровно один раз
+- **Числовые параметры:** `parseInt` пропускает дробные (`"2.9"` → 2). Валидировать что число целое: `Number.isInteger(Number(value))`
+
+### Архитектура
+- **UI-компонент только рендерит.** Fetch-вызовы, мутации, оптимистичные обновления — в кастомных хуках (`src/components/hooks/`)
+- **API route handler — тонкий:** парсинг запроса → логика → ответ. Не разращивать SQL-сборку внутри handler
+- **Общие SQL-паттерны** (COUNT + pagination, нормализация тегов) — через хелперы из `lib/`, не копипастить
+- **Общие проверки авторизации:** вынести в хелперы (`requireMod()`, `requireParticipant(gameId, userId)`) — не дублировать проверку роли/участия в каждом handler
+- **Новый API-эндпоинт** — типизировать запрос и ответ в `src/types/api.ts`
+- **Мёртвый код:** не оставлять неиспользуемые таблицы/колонки в схеме БД и устаревшие поля в типах. Удалять сразу
+
+### TypeScript
+- **Запрещено:** `any`, `as any`, `@ts-ignore`
+- **Запрещено:** `as unknown as` для обхода типов — если тип не совпадает, исправить тип, а не кастить
+- `eslint-disable` — только с комментарием-объяснением
+- DB-запросы с дженериком: `query<MyType>(sql, params)`
+- **Union types для известных наборов:** `type: 'ic' | 'ooc' | 'dice'`, не `string`. `banner_pref: 'own' | 'partner' | 'none'`, не `string`
+- **Константы — в одном файле.** Не дублировать одну и ту же константу в нескольких местах (например, `MIN_IC_POSTS`)
+
+### Обработка ошибок
+- Пустой `.catch(() => {})` — только для fire-and-forget + обязательный комментарий `// fire-and-forget: [причина]`
+- API route: всегда `try/catch` → `console.error('[API path] METHOD:', error)` → `{ error: 'errorKey' }`
+- **`req.json()` — всегда в try/catch:** невалидный JSON должен возвращать 400, а не 500
+- Не глотать ошибки молча в операциях, важных для пользователя
+
+### React-паттерны
+- useEffect: полный массив зависимостей. Если нужно исключить — useRef-паттерн (как в useGameSSE), НЕ eslint-disable
+- setInterval/setTimeout — всегда cleanup в return useEffect
+- EventSource/WebSocket — всегда `.onerror` обработчик + cleanup. При ошибке SSE — показывать пользователю, не глотать молча
+- Стабилизация колбэков через useRef (не useCallback с пустыми deps)
+- **Подписки (addEventListener):** регистрировать в `useEffect`, не в `useState`. Всегда `removeEventListener` в cleanup — иначе утечка
+- **Большие компоненты (300+ строк):** выносить логику в кастомные хуки (например, `usePublishFlow` из `GameDialogClient`). Inline-обработчики с логикой → отдельные функции
+- **addEventListener в рендере — запрещено.** Паттерн `useState(() => { document.addEventListener(...) })` — баг. Только `useEffect` для подписок
+- **beforeunload:** добавлять через ref-паттерн (не на каждый keystroke). Ref хранит `hasContent`, listener регистрируется один раз
+- **setTimeout/setInterval в хуках:** всегда хранить в ref и clearTimeout в cleanup. Включая "временные" таймеры типа `setTimeout(() => setFlag(false), 2000)`
+
+### Производительность
+- Нет fetch в циклах — batch-операции через один запрос
+- Коррелированные подзапросы — заменять на JOIN/CTE
+- Внешние API — проксировать через свой route
+- **COUNT + данные в одном запросе:** использовать `COUNT(*) OVER()` вместо двух отдельных запросов
+- **Polling:** не делать N+1 запросов при периодическом опросе (например, непрочитанные — одним запросом)
+- **Polling при скрытой вкладке:** приостанавливать setInterval через `document.addEventListener('visibilitychange', ...)` — не тратить ресурсы сервера когда пользователь не смотрит
+
+### UX-правила
+- **a11y:** кнопки без текста → `aria-label`. Модалки → `role="dialog"`, `aria-modal`, focus trap. Ошибки → `aria-live="polite"`. SVG-иконки → `aria-hidden="true"`
+- **a11y дропдауны:** `aria-expanded` на кнопке-триггере, закрытие по Escape, навигация стрелками
+- **Семантика:** навигация в `<nav>`, контент в `<main>`, карточки в `<article>`. Кликабельные элементы — `<button>`, не `<div onClick>`
+- **Focus:** не убирать `outline` без замены. Глобальный `:focus-visible` с `outline: 2px solid var(--accent)`
+- **Touch:** минимальный интерактивный элемент 44x44px
+- **Мобильная адаптивность:** навигация → гамбургер-меню на < 768px. Тулбары с 4+ кнопками → overflow-меню «...» на узких экранах
+- **Обратная связь:** успех/ошибка → Toast (не `alert()` и не `window.confirm()`). Кнопка загрузки → disabled + спиннер (не просто `...`). Опасное действие → `<ConfirmDialog>` (не `window.confirm()`)
+- **Toast в хуках:** хуки (`useGameChat`, `useGameNotes`, `useDiceRoller`) не имеют доступа к контексту напрямую. Передавать `addToast` параметром хука: `useGameChat({ ..., addToast })`. НЕ использовать `alert()` в хуках
+- **Loading states:** скелетоны (пульсирующие серые блоки), не текст «Загрузка...». Empty state — всегда с CTA-кнопкой («Создать первую заявку»). Error state — всегда с кнопкой «Повторить»
+- **Формы:** валидация inline у поля (не общим блоком внизу). Длинные формы → автосохранение в localStorage. Placeholder ≠ label. Предупреждение `beforeunload` при уходе с несохранённым текстом
+- **Тексты:** все строки через `useT()`, никакого хардкода на русском — включая error.tsx, админку, empty states
+- **Навигация:** вложенные страницы → ссылка «назад» к родительскому списку (не к `/`). Хлебные крошки на страницах глубже 2 уровней
+- **Цвета/стили:** CSS-переменные, не хардкод цветов. Тема должна поддерживать preview при выборе
 
 ## Планы на будущее (не реализовано)
 

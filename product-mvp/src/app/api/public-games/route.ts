@@ -74,12 +74,21 @@ export async function GET(req: NextRequest) {
               r.title as request_title, r.type as request_type,
               r.fandom_type as request_fandom_type, r.pairing as request_pairing,
               r.content_level as request_content_level, r.tags as request_tags,
-              (SELECT COUNT(*) FROM messages m WHERE m.game_id = g.id AND m.type = 'ic')::text as ic_count,
-              (SELECT COUNT(*) FROM game_likes gl WHERE gl.game_id = g.id)::text as likes_count,
-              (SELECT json_agg(json_build_object('nickname', gp.nickname, 'avatar_url', gp.avatar_url))
-                FROM game_participants gp WHERE gp.game_id = g.id)::text as participants
+              COALESCE(mc.ic_count, 0)::text as ic_count,
+              COALESCE(lc.likes_count, 0)::text as likes_count,
+              COALESCE(pp.participants, '[]')::text as participants
        FROM games g
        LEFT JOIN requests r ON r.id = g.request_id
+       LEFT JOIN (
+         SELECT game_id, COUNT(*) as ic_count FROM messages WHERE type = 'ic' GROUP BY game_id
+       ) mc ON mc.game_id = g.id
+       LEFT JOIN (
+         SELECT game_id, COUNT(*) as likes_count FROM game_likes GROUP BY game_id
+       ) lc ON lc.game_id = g.id
+       LEFT JOIN (
+         SELECT game_id, json_agg(json_build_object('nickname', nickname, 'avatar_url', avatar_url)) as participants
+         FROM game_participants GROUP BY game_id
+       ) pp ON pp.game_id = g.id
        ${where}
        ORDER BY g.published_at DESC
        LIMIT $${p++} OFFSET $${p++}`,

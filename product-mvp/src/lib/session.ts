@@ -12,6 +12,7 @@ export interface SessionData {
   userId?: string
   email?: string
   role?: Role
+  sessionVersion?: number
 }
 
 const sessionOptions: SessionOptions = {
@@ -36,14 +37,30 @@ export async function getUser() {
   return { id: session.userId, email: session.email!, role: (session.role || 'user') as Role }
 }
 
-/** For write endpoints: checks auth + ban status from DB */
+/** For write endpoints: checks auth + ban status + session version from DB */
 export async function requireUser() {
-  const user = await getUser()
-  if (!user) return { error: 'unauthorized' as const, user: null, banReason: null }
-  const row = await queryOne<{ banned_at: string | null; ban_reason: string | null }>(
-    'SELECT banned_at, ban_reason FROM users WHERE id = $1', [user.id]
+  const session = await getSession()
+  if (!session.userId) return { error: 'unauthorized' as const, user: null, banReason: null }
+
+  const row = await queryOne<{ banned_at: string | null; ban_reason: string | null; session_version: number; role: string }>(
+    'SELECT banned_at, ban_reason, session_version, role FROM users WHERE id = $1', [session.userId]
   )
-  if (row?.banned_at) return { error: 'banned' as const, user: null, banReason: row.ban_reason }
+  if (!row) return { error: 'unauthorized' as const, user: null, banReason: null }
+  if (row.banned_at) return { error: 'banned' as const, user: null, banReason: row.ban_reason }
+
+  // Session version check: only enforce when session actually has a version
+  if (session.sessionVersion && session.sessionVersion !== row.session_version) {
+    session.destroy()
+    await session.save()
+    return { error: 'unauthorized' as const, user: null, banReason: null }
+  }
+  // Auto-upgrade pre-versioning sessions
+  if (!session.sessionVersion) {
+    session.sessionVersion = row.session_version
+    await session.save()
+  }
+
+  const user = { id: session.userId, email: session.email!, role: (row.role || 'user') as Role }
   return { error: null, user, banReason: null }
 }
 

@@ -15,7 +15,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (targetId === user!.id) {
     return NextResponse.json({ error: 'cannotModifySelf' }, { status: 400 })
   }
-  const { action, reason, role: newRole } = await req.json()
+  let action: string, reason: string | undefined, newRole: string | undefined
+  try {
+    ({ action, reason, role: newRole } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'invalidData' }, { status: 400 })
+  }
 
   try {
     // Get target user info for hierarchy checks

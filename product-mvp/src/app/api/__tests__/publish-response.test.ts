@@ -103,7 +103,7 @@ describe('POST /api/games/[id]/publish-response', () => {
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
     // 2. game status - not active
-    mockClient.query.mockResolvedValueOnce({ rows: [{ status: 'finished' }] })
+    mockClient.query.mockResolvedValueOnce({ rows: [{ status: 'published' }] })
 
     const req = makeReq(`http://localhost/api/games/${GAME_ID}/publish-response`, { choice: 'decline' })
     const res = await publishResponse(req, makeParams())

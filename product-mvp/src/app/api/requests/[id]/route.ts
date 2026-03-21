@@ -40,7 +40,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
   if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
-  const body = await req.json()
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
 
   // Status-only update (from MyRequestsClient quick actions)
   if (body.status && Object.keys(body).length === 1) {
@@ -94,20 +99,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // Dual-write: replace request_tags (always delete, then re-insert)
       await client.query('DELETE FROM request_tags WHERE request_id = $1', [id])
       if (structuredTags.length > 0) {
-        for (const tag of structuredTags) {
-          let tagId = tag.id
-          if (!tagId) {
-            const found = await client.query(
-              'SELECT id FROM tags WHERE slug = $1', [tag.slug]
-            )
-            tagId = found.rows[0]?.id
-          }
-          if (tagId) {
-            await client.query(
-              'INSERT INTO request_tags (request_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-              [id, tagId]
-            )
-          }
+        // Batch lookup: find all tag IDs in one query instead of N+1
+        const slugsWithoutId = structuredTags.filter(t => !t.id).map(t => t.slug)
+        let slugToId: Record<string, string> = {}
+
+        if (slugsWithoutId.length > 0) {
+          const found = await client.query<{ id: string; slug: string }>(
+            'SELECT id, slug FROM tags WHERE slug = ANY($1)',
+            [slugsWithoutId]
+          )
+          slugToId = Object.fromEntries(found.rows.map(r => [r.slug, r.id]))
+        }
+
+        const tagIds = structuredTags
+          .map(t => t.id || slugToId[t.slug])
+          .filter(Boolean) as string[]
+
+        if (tagIds.length > 0) {
+          const values = tagIds.map((_, i) => `($1, $${i + 2})`).join(', ')
+          await client.query(
+            `INSERT INTO request_tags (request_id, tag_id) VALUES ${values} ON CONFLICT DO NOTHING`,
+            [id, ...tagIds]
+          )
         }
       }
 

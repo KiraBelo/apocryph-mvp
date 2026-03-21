@@ -8,7 +8,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const { id: gameId, noteId } = await params
-  const { title, content } = await req.json()
+
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
+  const { title, content } = body
 
   if (title && title.length > 200) {
     return NextResponse.json({ error: 'noteTitleTooLong' }, { status: 400 })

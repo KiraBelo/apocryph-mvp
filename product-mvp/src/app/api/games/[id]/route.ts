@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { getUser, requireUser } from '@/lib/session'
+import { requireParticipant } from '@/lib/auth'
+import { sanitizeNickname } from '@/lib/sanitize'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
@@ -52,7 +54,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
 
   const { id: gameId } = await params
-  const { banner_url, nickname, avatar_url, ooc_enabled, banner_pref, starred, hidden } = await req.json()
+
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
+  const { banner_url, nickname, avatar_url, ooc_enabled, banner_pref, starred, hidden } = body
 
   if (avatar_url && !/^https?:\/\//i.test(avatar_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
   if (banner_url && !/^https?:\/\//i.test(banner_url)) return NextResponse.json({ error: 'invalidUrl' }, { status: 400 })
@@ -74,6 +83,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
+    // Verify user is a participant of this game
+    const participant = await requireParticipant(gameId, user!.id, { includeLeft: true })
+    if (!participant) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+
     if (ooc_enabled !== undefined) {
       // Only the first participant (game creator) can toggle OOC
       const first = await queryOne<{ user_id: string }>(
@@ -92,7 +105,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           banner_url=COALESCE($5,banner_url),
           banner_pref=COALESCE($6,banner_pref)
         WHERE game_id=$1 AND user_id=$2`,
-        [gameId, user!.id, nickname, avatar_url, banner_url, banner_pref]
+        [gameId, user!.id, nickname ? sanitizeNickname(nickname) : nickname, avatar_url, banner_url, banner_pref]
       )
     }
 

@@ -24,6 +24,9 @@ const ru = {
     proposals: 'Предложения',
     proposalFinish: 'Завершить сюжет?',
     proposalPublish: 'Игру можно опубликовать',
+    openMenu: 'Открыть меню',
+    closeMenu: 'Закрыть меню',
+    notifications: 'Уведомления',
   },
 
   // ── Auth ──
@@ -129,6 +132,7 @@ const ru = {
     newTitle: 'Создать заявку',
     editSectionLabel: '§ Редактирование',
     editTitle: 'Изменить заявку',
+    editBreadcrumb: 'Редактирование',
     titleLabel: 'Название заявки *',
     titlePlaceholder: 'Коротко и ёмко...',
     gameType: 'Тип игры *',
@@ -143,6 +147,7 @@ const ru = {
     saveDraft: 'Сохранить в черновики',
     errorNoTitle: 'Укажите название заявки',
     errorMinTags: 'Для публикации нужно минимум 3 тега',
+    draftSaved: 'Черновик сохранён',
   },
 
   // ── Request Detail ──
@@ -175,6 +180,7 @@ const ru = {
     inactive: 'Неактивные',
     allRequests: 'Все заявки',
     noRequests: 'Заявок нет.',
+    createFirst: 'Создать заявку',
     deleteConfirm: 'Удалить заявку?',
     yes: 'Да',
     no: 'Нет',
@@ -196,6 +202,7 @@ const ru = {
     waitingMyPost: 'Ждут мой пост',
     waitingTheirPost: 'Жду пост соигрока',
     empty: 'Пусто.',
+    goToFeed: 'Перейти к ленте',
     hideFromList: 'Скрыть из списка',
     removeFromStarred: 'Убрать из избранного',
     addToStarred: 'В избранное',
@@ -490,6 +497,10 @@ const ru = {
     unhideGame: 'Показать игру',
     hideGame: 'Скрыть игру',
     searchUsers: 'Поиск по email...',
+    noResults: 'Нет результатов',
+    banReasonPlaceholder: 'Причина бана...',
+    cancel: 'Отмена',
+    confirm: 'Подтверждение',
     noReports: 'Жалоб нет',
     reportCount: 'жалоб',
     setRole: 'Назначить роль',
@@ -511,6 +522,21 @@ const ru = {
     stopContext: 'Контекст',
     stopConfirmDelete: 'Удалить фразу из стоп-листа?',
     stopViolations7d: 'Нарушения (7д)',
+    // Moderation queue
+    moderationTitle: 'Модерация',
+    gamesForPublish: 'Игры на публикацию',
+    queueEmpty: 'Очередь пуста',
+    untitled: 'Без названия',
+    posts: 'постов',
+    approve: 'Одобрить',
+    reject: 'Отклонить',
+    rejectReasonPlaceholder: 'Причина отклонения (необязательно)',
+    commentsQueue: 'Комментарии на проверке',
+    noComments: 'Комментариев нет',
+    authorReply: 'Ответ автора',
+    readerComment: 'Читатель',
+    gameFallback: 'Игра',
+    deleteComment: 'Удалить',
   },
 
   // ── Ban Banner ──
@@ -542,6 +568,10 @@ const ru = {
     forbidden: 'Нет доступа',
     networkError: 'Ошибка сети',
     generic: 'Ошибка',
+    errorPageLabel: '§ ошибка',
+    errorPageTitle: 'Что-то пошло не так',
+    errorPageDescription: 'Произошла непредвиденная ошибка. Попробуйте обновить страницу.',
+    errorPageRetry: 'Попробовать снова',
     savingNote: 'Ошибка сохранения заметки',
     sendingMessage: 'Ошибка отправки сообщения',
     selectLeaveReason: 'Выберите причину выхода',
@@ -586,6 +616,7 @@ const ru = {
     requestLimitReached: 'Лимит заявок (5 в день)',
     requestCooldown: 'Подождите 2 минуты перед следующей заявкой',
     duplicateRequest: 'Похожая заявка уже создана сегодня',
+    sessionExpired: 'Сессия истекла. Войдите заново.',
   },
 } as const
 

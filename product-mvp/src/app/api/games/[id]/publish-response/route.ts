@@ -37,14 +37,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return { error: 'invalidStatus', status: 400 }
       }
 
-      // Check that partner already proposed (has consent record)
-      const partnerConsentRes = await client.query(
-        `SELECT 1 FROM game_publish_consent c
+      // Check consent state: initiator cannot self-approve, and partner must have proposed
+      const consentRes = await client.query(
+        `SELECT gp.user_id FROM game_publish_consent c
          JOIN game_participants gp ON gp.id = c.participant_id
-         WHERE c.game_id=$1 AND gp.user_id != $2 AND c.consented = true`,
-        [gameId, user.id]
+         WHERE c.game_id=$1 AND c.consented = true`,
+        [gameId]
       )
-      if (partnerConsentRes.rows.length === 0) {
+      const consentUserIds = consentRes.rows.map((r: { user_id: string }) => r.user_id)
+      if (consentUserIds.includes(user.id)) {
+        return { error: 'forbidden', status: 403 }
+      }
+      if (!consentUserIds.some((id: string) => id !== user.id)) {
         return { error: 'forbidden', status: 403 }
       }
 

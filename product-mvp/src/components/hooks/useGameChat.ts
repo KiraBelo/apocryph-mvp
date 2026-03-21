@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Message } from '../game/types'
+import type { ToastType } from '../ToastProvider'
 
-export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentReset }: {
+export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentReset, addToast }: {
   gameId: string
   participantId: string
   activeTab: 'ic' | 'ooc' | 'notes' | 'prepare'
   t: (key: string) => unknown
   onMyConsentReset?: () => void
+  addToast: (msg: string, type?: ToastType) => void
 }, initial: {
   messages: Message[]
   page: number
@@ -43,18 +45,44 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId])
 
-  // Auto-save every 30 seconds
+  // Auto-save every 30 seconds, pause when tab is hidden
+  const draftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const contentRef = useRef(content)
+  const oocContentRef = useRef(oocContent)
+  contentRef.current = content
+  oocContentRef.current = oocContent
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      const icDraft = content.trim()
-      const oocDraft = oocContent.trim()
+    const saveDrafts = () => {
+      const icDraft = contentRef.current.trim()
+      const oocDraft = oocContentRef.current.trim()
       if (icDraft) localStorage.setItem(draftKey('ic'), icDraft)
       else localStorage.removeItem(draftKey('ic'))
       if (oocDraft) localStorage.setItem(draftKey('ooc'), oocDraft)
       else localStorage.removeItem(draftKey('ooc'))
-    }, 30000)
-    return () => clearInterval(interval)
-  }, [content, oocContent, gameId])
+    }
+
+    const startInterval = () => {
+      if (draftIntervalRef.current) clearInterval(draftIntervalRef.current)
+      draftIntervalRef.current = setInterval(saveDrafts, 30000)
+    }
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (draftIntervalRef.current) { clearInterval(draftIntervalRef.current); draftIntervalRef.current = null }
+      } else {
+        startInterval()
+      }
+    }
+
+    startInterval()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      if (draftIntervalRef.current) clearInterval(draftIntervalRef.current)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [gameId])
 
   // Save on beforeunload
   useEffect(() => {
@@ -80,14 +108,14 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        alert(data.error === 'stopListBlocked'
+        addToast(data.error === 'stopListBlocked'
           ? t('errors.stopListBlocked') as string
-          : t('errors.sendingMessage') as string)
+          : t('errors.sendingMessage') as string, 'error')
         return
       }
       if (activeTab === 'ooc') { setOocContent(''); setOocSendKey(k => k + 1); localStorage.removeItem(draftKey('ooc')) }
       else { setContent(''); setSendKey(k => k + 1); localStorage.removeItem(draftKey('ic')) }
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
     finally { setSending(false) }
   }
 
@@ -112,14 +140,14 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       const updated = await res.json()
       const updater = (prev: Message[]) => prev.map(m => m.id === editingId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m)
       setIcMessages(updater)
       setOocMessages(updater)
       onMyConsentReset?.()
       cancelEdit()
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
     finally { setEditSaving(false) }
   }
 
@@ -128,7 +156,7 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
     try {
       const pageLimit = type === 'ooc' ? 100 : 30
       const res = await fetch(`/api/games/${gameId}/messages?type=${type}&page=${page}&limit=${pageLimit}`)
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       const data = await res.json()
       if (type === 'ic') {
         setIcMessages(data.messages)
@@ -140,7 +168,7 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
         setOocTotalPages(data.totalPages)
       }
       scrollRef.current?.scrollTo({ top: 0 })
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
     finally {
       setPageLoading(false)
     }
@@ -157,7 +185,7 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
         setOocTotalPages(data.totalPages)
         setOocLoaded(true)
       })
-      .catch(() => { alert(t('errors.networkError') as string) })
+      .catch(() => { addToast(t('errors.networkError') as string, 'error') })
       .finally(() => setPageLoading(false))
   }
 

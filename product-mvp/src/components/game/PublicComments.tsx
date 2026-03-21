@@ -121,7 +121,7 @@ export default function PublicComments({ gameId, userId, authorUserIds }: Public
                         disabled={replySubmitting}
                         className="btn-primary font-mono text-[0.65rem] p-[0.3rem_0.8rem]"
                       >
-                        {replySubmitting ? '...' : t('game.save') as string}
+                        {replySubmitting ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.save') as string}
                       </button>
                       <button
                         onClick={() => { setReplyingTo(null); setReplyText('') }}
@@ -176,7 +176,7 @@ export default function PublicComments({ gameId, userId, authorUserIds }: Public
             disabled={submitting || !commentText.trim()}
             className="btn-primary font-mono text-[0.7rem] p-[0.4rem_1rem] self-end"
           >
-            {submitting ? '...' : t('game.commentSend') as string}
+            {submitting ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.commentSend') as string}
           </button>
         </div>
       )}

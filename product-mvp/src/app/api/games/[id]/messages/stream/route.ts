@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { requireUser } from '@/lib/session'
-import { queryOne } from '@/lib/db'
+import { requireParticipant } from '@/lib/auth'
 import { subscribe, canConnect, trackConnect, trackDisconnect } from '@/lib/sse'
 
 export const dynamic = 'force-dynamic'
@@ -15,10 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Verify user is a participant of this game (or a moderator)
   const isMod = user!.role === 'moderator' || user!.role === 'admin'
   if (!isMod) {
-    const participant = await queryOne(
-      'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2',
-      [gameId, user!.id]
-    )
+    const participant = await requireParticipant(gameId, user!.id, { includeLeft: true })
     if (!participant) return new Response('Forbidden', { status: 403 })
   }
 
@@ -29,6 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const userId = user!.id
   const encoder = new TextEncoder()
   let unsubscribe: (() => void) | undefined
+  let cleaned = false
 
   trackConnect(userId)
 
@@ -52,6 +50,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       })
 
       req.signal.addEventListener('abort', () => {
+        if (cleaned) return
+        cleaned = true
         clearInterval(ping)
         unsubscribe?.()
         trackDisconnect(userId)
@@ -59,6 +59,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       })
     },
     cancel() {
+      if (cleaned) return
+      cleaned = true
       unsubscribe?.()
       trackDisconnect(userId)
     },

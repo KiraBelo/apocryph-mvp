@@ -2,7 +2,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Breadcrumbs from './Breadcrumbs'
 import { useT } from './SettingsContext'
+import { useToast } from './ToastProvider'
+import ConfirmDialog from './ConfirmDialog'
 
 interface Request {
   id: string; title: string; body: string | null; type: string; content_level: string
@@ -22,6 +25,7 @@ const LEAVE_REASONS_KEYS = ['game.leaveReasons'] as const
 export default function RequestDetailClient({ request, user, isAuthor, isBookmarked: initBm, existingGameId }: Props) {
   const router = useRouter()
   const t = useT()
+  const { addToast } = useToast()
   const [bookmarked, setBookmarked] = useState(initBm)
   const [nickname, setNickname] = useState(t('detail.nicknamePlaceholder') as string)
   const [respondLoading, setRespondLoading] = useState(false)
@@ -29,6 +33,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
   const [showNicknameModal, setShowNicknameModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
+  const [confirmState, setConfirmState] = useState<{ action: () => void; message: string } | null>(null)
 
   const contentLabels: Record<string, string> = {
     none: t('filters.noNsfw') as string, rare: t('filters.nsfwRare') as string,
@@ -46,7 +51,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     const method = bookmarked ? 'DELETE' : 'POST'
     const res = await fetch(`/api/bookmarks/${request.id}`, { method })
     if (res.ok) setBookmarked(b => !b)
-    else { const d = await res.json(); alert(t(`errors.${d.error}`) as string || d.error) }
+    else { const d = await res.json(); addToast(t(`errors.${d.error}`) as string || d.error, 'error') }
   }
 
   async function respond() {
@@ -58,7 +63,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     })
     const d = await res.json()
     if (res.ok) router.push(`/games/${d.gameId}`)
-    else { alert(t(`errors.${d.error}`) as string || d.error); setRespondLoading(false) }
+    else { addToast(t(`errors.${d.error}`) as string || d.error, 'error'); setRespondLoading(false) }
   }
 
   async function createInvite() {
@@ -69,7 +74,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     })
     const d = await res.json()
     if (res.ok) setInviteUrl(`${window.location.origin}/invite/${d.token}`)
-    else alert(t(`errors.${d.error}`) as string || d.error)
+    else addToast(t(`errors.${d.error}`) as string || d.error, 'error')
   }
 
   async function changeStatus(status: string) {
@@ -83,37 +88,44 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
       if (res.ok) {
         router.refresh()
       } else {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
       }
     } catch {
-      alert(t('errors.networkError') as string)
+      addToast(t('errors.networkError') as string, 'error')
     }
     setStatusLoading(false)
   }
 
-  async function deleteRequest() {
-    if (!confirm(t('detail.confirmDelete') as string)) return
+  async function doDeleteRequest() {
     setDeleteLoading(true)
     try {
       const res = await fetch(`/api/requests/${request.id}`, { method: 'DELETE' })
       if (res.ok) {
         router.push('/my/requests')
       } else {
-        alert(t('errors.networkError') as string)
+        addToast(t('errors.networkError') as string, 'error')
         setDeleteLoading(false)
       }
     } catch {
-      alert(t('errors.networkError') as string)
+      addToast(t('errors.networkError') as string, 'error')
       setDeleteLoading(false)
     }
   }
 
+  function deleteRequest() {
+    setConfirmState({
+      action: () => doDeleteRequest(),
+      message: t('detail.confirmDelete') as string,
+    })
+  }
+
   return (
     <div className="max-w-[1050px] mx-auto px-7 py-12">
-      {/* Back */}
-      <Link href="/" className="link-accent text-ink-2 inline-block mb-8">
-        {t('detail.backToFeed') as string}
-      </Link>
+      {/* Breadcrumbs */}
+      <Breadcrumbs items={[
+        { label: t('nav.feed') as string, href: '/feed' },
+        { label: request.title },
+      ]} />
 
       {/* Header */}
       <div className="flex justify-between items-start gap-4 mb-6">
@@ -166,7 +178,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
                 placeholder={t('detail.nicknamePlaceholder') as string}
               />
               <button onClick={respond} disabled={respondLoading} className="btn-primary text-[0.95rem] py-2 px-5">
-                {respondLoading ? '...' : t('detail.respondButton') as string}
+                {respondLoading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('detail.respondButton') as string}
               </button>
             </div>
           </div>
@@ -181,12 +193,12 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
           </Link>
           {request.status === 'active' && (
             <button onClick={() => changeStatus('inactive')} disabled={statusLoading} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
-              {statusLoading ? '...' : t('detail.deactivate') as string}
+              {statusLoading ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('detail.deactivate') as string}
             </button>
           )}
           {request.status !== 'active' && (
             <button onClick={() => changeStatus('active')} disabled={statusLoading} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
-              {statusLoading ? '...' : t('detail.activate') as string}
+              {statusLoading ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('detail.activate') as string}
             </button>
           )}
           <button onClick={createInvite} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
@@ -194,7 +206,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
           </button>
           <button onClick={deleteRequest} disabled={deleteLoading}
             className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5 text-[#c0392b] border-[#c0392b]">
-            {deleteLoading ? '...' : t('detail.deleteButton') as string}
+            {deleteLoading ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('detail.deleteButton') as string}
           </button>
         </div>
       )}
@@ -216,6 +228,15 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
           <Link href="/auth/login" className="text-accent border-b border-current">{t('detail.loginToRespond') as string}</Link>{t('detail.loginToRespondSuffix') as string}
         </p>
       )}
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={t('detail.confirmTitle') as string || 'Подтверждение'}
+        message={confirmState?.message ?? ''}
+        danger
+        onConfirm={() => { confirmState?.action(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

@@ -104,7 +104,7 @@ export default function ResetPasswordPage() {
             {error && <p className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
 
             <button type="submit" disabled={loading} className="btn-primary text-[1rem] p-[0.7rem_1.4rem] mt-1">
-              {loading ? '...' : t('auth.resetSubmit') as string}
+              {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('auth.resetSubmit') as string}
             </button>
           </form>
         )}

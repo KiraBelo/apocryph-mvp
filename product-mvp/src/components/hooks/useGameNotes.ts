@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { escapeHtml } from '@/lib/game-utils'
 import type { NoteEntry, Message } from '../game/types'
+import type { ToastType } from '../ToastProvider'
 
-export function useGameNotes({ gameId, t }: {
+export function useGameNotes({ gameId, t, addToast }: {
   gameId: string
   t: (key: string) => unknown
+  addToast: (msg: string, type?: ToastType) => void
 }) {
   const [notes, setNotes] = useState<NoteEntry[]>([])
   const [notesLoaded, setNotesLoaded] = useState(false)
@@ -43,13 +45,13 @@ export function useGameNotes({ gameId, t }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newNoteTitle, content: newNoteContent }),
       })
-      if (!res.ok) { alert(t('errors.savingNote') as string); return }
+      if (!res.ok) { addToast(t('errors.savingNote') as string, 'error'); return }
       const d = await res.json()
       if (d.note) setNotes(prev => [d.note, ...prev])
       setNewNoteTitle('')
       setNewNoteContent('')
       setNewNoteKey(k => k + 1)
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
     finally { setNewNoteSending(false) }
   }
 
@@ -62,21 +64,21 @@ export function useGameNotes({ gameId, t }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: noteEditTitle, content: noteEditContent }),
       })
-      if (!res.ok) { alert(t('errors.savingNote') as string); return }
+      if (!res.ok) { addToast(t('errors.savingNote') as string, 'error'); return }
       const d = await res.json()
       if (d.note) setNotes(prev => prev.map(n => n.id === noteId ? d.note : n))
       setNoteEditingId(null)
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
     finally { setNoteEditSaving(false) }
   }
 
   async function deleteNote(noteId: number) {
     try {
       const res = await fetch(`/api/games/${gameId}/notes/${noteId}`, { method: 'DELETE' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(t(`errors.${d.error}`) as string || t('errors.networkError') as string); return }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       setNotes(prev => prev.filter(n => n.id !== noteId))
       setDeleteConfirmId(null)
-    } catch { alert(t('errors.networkError') as string) }
+    } catch { addToast(t('errors.networkError') as string, 'error') }
   }
 
   function toggleNoteExpand(id: number) {

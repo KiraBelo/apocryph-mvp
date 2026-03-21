@@ -204,7 +204,19 @@ export default function LibraryClient() {
 
       {/* Games grid */}
       {loading ? (
-        <p className="text-ink-2 font-heading italic">{t('library.loading') as string}</p>
+        <div className="grid gap-[var(--game-gap,1rem)]">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="card p-7" style={{ animation: `fadeInUp 0.3s ease ${i * 0.1}s both` }}>
+              <div className="skeleton-block mb-3" style={{ width: '60%', height: '1.2rem' }} />
+              <div className="flex gap-2 mb-3">
+                {[45, 55, 40].map((w, j) => (
+                  <div key={j} className="skeleton-block" style={{ width: `${w}px`, height: '1.1rem', borderRadius: '2px' }} />
+                ))}
+              </div>
+              <div className="skeleton-block" style={{ width: '50%', height: '0.75rem' }} />
+            </div>
+          ))}
+        </div>
       ) : games.length === 0 ? (
         <p className="text-ink-2 font-heading italic">{t('library.empty') as string}</p>
       ) : (

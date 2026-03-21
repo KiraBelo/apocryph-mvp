@@ -133,10 +133,28 @@ export default function SettingsPanel() {
       )}
 
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('settings.title') as string}
         className="fixed top-[60px] right-0 w-[370px] h-[calc(100vh-60px)] bg-surface border-l border-edge rounded-tl-lg z-300 overflow-y-auto flex flex-col gap-5 transition-transform duration-250 ease-out"
         style={{
           transform: panelOpen ? 'translateX(0)' : 'translateX(100%)',
           padding: '1.25rem 1.25rem 1.5rem',
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Tab') return
+          const panel = e.currentTarget
+          const focusable = panel.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+          if (!focusable.length) return
+          const first = focusable[0]
+          const last = focusable[focusable.length - 1]
+          if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus() }
+          } else {
+            if (document.activeElement === last) { e.preventDefault(); first.focus() }
+          }
         }}
       >
         {/* Header */}
@@ -162,16 +180,26 @@ export default function SettingsPanel() {
           </Row>
 
           <Row label={t('settings.theme') as string} open={openField === 'theme'} onToggle={() => toggle('theme')}>
-            <select
-              value={theme}
-              onChange={e => set('theme', e.target.value as Settings['theme'])}
-              className="select-base"
-            >
-              <option value="light">{t('settings.themePaper') as string}</option>
-              <option value="sepia">{t('settings.themeSepia') as string}</option>
-              <option value="ink">{t('settings.themeInk') as string}</option>
-              <option value="nocturne">{t('settings.themeMidnight') as string}</option>
-            </select>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { value: 'light', label: t('settings.themePaper'), bg: '#f6f2e8', accent: '#7a1e1e', text: '#1c1813' },
+                { value: 'sepia', label: t('settings.themeSepia'), bg: '#e8dfcf', accent: '#7b2323', text: '#211b15' },
+                { value: 'ink', label: t('settings.themeInk'), bg: '#26211d', accent: '#b45151', text: '#f0e8dc' },
+                { value: 'nocturne', label: t('settings.themeMidnight'), bg: '#181b1f', accent: '#8f5a7a', text: '#e7ebef' },
+              ] as const).map(th => (
+                <button
+                  key={th.value}
+                  onClick={() => set('theme', th.value)}
+                  className={`flex flex-col items-center gap-1 p-2 border cursor-pointer transition-all ${theme === th.value ? 'border-accent' : 'border-edge'}`}
+                  style={{ minWidth: 64 }}
+                >
+                  <div className="w-12 h-8 rounded-sm flex items-center justify-center" style={{ background: th.bg, border: '1px solid rgba(128,128,128,0.2)' }}>
+                    <span style={{ color: th.accent, fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: '0.7rem' }}>Аа</span>
+                  </div>
+                  <span className="font-mono text-[0.55rem] tracking-[0.08em]">{th.label as string}</span>
+                </button>
+              ))}
+            </div>
           </Row>
 
           <Row label={t('settings.fontSize') as string} open={openField === 'fontSize'} onToggle={() => toggle('fontSize')}>
@@ -199,19 +227,41 @@ export default function SettingsPanel() {
           </Row>
 
           <Row label={t('settings.font') as string} open={openField === 'font'} onToggle={() => toggle('font')}>
-            <select
-              value={siteFont}
-              onChange={e => set('siteFont', e.target.value)}
-              className="select-base"
-              style={{ fontFamily: siteFont }}
-            >
-              {FONT_GROUPS.flatMap((g, gi) => [
-                <option key={`g-${gi}`} disabled style={{ fontWeight: 'bold' }}>— {t(`editor.${g.key}`) as string} —</option>,
-                ...g.fonts.map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                )),
-              ])}
-            </select>
+            <div className="relative">
+              <button
+                className="select-base w-full text-left"
+                style={{ fontFamily: siteFont }}
+                onClick={() => setOpenField(openField === 'font' ? null : 'font')}
+              >
+                {FONT_GROUPS.flatMap(g => g.fonts).find(f => f.value === siteFont)?.label || siteFont}
+              </button>
+              {openField === 'font' && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-edge rounded shadow-lg z-10 max-h-80 overflow-y-auto">
+                  {FONT_GROUPS.map((g, gi) => (
+                    <div key={gi}>
+                      <div className="sticky top-0 px-3 py-1.5 bg-surface-3 font-mono text-[0.58rem] tracking-[0.08em] uppercase text-accent-2">
+                        {t(`editor.${g.key}`) as string}
+                      </div>
+                      {g.fonts.map(f => (
+                        <button
+                          key={f.value}
+                          onClick={() => {
+                            set('siteFont', f.value)
+                            setOpenField(null)
+                          }}
+                          className={`w-full text-left px-3 py-2 transition-colors ${
+                            siteFont === f.value ? 'bg-accent-dim text-accent' : 'text-ink hover:bg-accent-dim/30'
+                          }`}
+                          style={{ fontFamily: f.value }}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </Row>
 
           <Toggle label={t('settings.emailNotifs') as string} value={emailNotifs} onChange={v => set('emailNotifs', v)} />
