@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useT } from '../SettingsContext'
 import { paginationRange } from '@/lib/game-utils'
+import { safeJson } from '@/lib/fetch-utils'
 import RichEditor from '../RichEditor'
 import MsgContent from './MsgContent'
 import { Pencil } from 'lucide-react'
@@ -58,7 +59,7 @@ export default function PrepareTab({
         setEditingId(null)
         setEditContent('')
       } else {
-        const d = await res.json().catch(() => ({}))
+        const d = await safeJson(res)
         setErrorMsg(t(`errors.${d.error}`) as string || t('errors.networkError') as string)
       }
     } catch {

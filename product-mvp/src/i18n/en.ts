@@ -5,6 +5,8 @@ const en: Translations = {
   common: {
     yes: 'Yes',
     no: 'No',
+    cancel: 'Cancel',
+    ok: 'OK',
   },
 
   // ── Nav ──

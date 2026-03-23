@@ -3,6 +3,8 @@ const ru = {
   common: {
     yes: 'Да',
     no: 'Нет',
+    cancel: 'Отмена',
+    ok: 'OK',
   },
 
   // ── Nav ──
@@ -436,7 +438,7 @@ const ru = {
     sceneSeparator: 'Разделитель сцен',
     clearFormatting: 'Очистить форматирование',
     embedMusic: 'Встроить музыку',
-    embedPrompt: 'Вставьте embed-код со Spotify или Яндекс.Музыки',
+    embedPrompt: 'Вставьте embed-код от Spotify или Яндекс.Музыки',
     embedInsert: 'Вставить',
     embedCancel: 'Отмена',
     embedNoIframe: 'Не найден iframe в коде',

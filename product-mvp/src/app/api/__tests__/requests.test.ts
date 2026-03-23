@@ -12,6 +12,13 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/session', () => ({
   requireUser: vi.fn().mockResolvedValue({ error: null, user: { id: 'user-id', email: 'a@b.com', role: 'user' }, banReason: null }),
   getUser: vi.fn().mockResolvedValue(null),
+  handleAuthError: (error: string | null) => {
+    const { NextResponse } = require('next/server')
+    if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+    if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+    if (error === 'forbidden') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    return null
+  },
 }))
 
 vi.mock('@/lib/sanitize', () => ({
@@ -116,7 +123,7 @@ describe('POST /api/requests', () => {
     it('returns 429 with requestLimitReached when daily limit is reached', async () => {
       mockQueryOne.mockResolvedValueOnce({ count: '5' }) // COUNT of requests today >= 5
 
-      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none' })
+      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none', status: 'active' })
       const res = await POST(req)
       const data = await res.json()
 
@@ -128,7 +135,7 @@ describe('POST /api/requests', () => {
       mockQueryOne.mockResolvedValueOnce({ count: '1' }) // count check passes (< 5)
       mockQueryOne.mockResolvedValueOnce({ created_at: new Date().toISOString() }) // last request was just now
 
-      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none' })
+      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none', status: 'active' })
       const res = await POST(req)
       const data = await res.json()
 
@@ -143,7 +150,7 @@ describe('POST /api/requests', () => {
       mockQueryOne.mockResolvedValueOnce({ created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString() }) // 5 min ago (cooldown passes)
       mockQueryOne.mockResolvedValueOnce({ id: 'dup-id' }) // duplicate found
 
-      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none' })
+      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none', status: 'active' })
       const res = await POST(req)
       const data = await res.json()
 
@@ -154,9 +161,6 @@ describe('POST /api/requests', () => {
 
   describe('success → 201', () => {
     it('returns 201 with created request when all checks pass', async () => {
-      mockQueryOne.mockResolvedValueOnce({ count: '0' }) // no requests today
-      mockQueryOne.mockResolvedValueOnce(null) // no recent request (no cooldown)
-      mockQueryOne.mockResolvedValueOnce(null) // no duplicate
       mockWithTransaction.mockResolvedValue({
         id: 'new-id',
         title: 'Test',

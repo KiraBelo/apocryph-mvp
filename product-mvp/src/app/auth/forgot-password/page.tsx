@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useT } from '@/components/SettingsContext'
+import { safeJson } from '@/lib/fetch-utils'
 
 export default function ForgotPasswordPage() {
   const t = useT()
@@ -21,7 +22,7 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       })
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
+        const d = await safeJson(res)
         setError(t(`errors.${d.error}`) as string || t('errors.networkError') as string)
         return
       }

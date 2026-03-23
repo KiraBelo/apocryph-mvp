@@ -10,6 +10,13 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/session', () => ({
   requireMod: vi.fn().mockResolvedValue({ error: 'forbidden', user: null }),
+  handleAuthError: (error: string | null) => {
+    const { NextResponse } = require('next/server')
+    if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+    if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+    if (error === 'forbidden') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    return null
+  },
 }))
 
 import { query } from '@/lib/db'
@@ -64,9 +71,9 @@ describe('GET /api/admin/users', () => {
           banned_at: null,
           ban_reason: null,
           created_at: '2026-01-01',
+          _total: '1',
         },
       ])
-      mockQuery.mockResolvedValueOnce([{ cnt: '1' }])
 
       const res = await GET(makeRequest())
       const data = await res.json()
@@ -83,7 +90,6 @@ describe('GET /api/admin/users', () => {
         user: { id: 'admin-id', email: 'admin@test.com', role: 'admin' },
       })
       mockQuery.mockResolvedValueOnce([])
-      mockQuery.mockResolvedValueOnce([{ cnt: '0' }])
 
       const res = await GET(makeRequest())
 
@@ -105,9 +111,9 @@ describe('GET /api/admin/users', () => {
           banned_at: null,
           ban_reason: null,
           created_at: '2026-01-01',
+          _total: '1',
         },
       ])
-      mockQuery.mockResolvedValueOnce([{ cnt: '1' }])
 
       const res = await GET(makeRequest('?q=found'))
       const data = await res.json()
@@ -122,7 +128,6 @@ describe('GET /api/admin/users', () => {
         user: { id: 'mod-id', email: 'mod@test.com', role: 'moderator' },
       })
       mockQuery.mockResolvedValueOnce([])
-      mockQuery.mockResolvedValueOnce([{ cnt: '0' }])
 
       const res = await GET(makeRequest('?q=nonexistent'))
       const data = await res.json()
@@ -138,7 +143,6 @@ describe('GET /api/admin/users', () => {
         user: { id: 'mod-id', email: 'mod@test.com', role: 'moderator' },
       })
       mockQuery.mockResolvedValueOnce([])
-      mockQuery.mockResolvedValueOnce([{ cnt: '0' }])
 
       const res = await GET(makeRequest('?page=2'))
       const data = await res.json()

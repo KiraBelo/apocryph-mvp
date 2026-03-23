@@ -66,7 +66,7 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
     fetch(`/api/public-games/${gameId}/likes`)
       .then(r => r.ok ? r.json() : { count: 0, liked: false })
       .then(d => { setLikesCount(d.count ?? 0); setLiked(d.liked ?? false) })
-      .catch(() => {})
+      .catch(() => {}) // fire-and-forget: likes count is non-critical, game displays without it
   }, [gameId])
 
   async function toggleLike() {

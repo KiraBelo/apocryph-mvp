@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, withTransaction } from '@/lib/db'
-import { requireUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 
 // POST — submit a 'preparing' game to moderation queue
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: gameId } = await params
 

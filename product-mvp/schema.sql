@@ -344,3 +344,12 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read
 
 -- ── SESSION VERSIONING ───────────────────────────────────────
 ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1;
+
+-- ── AUDIT: MISSING FK INDEXES ──────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_invites_request ON invites(request_id);
+CREATE INDEX IF NOT EXISTS idx_stop_violations_user ON stop_violations(user_id);
+CREATE INDEX IF NOT EXISTS idx_game_comments_parent ON game_comments(parent_id) WHERE parent_id IS NOT NULL;
+
+-- ── AUDIT: MISSING FILTERED INDEXES ────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_gp_starred ON game_participants(game_id) WHERE starred_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_gp_hidden ON game_participants(game_id) WHERE hidden_at IS NOT NULL;

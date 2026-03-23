@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Message } from '../game/types'
 import type { ToastType } from '../ToastProvider'
+import { safeJson } from '@/lib/fetch-utils'
 
 export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentReset, addToast }: {
   gameId: string
@@ -107,7 +108,7 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
         body: JSON.stringify({ content: text, type: activeTab }),
       })
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
+        const data = await safeJson(res)
         addToast(data.error === 'stopListBlocked'
           ? t('errors.stopListBlocked') as string
           : t('errors.sendingMessage') as string, 'error')
@@ -140,7 +141,7 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       const updated = await res.json()
       const updater = (prev: Message[]) => prev.map(m => m.id === editingId ? { ...m, content: updated.content, edited_at: updated.edited_at } : m)
       setIcMessages(updater)
@@ -156,7 +157,7 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
     try {
       const pageLimit = type === 'ooc' ? 100 : 30
       const res = await fetch(`/api/games/${gameId}/messages?type=${type}&page=${page}&limit=${pageLimit}`)
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       const data = await res.json()
       if (type === 'ic') {
         setIcMessages(data.messages)

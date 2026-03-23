@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ToastType } from '../ToastProvider'
+import { safeJson } from '@/lib/fetch-utils'
 
 export function useDiceRoller({ gameId, participantId, t, addToast }: {
   gameId: string
@@ -22,7 +23,7 @@ export function useDiceRoller({ gameId, participantId, t, addToast }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sides: s }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
     } catch { addToast(t('errors.networkError') as string, 'error') }
     finally { setDiceRolling(false) }
   }

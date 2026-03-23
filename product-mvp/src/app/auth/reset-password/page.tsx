@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useT } from '@/components/SettingsContext'
+import { safeJson } from '@/lib/fetch-utils'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -37,7 +38,7 @@ export default function ResetPasswordPage() {
         body: JSON.stringify({ token, password }),
       })
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
+        const d = await safeJson(res)
         if (d.error === 'resetExpired') {
           setError(t('auth.resetExpired') as string)
         } else {

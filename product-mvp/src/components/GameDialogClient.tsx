@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useSettings, useT } from './SettingsContext'
 import type { Message, GameDialogProps } from './game/types'
 import type { GameStatus } from '@/types/api'
+import { safeJson } from '@/lib/fetch-utils'
 import Modal from './game/Modal'
 import MessageFeed from './game/MessageFeed'
 import MessageEditor from './game/MessageEditor'
@@ -107,11 +108,11 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
     return () => document.removeEventListener('keydown', handler)
   }, [fullscreen])
 
-  useEffect(() => { fetch(`/api/games/${gameId}/read`, { method: 'POST' }).catch(() => {}) }, [gameId])
+  useEffect(() => { fetch(`/api/games/${gameId}/read`, { method: 'POST' }).catch(() => {}) /* fire-and-forget: read marker is non-critical */ }, [gameId])
 
   useEffect(() => {
-    if (activeTab === 'ooc') fetch(`/api/games/${gameId}/read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tab: 'ooc' }) }).catch(() => {})
-    else if (activeTab === 'ic') fetch(`/api/games/${gameId}/read`, { method: 'POST' }).catch(() => {})
+    if (activeTab === 'ooc') fetch(`/api/games/${gameId}/read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tab: 'ooc' }) }).catch(() => {}) // fire-and-forget: read marker is non-critical
+    else if (activeTab === 'ic') fetch(`/api/games/${gameId}/read`, { method: 'POST' }).catch(() => {}) // fire-and-forget: read marker is non-critical
   }, [activeTab, gameId])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -310,14 +311,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
               </label>
             ))}
           </div>
-          <button onClick={async () => { if (!leaveReason) { addToast(t('errors.selectLeaveReason') as string, 'error'); return }; try { const res = await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } router.push('/my/games') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
+          <button onClick={async () => { if (!leaveReason) { addToast(t('errors.selectLeaveReason') as string, 'error'); return }; try { const res = await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } router.push('/my/games') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
         </Modal>
       )}
 
       {showReport && (
         <Modal onClose={() => setShowReport(false)} title={t('game.reportTitle') as string}>
           <textarea value={reportReason} onChange={e => setReportReason(e.target.value)} placeholder={t('game.reportPlaceholder') as string} rows={4} className="w-full font-body text-[1rem] bg-surface border border-edge text-ink p-[0.65rem] outline-none resize-y mb-4" />
-          <button onClick={async () => { try { const res = await fetch(`/api/games/${gameId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reportReason }) }); if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } setShowReport(false); addToast(t('game.reportSent') as string, 'success') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">{t('game.reportButton') as string}</button>
+          <button onClick={async () => { try { const res = await fetch(`/api/games/${gameId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reportReason }) }); if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } setShowReport(false); addToast(t('game.reportSent') as string, 'success') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="btn-primary p-[0.6rem_1.4rem] text-[1rem]">{t('game.reportButton') as string}</button>
         </Modal>
       )}
 

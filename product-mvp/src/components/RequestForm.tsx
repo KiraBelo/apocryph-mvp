@@ -5,6 +5,7 @@ import RichEditor from './RichEditor'
 import TagAutocomplete, { type TagItem } from './TagAutocomplete'
 import { useT } from './SettingsContext'
 import FilterSelect from './FilterSelect'
+import { safeJson } from '@/lib/fetch-utils'
 
 interface Props {
   initial?: {
@@ -145,7 +146,7 @@ export default function RequestForm({ initial }: Props) {
       })
 
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
+        const d = await safeJson(res)
         const errKey = `errors.${d.error}`
         const translated = t(errKey)
         setErrors({ server: (translated !== errKey ? translated : d.error ?? t('errors.generic')) as string })

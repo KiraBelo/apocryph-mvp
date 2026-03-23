@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { getUser, requireUser } from '@/lib/session'
+import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
-
-const PAGE_SIZE = 30
+import { PAGE_SIZE } from '@/lib/constants'
 
 // GET /api/requests — лента с фильтрами + пагинация
 export async function GET(req: NextRequest) {
@@ -78,16 +77,11 @@ export async function GET(req: NextRequest) {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
-    const countResult = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM requests r ${joinClause} ${where}`,
-      params
-    )
-    const total = parseInt(countResult?.count || '0', 10)
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
     const offset = (page - 1) * PAGE_SIZE
 
-    const rows = await query(
-      `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.language, r.tags, r.status, r.is_public, r.created_at, r.updated_at, r.author_id
+    const rows = await query<{ _total: string; body?: string }>(
+      `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.language, r.tags, r.status, r.is_public, r.created_at, r.updated_at, r.author_id,
+              COUNT(*) OVER() as _total
        FROM requests r
        ${joinClause}
        ${where}
@@ -95,9 +89,12 @@ export async function GET(req: NextRequest) {
        LIMIT $${p++} OFFSET $${p++}`,
       [...params, PAGE_SIZE, offset]
     )
+    const total = rows.length > 0 ? parseInt(rows[0]._total) : 0
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
     // Sanitize body on read to protect against stored XSS from old data
-    const safeRows = (rows as { body?: string }[]).map(r => ({
+    const safeRows = rows.map(r => ({
       ...r,
+      _total: undefined,
       body: r.body ? sanitizeBody(r.body) : r.body,
     }))
     return NextResponse.json({ requests: safeRows, total, page, totalPages })
@@ -110,8 +107,8 @@ export async function GET(req: NextRequest) {
 // POST /api/requests — создать заявку
 export async function POST(req: NextRequest) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   let body
   try {

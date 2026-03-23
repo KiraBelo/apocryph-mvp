@@ -16,6 +16,13 @@ vi.mock('@/lib/session', () => ({
     banReason: null,
   }),
   getUser: vi.fn().mockResolvedValue({ id: 'user-id', email: 'a@b.com', role: 'user' }),
+  handleAuthError: (error: string | null) => {
+    const { NextResponse } = require('next/server')
+    if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+    if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+    if (error === 'forbidden') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    return null
+  },
 }))
 
 vi.mock('@/lib/sse', () => ({

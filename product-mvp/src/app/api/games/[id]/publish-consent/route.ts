@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { getUser, requireUser } from '@/lib/session'
+import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { MIN_IC_POSTS } from '@/lib/constants'
 
@@ -55,8 +55,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 // POST — propose publication (initiator)
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: gameId } = await params
 
@@ -112,8 +112,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 // DELETE — revoke consent / revoke publication
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: gameId } = await params
 

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { requireMod } from '@/lib/session'
+import { requireMod, handleAuthError } from '@/lib/session'
 
 // GET /api/admin/violations?page=1&game_id=...
 export async function GET(req: NextRequest) {
   const { error } = await requireMod()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
-  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const sp = req.nextUrl.searchParams
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10))

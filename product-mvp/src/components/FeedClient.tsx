@@ -137,14 +137,14 @@ export default function FeedClient({ user }: Props) {
     if (!user) return
     fetch('/api/bookmarks').then(r => r.json()).then((rows: { id: string }[]) => {
       setBookmarked(new Set(rows.map(r => r.id)))
-    }).catch(() => {})
+    }).catch(() => {}) // fire-and-forget: bookmarks are non-critical, feed works without them
   }, [user])
 
   useEffect(() => {
     if (!user) return
     fetch('/api/blacklist').then(r => r.json()).then((t: string[]) => {
       setBlacklist(t)
-    }).catch(() => {})
+    }).catch(() => {}) // fire-and-forget: blacklist is non-critical, feed works without tag filtering
   }, [user])
 
   async function addToBlacklist(raw?: string) {

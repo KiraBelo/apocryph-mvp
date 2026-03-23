@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { requireMod } from '@/lib/session'
+import { requireMod, handleAuthError } from '@/lib/session'
 
 // PATCH /api/admin/games/[id] — change moderation_status
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error } = await requireMod()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: gameId } = await params
 

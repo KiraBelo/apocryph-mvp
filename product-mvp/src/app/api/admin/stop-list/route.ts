@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { requireMod } from '@/lib/session'
+import { requireMod, handleAuthError } from '@/lib/session'
 import { invalidateStopPhraseCache } from '@/lib/stoplist'
 
 // GET /api/admin/stop-list?page=1&search=...
 export async function GET(req: NextRequest) {
   const { error } = await requireMod()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
-  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const sp = req.nextUrl.searchParams
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10))
@@ -24,8 +23,9 @@ export async function GET(req: NextRequest) {
     : [limit, offset]
 
   try {
-    const phrases = await query(
-      `SELECT sp.*, u.email as created_by_email
+    const phrases = await query<{ _total: string }>(
+      `SELECT sp.*, u.email as created_by_email,
+              COUNT(*) OVER() as _total
        FROM stop_phrases sp
        LEFT JOIN users u ON u.id = sp.created_by
        ${whereClause}
@@ -33,16 +33,12 @@ export async function GET(req: NextRequest) {
        LIMIT $${search ? 2 : 1} OFFSET $${search ? 3 : 2}`,
       params
     )
-
-    const countParams = search ? [search.replace(/[%_\\]/g, '\\$&')] : []
-    const [countRow] = await query<{ cnt: string }>(
-      `SELECT COUNT(*) as cnt FROM stop_phrases sp ${whereClause}`,
-      countParams
-    )
+    const total = phrases.length > 0 ? parseInt(phrases[0]._total) : 0
+    const safePhrases = phrases.map(({ _total, ...rest }) => rest)
 
     return NextResponse.json({
-      phrases,
-      total: parseInt(countRow?.cnt || '0'),
+      phrases: safePhrases,
+      total,
       page,
     })
   } catch (error) {
@@ -54,9 +50,8 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/stop-list — create phrase
 export async function POST(req: NextRequest) {
   const { error, user } = await requireMod()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
-  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   let body
   try {

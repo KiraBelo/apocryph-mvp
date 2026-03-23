@@ -1,5 +1,6 @@
 import { getIronSession, SessionOptions } from 'iron-session'
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 import { queryOne } from './db'
 
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
@@ -75,4 +76,15 @@ export async function requireMod() {
   if (row.banned_at) return { error: 'banned' as const, user: null }
   if (row.role !== 'moderator' && row.role !== 'admin') return { error: 'forbidden' as const, user: null }
   return { error: null, user: { id: session.userId, email: session.email!, role: row.role as Role } }
+}
+
+/**
+ * Converts requireUser/requireMod error string to NextResponse.
+ * Returns null if no error (caller proceeds normally).
+ */
+export function handleAuthError(error: string | null): NextResponse | null {
+  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  if (error === 'forbidden') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  return null
 }

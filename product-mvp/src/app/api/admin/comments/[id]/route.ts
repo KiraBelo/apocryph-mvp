@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
-import { requireUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 
 // POST — approve comment
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
@@ -28,7 +29,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 // DELETE — remove comment
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { requireMod } from '@/lib/session'
+import { requireMod, handleAuthError } from '@/lib/session'
 
 // GET /api/admin/reports?status=pending&page=1
 export async function GET(req: NextRequest) {
   const { error, user } = await requireMod()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const sp = req.nextUrl.searchParams
   const status = sp.get('status') || 'pending'

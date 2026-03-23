@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import type { GameStatus } from '@/types/api'
+import { safeJson } from '@/lib/fetch-utils'
 
 type TranslateFunc = (key: string) => string | readonly string[] | Record<string, string>
 
@@ -50,7 +51,7 @@ export default function usePublishFlow({
     setPublishLoading(true)
     try {
       const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'POST' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       setMyPublishConsent(true)
     } catch { addToast(t('errors.networkError') as string, 'error') }
     finally { setPublishLoading(false) }
@@ -63,7 +64,7 @@ export default function usePublishFlow({
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ choice })
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       const data = await res.json()
       setPartnerWantsPublish(false)
       setShowPublishModal(false)
@@ -80,7 +81,7 @@ export default function usePublishFlow({
     setPublishLoading(true)
     try {
       const res = await fetch(`/api/games/${gameId}/publish-consent`, { method: 'DELETE' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       setGameStatus('active')
       setMyPublishConsent(false)
       setPartnerPublishConsent(false)
@@ -94,7 +95,7 @@ export default function usePublishFlow({
     setSubmitLoading(true)
     try {
       const res = await fetch(`/api/games/${gameId}/submit-to-moderation`, { method: 'POST' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       setGameStatus('moderation')
       setShowModerationSent(true)
     } catch { addToast(t('errors.networkError') as string, 'error') }

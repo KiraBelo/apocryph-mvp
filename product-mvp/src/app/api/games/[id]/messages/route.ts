@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser, requireUser } from '@/lib/session'
+import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
 import { getActiveStopPhrases, checkStopList, VIOLATION_THRESHOLD } from '@/lib/stoplist'
 import { requireParticipant } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
-
-const PAGE_SIZE = 30
+import { PAGE_SIZE } from '@/lib/constants'
 
 // GET — paginated messages + search
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -119,8 +118,8 @@ function htmlToSnippet(html: string, query: string): string {
 // POST — отправить сообщение
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { allowed } = rateLimit(`messages:${user!.id}`, 30, 60_000)
   if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })

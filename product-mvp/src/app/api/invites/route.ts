@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { requireUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { randomBytes } from 'crypto'
 
 // POST — создать инвайт-ссылку
 export async function POST(req: NextRequest) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   let requestId: string
   try {

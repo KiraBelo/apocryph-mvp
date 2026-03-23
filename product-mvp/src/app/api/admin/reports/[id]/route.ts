@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { requireMod } from '@/lib/session'
+import { requireMod, handleAuthError } from '@/lib/session'
 
 // PATCH /api/admin/reports/[id] — resolve or dismiss a report
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireMod()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: reportId } = await params
 

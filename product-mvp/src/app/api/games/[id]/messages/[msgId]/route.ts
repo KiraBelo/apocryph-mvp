@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, withTransaction } from '@/lib/db'
 
-import { requireUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
 
 // PATCH — редактировать своё сообщение
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; msgId: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: gameId, msgId } = await params
 

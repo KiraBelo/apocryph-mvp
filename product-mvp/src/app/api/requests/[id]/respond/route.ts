@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { requireUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { escapeHtml } from '@/lib/game-utils'
 
 // POST /api/requests/[id]/respond — откликнуться на заявку
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: requestId } = await params
   let nickname: string | undefined

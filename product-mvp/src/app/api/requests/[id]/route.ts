@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { getUser, requireUser } from '@/lib/session'
+import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -30,8 +30,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id } = await params
   const request = await queryOne<{ author_id: string }>(
@@ -136,8 +136,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id } = await params
   try {

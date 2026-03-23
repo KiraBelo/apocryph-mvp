@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { sanitizeBody } from '@/lib/sanitize'
-
-const PAGE_SIZE = 30
+import { PAGE_SIZE } from '@/lib/constants'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: gameId } = await params

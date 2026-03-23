@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withTransaction } from '@/lib/db'
-import { requireMod } from '@/lib/session'
+import { requireMod, handleAuthError } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 
 // POST — admin approves or rejects a game in moderation queue
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireMod()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'forbidden') return NextResponse.json({ error }, { status: 403 })
-  if (error === 'banned') return NextResponse.json({ error }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { id: gameId } = await params
   let action: string

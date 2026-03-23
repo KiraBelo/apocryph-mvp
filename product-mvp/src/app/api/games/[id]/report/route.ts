@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { requireUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { requireParticipant } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
-  if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-  if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { allowed } = rateLimit(`report:${user!.id}`, 3, 60 * 60_000)
   if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })

@@ -36,7 +36,7 @@ export default function Nav({ user }: Props) {
     fetch('/api/games/unread-count')
       .then(r => r.json())
       .then(d => { setUnreadGames(d.games ?? []); setProposals(d.proposals ?? []) })
-      .catch(() => {})
+      .catch(() => {}) // fire-and-forget: unread count is non-critical, nav works without badge
 
   const unreadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 

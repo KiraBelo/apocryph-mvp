@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
+import { useT } from './SettingsContext'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -14,11 +15,14 @@ interface ConfirmDialogProps {
 
 export default function ConfirmDialog({
   open, title, message,
-  confirmLabel = 'OK',
-  cancelLabel = 'Отмена',
+  confirmLabel,
+  cancelLabel,
   danger = false,
   onConfirm, onCancel,
 }: ConfirmDialogProps) {
+  const t = useT()
+  const resolvedConfirmLabel = confirmLabel ?? (t('common.ok') as string)
+  const resolvedCancelLabel = cancelLabel ?? (t('common.cancel') as string)
   const confirmRef = useRef<HTMLButtonElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
 
@@ -58,7 +62,7 @@ export default function ConfirmDialog({
             onClick={onCancel}
             className="btn-ghost text-[0.8rem] px-4 py-1.5"
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             ref={confirmRef}
@@ -66,7 +70,7 @@ export default function ConfirmDialog({
             className="btn-primary text-[0.8rem] px-4 py-1.5"
             style={danger ? { background: '#c0392b' } : undefined}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

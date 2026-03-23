@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
+import { query } from '@/lib/db'
 import { getUser } from '@/lib/session'
-
-const PAGE_SIZE = 30
+import { PAGE_SIZE } from '@/lib/constants'
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
@@ -57,12 +56,6 @@ export async function GET(req: NextRequest) {
   const where = `WHERE ${conditions.join(' AND ')}`
 
   try {
-    const countRes = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM games g LEFT JOIN requests r ON r.id = g.request_id ${where}`,
-      params
-    )
-    const total = parseInt(countRes?.count || '0')
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
     const offset = (page - 1) * PAGE_SIZE
 
     const games = await query<{
@@ -70,7 +63,7 @@ export async function GET(req: NextRequest) {
       request_title: string | null; request_type: string | null;
       request_fandom_type: string | null; request_pairing: string | null;
       request_content_level: string | null; request_language: string | null; request_tags: string[] | null;
-      ic_count: string; likes_count: string; participants: string
+      ic_count: string; likes_count: string; participants: string; _total: string
     }>(
       `SELECT g.id, g.published_at, g.banner_url,
               r.title as request_title, r.type as request_type,
@@ -78,7 +71,8 @@ export async function GET(req: NextRequest) {
               r.content_level as request_content_level, r.language as request_language, r.tags as request_tags,
               COALESCE(mc.ic_count, 0)::text as ic_count,
               COALESCE(lc.likes_count, 0)::text as likes_count,
-              COALESCE(pp.participants, '[]')::text as participants
+              COALESCE(pp.participants, '[]')::text as participants,
+              COUNT(*) OVER() as _total
        FROM games g
        LEFT JOIN requests r ON r.id = g.request_id
        LEFT JOIN (
@@ -96,9 +90,12 @@ export async function GET(req: NextRequest) {
        LIMIT $${p++} OFFSET $${p++}`,
       [...params, PAGE_SIZE, offset]
     )
+    const total = games.length > 0 ? parseInt(games[0]._total) : 0
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
     const safeGames = games.map(g => ({
       ...g,
+      _total: undefined,
       participants: g.participants ? JSON.parse(g.participants) : [],
     }))
 

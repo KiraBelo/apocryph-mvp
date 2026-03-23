@@ -34,7 +34,55 @@ export default async function MyGamesPage() {
   if (!user) redirect('/auth/login')
 
   const games = await query<GameRow>(
-    `SELECT g.*, gp.left_at, gp.nickname as my_nickname, gp.starred_at, gp.hidden_at,
+    `WITH my_games AS (
+       SELECT g.id as game_id, gp.id as participant_id,
+              gp.left_at, gp.nickname, gp.starred_at, gp.hidden_at,
+              gp.last_read_at, gp.last_read_ooc_at
+         FROM games g
+         JOIN game_participants gp ON gp.game_id = g.id AND gp.user_id = $1
+     ),
+     game_stats AS (
+       SELECT m.game_id,
+              COUNT(*)::text as message_count,
+              MAX(m.created_at)::text as last_message_at
+         FROM messages m
+         JOIN my_games mg ON mg.game_id = m.game_id
+        GROUP BY m.game_id
+     ),
+     last_msg AS (
+       SELECT DISTINCT ON (m.game_id)
+              m.game_id,
+              gp_last.user_id as last_message_user_id
+         FROM messages m
+         JOIN my_games mg ON mg.game_id = m.game_id
+         JOIN game_participants gp_last ON gp_last.id = m.participant_id
+        ORDER BY m.game_id, m.created_at DESC
+     ),
+     active_parts AS (
+       SELECT gp2.game_id,
+              COUNT(*)::text as active_participants
+         FROM game_participants gp2
+         JOIN my_games mg ON mg.game_id = gp2.game_id
+        WHERE gp2.left_at IS NULL
+        GROUP BY gp2.game_id
+     ),
+     unread_stats AS (
+       SELECT m.game_id,
+              COUNT(*) FILTER (WHERE m.type = 'ic'
+                AND m.created_at > COALESCE(mg.last_read_at, '-infinity'::timestamptz))::text as ic_unread,
+              COUNT(*) FILTER (WHERE m.type = 'ooc'
+                AND m.created_at > COALESCE(mg.last_read_ooc_at, '-infinity'::timestamptz))::text as ooc_unread
+         FROM messages m
+         JOIN my_games mg ON mg.game_id = m.game_id AND m.participant_id != mg.participant_id
+        GROUP BY m.game_id
+     ),
+     partner_consent AS (
+       SELECT c.game_id
+         FROM game_publish_consent c
+         JOIN game_participants gp4 ON gp4.id = c.participant_id
+        WHERE gp4.user_id != $1
+     )
+     SELECT g.*, mg.left_at, mg.nickname as my_nickname, mg.starred_at, mg.hidden_at,
             r.title as request_title,
             r.body as request_body,
             r.tags as request_tags,
@@ -42,31 +90,22 @@ export default async function MyGamesPage() {
             r.fandom_type as request_fandom_type,
             r.pairing as request_pairing,
             r.content_level as request_content_level,
-            (SELECT COUNT(*) FROM messages m WHERE m.game_id = g.id)::text as message_count,
-            (SELECT COUNT(*) FROM game_participants gp2 WHERE gp2.game_id = g.id AND gp2.left_at IS NULL)::text as active_participants,
-            (SELECT gp_last.user_id
-               FROM messages m_last
-               JOIN game_participants gp_last ON gp_last.id = m_last.participant_id
-              WHERE m_last.game_id = g.id
-              ORDER BY m_last.created_at DESC
-              LIMIT 1) as last_message_user_id,
-            (SELECT COUNT(*) FROM messages m
-              WHERE m.game_id = g.id AND m.type = 'ic'
-                AND m.participant_id != gp.id
-                AND m.created_at > COALESCE(gp.last_read_at, '-infinity'::timestamptz))::text as ic_unread,
-            (SELECT COUNT(*) FROM messages m
-              WHERE m.game_id = g.id AND m.type = 'ooc'
-                AND m.participant_id != gp.id
-                AND m.created_at > COALESCE(gp.last_read_ooc_at, '-infinity'::timestamptz))::text as ooc_unread,
-            (SELECT MAX(m.created_at) FROM messages m WHERE m.game_id = g.id)::text as last_message_at,
-            COALESCE((SELECT true FROM game_publish_consent c
-              JOIN game_participants gp4 ON gp4.id = c.participant_id
-              WHERE c.game_id = g.id AND gp4.user_id != $1
-              LIMIT 1), false) as partner_publish_consent
-     FROM games g
-     JOIN game_participants gp ON gp.game_id = g.id AND gp.user_id = $1
-     LEFT JOIN requests r ON r.id = g.request_id
-     ORDER BY g.created_at DESC`,
+            COALESCE(gs.message_count, '0') as message_count,
+            COALESCE(ap.active_participants, '0') as active_participants,
+            lm.last_message_user_id,
+            COALESCE(us.ic_unread, '0') as ic_unread,
+            COALESCE(us.ooc_unread, '0') as ooc_unread,
+            gs.last_message_at,
+            COALESCE(pc.game_id IS NOT NULL, false) as partner_publish_consent
+       FROM games g
+       JOIN my_games mg ON mg.game_id = g.id
+       LEFT JOIN requests r ON r.id = g.request_id
+       LEFT JOIN game_stats gs ON gs.game_id = g.id
+       LEFT JOIN last_msg lm ON lm.game_id = g.id
+       LEFT JOIN active_parts ap ON ap.game_id = g.id
+       LEFT JOIN unread_stats us ON us.game_id = g.id
+       LEFT JOIN partner_consent pc ON pc.game_id = g.id
+      ORDER BY g.created_at DESC`,
     [user.id]
   )
 

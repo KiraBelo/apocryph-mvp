@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { escapeHtml } from '@/lib/game-utils'
 import type { NoteEntry, Message } from '../game/types'
 import type { ToastType } from '../ToastProvider'
+import { safeJson } from '@/lib/fetch-utils'
 
 export function useGameNotes({ gameId, t, addToast }: {
   gameId: string
@@ -75,7 +76,7 @@ export function useGameNotes({ gameId, t, addToast }: {
   async function deleteNote(noteId: number) {
     try {
       const res = await fetch(`/api/games/${gameId}/notes/${noteId}`, { method: 'DELETE' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
+      if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return }
       setNotes(prev => prev.filter(n => n.id !== noteId))
       setDeleteConfirmId(null)
     } catch { addToast(t('errors.networkError') as string, 'error') }
