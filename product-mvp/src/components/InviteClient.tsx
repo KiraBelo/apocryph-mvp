@@ -37,7 +37,7 @@ export default function InviteClient({ token, invite }: Props) {
         <h3 className="font-heading text-[2rem] italic text-ink mb-3">
           {invite.title}
         </h3>
-        <p className="text-ink-2 font-body mb-8">
+        <p className="text-ink-2 font-body mb-5">
           {t('invite.typeLabel') as string} {invite.type === 'duo' ? t('invite.typeDuo') as string : t('invite.typeMultiplayer') as string}
         </p>
         <button onClick={accept} disabled={loading}

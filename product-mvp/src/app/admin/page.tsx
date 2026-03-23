@@ -35,8 +35,8 @@ export default async function AdminDashboard() {
   ]
 
   return (
-    <div className="max-w-[900px] mx-auto py-12 px-6">
-      <h1 className="page-title mb-8">Панель модерации</h1>
+    <div className="max-w-[900px] mx-auto py-8 px-6">
+      <h1 className="page-title mb-5">Панель модерации</h1>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {stats.map(s => (
           <Link key={s.label} href={s.href} className="card p-6 text-center no-underline block">

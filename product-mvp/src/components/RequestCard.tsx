@@ -1,8 +1,9 @@
 'use client'
 import Link from 'next/link'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useT } from './SettingsContext'
 import { useToast } from './ToastProvider'
+import { Link2, Pencil, Star, ChevronRight, Check } from 'lucide-react'
 
 export interface Request {
   id: string
@@ -13,6 +14,7 @@ export interface Request {
   content_level: 'none' | 'rare' | 'often' | 'core' | 'flexible'
   fandom_type: 'fandom' | 'original'
   pairing: 'sl' | 'fm' | 'gt' | 'any' | 'multi' | 'other'
+  language: 'ru' | 'en'
   tags: string[]
   status: string
   created_at: string
@@ -57,6 +59,11 @@ export default function RequestCard({
     original: t('filters.original') as string,
   }
 
+  const languageLabels: Record<string, string> = {
+    ru: t('filters.langRu') as string,
+    en: t('filters.langEn') as string,
+  }
+
   const pairingLabels: Record<string, string> = {
     sl: 'M/M',
     fm: 'F/F',
@@ -93,7 +100,21 @@ export default function RequestCard({
     setInviteLoading(false)
   }, [request.id])
 
-  const isLong = !!request.body && request.body.length > 1500
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [isLong, setIsLong] = useState(false)
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      // Temporarily apply max-height to measure if content overflows
+      const style = getComputedStyle(document.documentElement)
+      const maxBody = parseFloat(style.getPropertyValue('--card-body-size')) * 1.65 * parseFloat(style.getPropertyValue('--card-body-lines'))
+      const rootFontSize = parseFloat(style.fontSize)
+      const maxPx = maxBody * rootFontSize
+      setIsLong(el.scrollHeight > maxPx + 1)
+    })
+  }, [request.body])
 
   const hasTagMenu = !!(onTagSearch || onTagSubscribe || onTagBlacklist)
 
@@ -129,61 +150,86 @@ export default function RequestCard({
     setMenuTag(null)
   }
 
+  const metaParts = [
+    typeLabels[request.type],
+    fandomTypeLabels[request.fandom_type],
+    request.pairing !== 'any' ? pairingLabels[request.pairing] : null,
+    contentLabels[request.content_level],
+    languageLabels[request.language],
+  ].filter(Boolean)
+
   return (
-    <article className="card p-7 relative">
-      {/* Action icons row */}
-      <div className="flex items-center justify-end gap-2 mb-3">
-        {statusLabel && (
-          <span className={`font-mono text-[0.6rem] tracking-[0.1em] uppercase mr-auto ${statusActive ? 'text-accent' : 'text-ink-2 opacity-60'}`}>
-            {statusLabel}
-          </span>
-        )}
-        {isOwn && (
-          <>
-            <button
-              onClick={createInvite}
-              disabled={inviteLoading}
-              title={t('card.copyInvite') as string}
-              className={`bg-transparent border-none cursor-pointer p-0 leading-none flex items-center transition-[color,opacity] duration-150
-                ${inviteLink ? 'text-accent' : 'text-ink-2 opacity-65 hover:opacity-100'}`}
-            >
-              {inviteLoading ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : inviteLink ? '✓' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
-            </button>
-            <Link href={`/requests/${request.id}/edit`} title={t('card.edit') as string}
-              className="text-ink-2 text-[0.9rem] leading-none no-underline opacity-50 hover:opacity-100 inline-block scale-x-[-1]"
-            >
-              ✎
-            </Link>
-          </>
-        )}
-        <button onClick={toggleBookmark} disabled={loadingBm} title={bookmarked ? t('card.removeBookmark') as string : t('card.addBookmark') as string}
-          className={`bg-transparent border-none cursor-pointer text-[1.1rem] p-0 leading-none ${bookmarked ? 'text-accent' : 'text-ink-2'}`}
-        >
-          {bookmarked ? '★' : '☆'}
-        </button>
+    <article className="card">
+      {/* Header: meta + actions */}
+      <div className="card-header">
+        <div className="card-meta">
+          {statusLabel && (
+            <>
+              <span className={`card-status ${statusActive ? 'card-status-active' : 'card-status-dim'}`}>
+                {statusLabel}
+              </span>
+              <span className="sep" style={{ margin: '0 0.15rem' }}>|</span>
+            </>
+          )}
+          {metaParts.map((label, i) => (
+            <span key={i}>
+              {i > 0 && <span className="sep">/</span>}
+              {label}
+            </span>
+          ))}
+        </div>
+        <div className="card-actions">
+          {isOwn && (
+            <>
+              <button
+                onClick={createInvite}
+                disabled={inviteLoading}
+                title={t('card.copyInvite') as string}
+                className={`action-link ${inviteLink ? 'bookmarked' : ''}`}
+                aria-label={t('card.copyInvite') as string}
+              >
+                {inviteLoading
+                  ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  : inviteLink
+                    ? <Check size={13} aria-hidden="true" />
+                    : <Link2 size={13} aria-hidden="true" />
+                }
+              </button>
+              <Link
+                href={`/requests/${request.id}/edit`}
+                title={t('card.edit') as string}
+                className="action-link"
+                aria-label={t('card.edit') as string}
+              >
+                <Pencil size={12} aria-hidden="true" />
+              </Link>
+            </>
+          )}
+          <button
+            onClick={toggleBookmark}
+            disabled={loadingBm}
+            title={bookmarked ? t('card.removeBookmark') as string : t('card.addBookmark') as string}
+            className={bookmarked ? 'bookmarked' : ''}
+            aria-label={bookmarked ? t('card.removeBookmark') as string : t('card.addBookmark') as string}
+          >
+            <Star size={13} fill={bookmarked ? 'currentColor' : 'none'} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {/* Title */}
-      <div className="mb-3">
-        <Link href={`/requests/${request.id}`}>
-          <h3 className="font-heading text-[1.2rem] font-normal text-ink leading-tight break-words">
-            {request.title}
-          </h3>
-        </Link>
-      </div>
+      <Link href={`/requests/${request.id}`} className="card-title">
+        {request.title}
+      </Link>
 
-      {/* Tags row */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        <span className="badge badge-type">{typeLabels[request.type]}</span>
-        <span className="badge badge-fandom">{fandomTypeLabels[request.fandom_type]}</span>
-        {request.pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[request.pairing]}</span>}
-        <span className="badge badge-content">{contentLabels[request.content_level]}</span>
+      {/* User tags */}
+      <div className="card-tags">
         {request.tags.map(tag => (
           <span key={tag} className="relative inline-flex">
             <span
               onClick={hasTagMenu ? e => openMenu(e, tag) : undefined}
-              className={`badge badge-tag ${hasTagMenu ? 'cursor-pointer' : 'cursor-default'} select-none
-                ${menuTag === tag ? 'border-accent text-accent' : ''}`}
+              className={`tag tag-user ${hasTagMenu ? 'cursor-pointer' : ''} select-none
+                ${menuTag === tag ? '!border !border-accent !text-accent' : ''}`}
             >
               {tag.toLowerCase()}
             </span>
@@ -191,7 +237,7 @@ export default function RequestCard({
             {menuTag === tag && (
               <div
                 onClick={e => e.stopPropagation()}
-                className="absolute top-[calc(100%+4px)] left-0 z-200 bg-surface border border-edge min-w-[190px] shadow-[0_4px_16px_var(--shadow)]"
+                className="absolute top-[calc(100%+3px)] left-0 z-200 bg-surface border border-edge min-w-[150px] shadow-[0_2px_10px_var(--shadow)]"
               >
                 {onTagSearch && (
                   <button onClick={e => runAction(e, () => onTagSearch(tag))} className="tag-menu-item">
@@ -214,49 +260,60 @@ export default function RequestCard({
         ))}
       </div>
 
-      {/* Preview */}
+      {/* Body preview */}
       {request.body && (
-        <div className="mb-5">
-          <div className="relative">
+        <>
+          <div className={`relative ${isLong && !expanded ? '' : ''}`}>
             <div
-              className="text-ink-2 text-[0.95rem] leading-[1.7] break-words overflow-hidden"
-              style={{ maxHeight: isLong && !expanded ? '17rem' : 'none' }}
-              onClick={e => { const el = e.target as HTMLElement; if (el.classList.contains('ooc-spoiler')) el.classList.toggle('ooc-spoiler-open') }}
+              ref={bodyRef}
+              className={`card-body break-words ${isLong && !expanded ? 'card-body-clamped' : ''}`}
+              onClick={e => {
+                const el = e.target as HTMLElement
+                if (el.classList.contains('ooc-spoiler')) {
+                  el.classList.toggle('ooc-spoiler-open')
+                  return
+                }
+                if (isLong) setExpanded(x => !x)
+              }}
               dangerouslySetInnerHTML={{ __html: request.body }}
             />
-            {isLong && !expanded && (
-              <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-b from-transparent to-surface-2 pointer-events-none" />
-            )}
+            {isLong && !expanded && <div className="card-body-fade" />}
           </div>
-          {isLong && (
-            <button
-              onClick={e => { e.preventDefault(); setExpanded(x => !x) }}
-              className="link-accent bg-transparent border-none cursor-pointer block pt-[0.3rem]"
+          {isLong && !expanded && (
+            <div
+              className="card-body-dots"
+              onClick={() => setExpanded(true)}
             >
-              {expanded ? t('card.collapse') as string : t('card.readMore') as string}
-            </button>
+              ···
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Invite link */}
       {inviteLink && (
-        <div className="mb-4 p-3 bg-surface-3 border border-edge">
+        <div className="p-3 bg-surface-3 border border-edge">
           <code className="font-mono text-[0.78rem] text-accent break-all select-all">{inviteLink}</code>
         </div>
       )}
 
       {/* Footer */}
       {showRespond && (
-        isOwn ? (
-          <span className="link-accent text-ink-2">
-            {t('card.ownRequest') as string}
-          </span>
-        ) : (
-          <Link href={`/requests/${request.id}`} className="link-accent no-underline">
-            {t('card.respond') as string}
-          </Link>
-        )
+        <div className="card-footer">
+          {isOwn ? (
+            <span className="card-own-label">
+              {t('card.ownRequest') as string}
+            </span>
+          ) : (
+            <>
+              <div />
+              <Link href={`/requests/${request.id}`} className="respond-pill">
+                {t('card.respond') as string}
+                <ChevronRight size={11} strokeWidth={2} aria-hidden="true" />
+              </Link>
+            </>
+          )}
+        </div>
       )}
     </article>
   )

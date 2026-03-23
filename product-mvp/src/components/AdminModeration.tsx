@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { useSettings, useT } from './SettingsContext'
+import { useSettings, useT, usePlural } from './SettingsContext'
 import { useToast } from './ToastProvider'
 
 interface GameRow {
@@ -30,6 +30,7 @@ export default function AdminModerationClient({
   comments: CommentRow[]
 }) {
   const t = useT()
+  const tPlural = usePlural()
   const { lang } = useSettings()
   const { addToast } = useToast()
   const [games, setGames] = useState(initialGames)
@@ -79,11 +80,11 @@ export default function AdminModerationClient({
   }
 
   return (
-    <div className="max-w-[900px] mx-auto py-12 px-6">
-      <h1 className="page-title mb-8">{t('admin.moderationTitle') as string}</h1>
+    <div className="max-w-[900px] mx-auto py-8 px-6">
+      <h1 className="page-title mb-5">{t('admin.moderationTitle') as string}</h1>
 
       {/* Games queue */}
-      <section className="mb-12">
+      <section className="mb-6">
         <h2 className="font-mono text-[0.7rem] tracking-[0.15em] uppercase text-ink-2 mb-4 border-b border-edge pb-2">
           {t('admin.gamesForPublish') as string} ({games.length})
         </h2>
@@ -100,7 +101,7 @@ export default function AdminModerationClient({
                     </Link>
                     <p className="meta-text mt-1">
                       {g.participants.map(p => p.nickname).join(', ')}
-                      &nbsp;·&nbsp;{g.ic_count} {t('admin.posts') as string}
+                      &nbsp;·&nbsp;{tPlural(parseInt(g.ic_count) || 0, 'admin.posts')}
                       &nbsp;·&nbsp;{new Date(g.created_at).toLocaleDateString(lang)}
                     </p>
                   </div>
@@ -115,8 +116,7 @@ export default function AdminModerationClient({
                     <button
                       onClick={() => moderateGame(g.id, 'reject')}
                       disabled={loading === g.id}
-                      className="btn-ghost font-mono text-[0.65rem] p-[0.35rem_1rem]"
-                      style={{ color: '#c0392b', borderColor: '#c0392b' }}
+                      className="btn-ghost-danger text-[0.65rem] p-[0.35rem_1rem]"
                     >
                       {loading === g.id ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : (t('admin.reject') as string)}
                     </button>
@@ -172,8 +172,7 @@ export default function AdminModerationClient({
                     <button
                       onClick={() => deleteComment(c.id)}
                       disabled={loading === c.id}
-                      className="btn-ghost font-mono text-[0.6rem] p-[0.25rem_0.7rem]"
-                      style={{ color: '#c0392b', borderColor: '#c0392b' }}
+                      className="btn-ghost-danger text-[0.6rem] p-[0.25rem_0.7rem]"
                     >
                       {t('admin.deleteComment') as string}
                     </button>

@@ -1,5 +1,6 @@
 'use client'
 import { createContext, useCallback, useContext, useState } from 'react'
+import { X } from 'lucide-react'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -61,10 +62,10 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
               <span className="font-body text-[0.85rem] text-ink flex-1">{toast.message}</span>
               <button
                 onClick={() => removeToast(toast.id)}
-                className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.8rem] p-0 leading-none shrink-0"
+                className="bg-transparent border-none text-ink-2 cursor-pointer p-0 leading-none shrink-0 flex items-center"
                 aria-label="Close"
               >
-                ✕
+                <X size={13} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
           ))}

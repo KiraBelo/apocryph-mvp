@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react'
+import { X } from 'lucide-react'
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
@@ -45,8 +46,7 @@ export default function Modal({ onClose, title, children, wide }: { onClose: () 
   }, [])
 
   return (
-    <div className="overlay z-[500] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
+    <div className="overlay overlay-dark z-[500] flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div
         ref={modalRef}
@@ -55,7 +55,7 @@ export default function Modal({ onClose, title, children, wide }: { onClose: () 
         aria-labelledby={titleId}
         className={`modal p-8 w-full max-h-[calc(100vh-2rem)] overflow-y-auto ${wide ? 'max-w-[680px]' : 'max-w-[480px]'}`}
       >
-        <button onClick={onClose} aria-label="Close" className="sticky top-0 float-right bg-transparent border-none text-ink-2 cursor-pointer text-[1.1rem] z-10">&#10005;</button>
+        <button onClick={onClose} aria-label="Close" className="sticky top-0 float-right bg-transparent border-none text-ink-2 cursor-pointer z-10 flex items-center"><X size={18} strokeWidth={2} aria-hidden="true" /></button>
         <h2 id={titleId} className="font-heading text-2xl italic text-ink mb-5">{title}</h2>
         {children}
       </div>

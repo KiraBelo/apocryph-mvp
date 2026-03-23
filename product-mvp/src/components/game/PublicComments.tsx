@@ -7,6 +7,7 @@ interface Comment {
   content: string
   created_at: string
   is_author: boolean
+  author_nickname: string | null
   replies: Comment[]
 }
 
@@ -94,7 +95,7 @@ export default function PublicComments({ gameId, userId, authorUserIds }: Public
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-mono text-[0.55rem] tracking-[0.06em] text-ink-2 mb-1">
-                    {c.is_author ? t('game.gameAuthor') as string : t('game.reader') as string}
+                    {c.is_author ? (c.author_nickname ?? t('game.gameAuthor') as string) : t('game.reader') as string}
                     &nbsp;·&nbsp;
                     {new Date(c.created_at).toLocaleDateString('ru', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </p>
@@ -145,7 +146,7 @@ export default function PublicComments({ gameId, userId, authorUserIds }: Public
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-mono text-[0.55rem] tracking-[0.06em] text-ink-2 mb-1">
-                          {t('game.gameAuthor') as string}
+                          {r.author_nickname ?? t('game.gameAuthor') as string}
                           &nbsp;·&nbsp;
                           {new Date(r.created_at).toLocaleDateString('ru', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                         </p>

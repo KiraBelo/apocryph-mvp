@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { translate, type Lang } from '@/i18n'
+import { translate, plural, type Lang } from '@/i18n'
 
 export type Theme = 'light' | 'sepia' | 'ink' | 'nocturne'
 export type FontSize = 'small' | 'medium' | 'large'
@@ -185,5 +185,22 @@ export function useT() {
   return useCallback(
     (key: string): string | readonly string[] | Record<string, string> => translate(lang, key),
     [lang]
+  )
+}
+
+/** Pluralization hook — returns tPlural(n, 'section.key') → "5 постов" */
+export function usePlural() {
+  const { lang } = useContext(Ctx)
+  const t = useCallback(
+    (key: string): string | readonly string[] | Record<string, string> => translate(lang, key),
+    [lang]
+  )
+  return useCallback(
+    (n: number, key: string): string => {
+      const forms = t(key)
+      if (Array.isArray(forms)) return plural(lang, n, forms as readonly string[])
+      return `${n} ${forms as string}`
+    },
+    [lang, t]
   )
 }

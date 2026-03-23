@@ -6,6 +6,7 @@ import { tabBtnCls } from './utils'
 import type { Participant } from './types'
 import type { GameStatus } from '@/types/api'
 import StatusChip from './StatusChip'
+import { Search, Download, Settings, Maximize, Minimize, MoreHorizontal } from 'lucide-react'
 
 interface TopBarProps {
   requestTitle: string | null
@@ -39,9 +40,9 @@ interface TopBarProps {
 export default function TopBar({
   requestTitle, effectiveBanner, activeTab, setActiveTab,
   oocEnabled, fullscreen, isLeft, gameStatus, isFrozen, isPreparing, partnerWantsPublish,
-  participants, userId, notesCount, icPostCount,
+  participants, userId, notesCount,
   publishLoading,
-  onSearchToggle, onExport, onSettings, onReport, onLeave, onFullscreenToggle,
+  onSearchToggle, onExport, onSettings, onFullscreenToggle,
   onProposePublish, onPublishResponse, onRevoke, onSubmitToModeration,
 }: TopBarProps) {
   const { notesEnabled } = useSettings()
@@ -73,8 +74,6 @@ export default function TopBar({
     return () => document.removeEventListener('keydown', handler)
   }, [overflowOpen])
 
-  const iconBtn = "bg-transparent border-none text-ink-2 p-[0.3rem_0.4rem] cursor-pointer leading-none flex items-center justify-center"
-
   const overflowItem = (label: string, onClick: () => void) => (
     <button
       onClick={() => { onClick(); setOverflowOpen(false) }}
@@ -84,36 +83,36 @@ export default function TopBar({
     </button>
   )
 
+  const tabCls = (active: boolean) =>
+    `game-tab ${active ? 'game-tab-active' : ''}`
+
   return (
-    <div className="px-4 py-[0.35rem] border-b border-edge flex items-center shrink-0 bg-surface-2 gap-[0.4rem]">
+    <div className="game-topbar">
       {!fullscreen && (
-        <Link href="/my/games" className="font-mono text-[0.58rem] tracking-[0.1em] uppercase text-ink-2 mr-2 whitespace-nowrap" aria-label={t('detail.backToFeed') as string}>←</Link>
+        <Link href="/my/games" className="font-mono text-[0.7rem] text-ink-3 mr-1" aria-label={t('detail.backToFeed') as string}>←</Link>
       )}
       {requestTitle && !effectiveBanner && (
-        <span className="font-heading italic text-[0.9rem] text-ink-3 whitespace-nowrap overflow-hidden text-ellipsis min-w-0">{requestTitle}</span>
-      )}
-      {icPostCount > 0 && (
-        <span className="font-mono text-[0.5rem] tracking-[0.05em] text-ink-3 hidden md:inline">{icPostCount} {t('myGames.posts') as string}</span>
+        <span className="game-topbar-title">{requestTitle}</span>
       )}
       {(oocEnabled || notesEnabled || showPrepareTab) && (
         <>
-          {requestTitle && !effectiveBanner && <span className="w-px h-4 bg-ink-3 shrink-0" />}
+          {requestTitle && !effectiveBanner && <span className="game-topbar-sep" />}
           <div className="flex items-center gap-0 shrink-0">
-            <button onClick={() => setActiveTab('ic')} className={tabBtnCls(activeTab === 'ic', 'ic')}>
+            <button onClick={() => setActiveTab('ic')} className={tabCls(activeTab === 'ic')}>
               {t('game.history') as string}
             </button>
             {oocEnabled && (
-              <button onClick={() => setActiveTab('ooc')} className={tabBtnCls(activeTab === 'ooc', 'ooc')}>
+              <button onClick={() => setActiveTab('ooc')} className={tabCls(activeTab === 'ooc')}>
                 {t('game.offtop') as string}
               </button>
             )}
             {notesEnabled && (
-              <button onClick={() => setActiveTab('notes')} className={tabBtnCls(activeTab === 'notes', 'notes')}>
+              <button onClick={() => setActiveTab('notes')} className={tabCls(activeTab === 'notes')}>
                 {t('game.notes') as string} {notesCount > 0 && <span className="ml-[0.3em] opacity-60">{notesCount}</span>}
               </button>
             )}
             {showPrepareTab && (
-              <button onClick={() => setActiveTab('prepare')} className={tabBtnCls(activeTab === 'prepare', 'prepare')}>
+              <button onClick={() => setActiveTab('prepare')} className={tabCls(activeTab === 'prepare')}>
                 {t('game.prepareTab') as string}
               </button>
             )}
@@ -140,43 +139,37 @@ export default function TopBar({
           {!fullscreen && (
             <div className="flex gap-1 mr-[0.15rem]">
               {participants.filter(p => !p.left_at).map(p => (
-                <div key={p.id} title={p.nickname} className="w-8 h-8 rounded-full overflow-hidden bg-surface-3 flex items-center justify-center shrink-0" style={{ border: `2px solid ${p.user_id === userId ? 'var(--accent)' : 'var(--border)'}` }}>
+                <div
+                  key={p.id}
+                  title={p.nickname}
+                  className={`game-avatar ${p.user_id === userId ? 'game-avatar-mine' : ''}`}
+                >
                   {p.avatar_url
                     ? <img src={p.avatar_url} alt={p.nickname} className="w-full h-full object-cover" />
-                    : <span className="font-heading text-[0.8rem] text-ink-2">{p.nickname[0]}</span>
+                    : <span className="font-heading text-[0.7rem] text-ink-2">{p.nickname[0]}</span>
                   }
                 </div>
               ))}
             </div>
           )}
-          <span className="w-px h-4 bg-edge" />
-          <button onClick={onSearchToggle} className={iconBtn} aria-label={t('game.search') as string}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="5.5" cy="5.5" r="4" /><line x1="8.8" y1="8.8" x2="13" y2="13" /></svg>
+          <span className="game-topbar-sep" />
+          <button onClick={onSearchToggle} className="game-icon-btn" aria-label={t('game.search') as string}>
+            <Search size={14} strokeWidth={1.6} aria-hidden="true" />
           </button>
-          <button onClick={onExport} className={iconBtn} aria-label={t('game.export') as string}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="7" y1="1" x2="7" y2="9" /><polyline points="4,6 7,9 10,6" /><line x1="2" y1="12" x2="12" y2="12" /></svg>
+          <button onClick={onExport} className="game-icon-btn" aria-label={t('game.export') as string}>
+            <Download size={14} strokeWidth={1.6} aria-hidden="true" />
           </button>
           {!isLeft && (
-            <>
-              <button onClick={onSettings} className={iconBtn} aria-label={t('game.settings') as string}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              </button>
-              <button onClick={onReport} className={iconBtn} aria-label={t('game.report') as string}>
-                <svg width="13" height="14" viewBox="0 0 14 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 1v14M2 1h9l-2.5 3.5L11 8H2"/></svg>
-              </button>
-              <span className="w-px h-4 bg-edge" />
-              <button onClick={onLeave} className={iconBtn} aria-label={t('game.leaveGame') as string}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/><path d="M17 8l4 4-4 4"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              </button>
-            </>
+            <button onClick={onSettings} className="game-icon-btn" aria-label={t('game.settings') as string}>
+              <Settings size={14} strokeWidth={1.8} aria-hidden="true" />
+            </button>
           )}
-          <span className="w-px h-4 bg-edge" />
-          <button onClick={onFullscreenToggle} aria-label={fullscreen ? t('game.exitFullscreen') as string : t('game.fullscreen') as string} className={iconBtn}>
-            {fullscreen ? (
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="2,6 6,6 6,2"/><polyline points="8,2 8,6 12,6"/><polyline points="12,8 8,8 8,12"/><polyline points="6,12 6,8 2,8"/></svg>
-            ) : (
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1,5 1,1 5,1"/><polyline points="9,1 13,1 13,5"/><polyline points="13,9 13,13 9,13"/><polyline points="5,13 1,13 1,9"/></svg>
-            )}
+          <span className="game-topbar-sep" />
+          <button onClick={onFullscreenToggle} aria-label={fullscreen ? t('game.exitFullscreen') as string : t('game.fullscreen') as string} className="game-icon-btn">
+            {fullscreen
+              ? <Minimize size={13} strokeWidth={1.6} aria-hidden="true" />
+              : <Maximize size={13} strokeWidth={1.6} aria-hidden="true" />
+            }
           </button>
         </div>
 
@@ -184,21 +177,17 @@ export default function TopBar({
         <div className="flex md:hidden relative" ref={overflowRef}>
           <button
             onClick={() => setOverflowOpen(v => !v)}
-            className={iconBtn}
+            className="game-icon-btn"
             aria-label={t('nav.openMenu') as string}
             aria-expanded={overflowOpen}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/>
-            </svg>
+            <MoreHorizontal size={16} aria-hidden="true" />
           </button>
           {overflowOpen && (
             <div className="absolute top-[calc(100%+0.5rem)] right-0 bg-surface border border-edge min-w-[180px] z-300 shadow-[0_4px_24px_rgba(0,0,0,0.12)] py-1">
               {overflowItem(t('game.search') as string, onSearchToggle)}
               {overflowItem(t('game.export') as string, onExport)}
               {!isLeft && overflowItem(t('game.settings') as string, onSettings)}
-              {!isLeft && overflowItem(t('game.report') as string, onReport)}
-              {!isLeft && overflowItem(t('game.leaveGame') as string, onLeave)}
               {overflowItem(fullscreen ? t('game.exitFullscreen') as string : t('game.fullscreen') as string, onFullscreenToggle)}
             </div>
           )}

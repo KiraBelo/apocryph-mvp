@@ -15,7 +15,7 @@ export default function RequestFormWrapper({ mode, initial }: Props) {
   const title = mode === 'new' ? t('form.newTitle') as string : t('form.editTitle') as string
 
   return (
-    <div className="max-w-[1050px] mx-auto p-[3rem_1.75rem]">
+    <div className="max-w-[1050px] mx-auto px-7 py-8">
       {mode === 'edit' && initial && (
         <Breadcrumbs items={[
           { label: t('myRequests.title') as string, href: '/my/requests' },
@@ -23,8 +23,7 @@ export default function RequestFormWrapper({ mode, initial }: Props) {
           { label: t('form.editBreadcrumb') as string },
         ]} />
       )}
-      <p className="section-label text-accent-2 mb-3">{sectionLabel}</p>
-      <h1 className="font-heading text-[clamp(1.8rem,4vw,2.8rem)] italic font-light text-ink mb-10">
+      <h1 className="page-title mb-6">
         {title}
       </h1>
       <RequestForm initial={initial} />

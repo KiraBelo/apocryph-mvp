@@ -10,7 +10,7 @@ import MessageEditor from './game/MessageEditor'
 import SearchPanel from './game/SearchPanel'
 import StatusBanners from './game/StatusBanners'
 import ExportModal from './game/ExportModal'
-import SettingsModal from './game/SettingsModal'
+import GameSettingsPanel from './game/GameSettingsPanel'
 import TopBar from './game/TopBar'
 import NotesTab from './game/NotesTab'
 import PrepareTab from './game/PrepareTab'
@@ -201,6 +201,8 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         />
       )}
 
+      <div className="game-content">
+
       <StatusBanners
         isFrozen={isFrozen} moderationStatus={game.moderation_status}
         isLeft={isLeft}
@@ -259,6 +261,27 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         </>
       )}
 
+      {!isLeft && (
+        <GameSettingsPanel
+          open={showSettings}
+          gameId={gameId} me={me} partner={partner}
+          nickname={nickname} setNickname={setNickname} avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
+          bannerUrl={bannerUrl} setBannerUrl={setBannerUrl} bannerPref={bannerPref} setBannerPref={setBannerPref}
+          oocEnabled={oocEnabled} setOocEnabled={setOocEnabled}
+          onSettingsSaved={(n, a) => { chat.updateLocalNickname(userId, n, a || null); router.refresh() }}
+          onReport={() => setShowReport(true)}
+          onLeave={() => setShowLeave(true)}
+          onClose={() => setShowSettings(false)}
+          gameStatus={gameStatus}
+          icPostCount={icPostCount}
+          myPublishConsent={publishFlow.myPublishConsent}
+          publishLoading={publishLoading}
+          onProposePublish={handleProposePublish}
+        />
+      )}
+
+      </div>{/* /game-content */}
+
       {/* Quote toast */}
       {notesHook.quoteToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ink text-surface font-mono text-[0.7rem] tracking-[0.08em] px-[1.1rem] py-2 z-[600] pointer-events-none">{t('game.quotedToNotes') as string}</div>
@@ -310,16 +333,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         <ModerationSentModal onClose={() => setShowModerationSent(false)} />
       )}
 
-      {showSettings && (
-        <SettingsModal
-          gameId={gameId} game={game} me={me} partner={partner}
-          nickname={nickname} setNickname={setNickname} avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
-          bannerUrl={bannerUrl} setBannerUrl={setBannerUrl} bannerPref={bannerPref} setBannerPref={setBannerPref}
-          oocEnabled={oocEnabled} setOocEnabled={setOocEnabled}
-          onSettingsSaved={(n, a) => { chat.updateLocalNickname(userId, n, a || null); router.refresh() }}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
+      {/* Settings panel is rendered separately inside game-content */}
     </div>
   )
 }

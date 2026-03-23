@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const fandomType   = sp.get('fandom_type')  // fandom | original
   const pairing      = sp.get('pairing')      // sl | fm | gt | any
   const tags         = sp.get('tags')         // comma-separated
+  const language     = sp.get('language')     // ru | en
   const q            = sp.get('q')            // text search
   const mine         = sp.get('mine')         // 'true'
   const page         = Math.max(1, parseInt(sp.get('page') || '1', 10) || 1)
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
     if (contentLevel) { conditions.push(`r.content_level = $${p++}`); params.push(contentLevel) }
     if (fandomType)   { conditions.push(`r.fandom_type = $${p++}`);   params.push(fandomType) }
     if (pairing)      { conditions.push(`r.pairing = $${p++}`);       params.push(pairing) }
+    if (language)     { conditions.push(`r.language = $${p++}`);      params.push(language) }
     if (tags) {
       const tagArr = tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
       if (tagArr.length) {
@@ -85,7 +87,7 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * PAGE_SIZE
 
     const rows = await query(
-      `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.tags, r.status, r.is_public, r.created_at, r.updated_at, r.author_id
+      `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.language, r.tags, r.status, r.is_public, r.created_at, r.updated_at, r.author_id
        FROM requests r
        ${joinClause}
        ${where}
@@ -117,7 +119,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
   }
-  const { title, description, type, content_level, fandom_type, pairing, tags, is_public, status } = body
+  const { title, description, type, content_level, fandom_type, pairing, language, tags, is_public, status } = body
 
   if (!title || !type || !content_level) {
     return NextResponse.json({ error: 'fillRequired' }, { status: 400 })
@@ -134,49 +136,54 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Anti-spam: rate limit (5 requests/day)
-    const recentCount = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM requests WHERE author_id = $1 AND created_at > NOW() - INTERVAL '1 day'`,
-      [user.id]
-    )
-    if (recentCount && parseInt(recentCount.count) >= 5) {
-      return NextResponse.json({ error: 'requestLimitReached' }, { status: 429 })
-    }
+    // Anti-spam checks apply only to published requests (status = 'active'), not drafts
+    const isPublishing = status === 'active'
 
-    // Anti-spam: cooldown (2 minutes between requests)
-    const lastRequest = await queryOne<{ created_at: string }>(
-      `SELECT created_at FROM requests WHERE author_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [user.id]
-    )
-    if (lastRequest) {
-      const diff = Date.now() - new Date(lastRequest.created_at).getTime()
-      if (diff < 2 * 60 * 1000) {
-        return NextResponse.json({ error: 'requestCooldown' }, { status: 429 })
+    if (isPublishing && process.env.NODE_ENV !== 'development') {
+      // Anti-spam: rate limit (5 published requests/day, drafts unlimited)
+      const recentCount = await queryOne<{ count: string }>(
+        `SELECT COUNT(*) as count FROM requests WHERE author_id = $1 AND status = 'active' AND created_at > NOW() - INTERVAL '1 day'`,
+        [user.id]
+      )
+      if (recentCount && parseInt(recentCount.count) >= 5) {
+        return NextResponse.json({ error: 'requestLimitReached' }, { status: 429 })
       }
-    }
 
-    // Anti-spam: fuzzy duplicate detection (similar title OR body in last 24h)
-    const duplicate = await queryOne<{ id: string }>(
-      `SELECT id FROM requests
-       WHERE author_id = $1 AND created_at > NOW() - INTERVAL '1 day'
-       AND (
-         similarity(LOWER(title), LOWER($2)) > 0.7
-         OR ($3 IS NOT NULL AND $3 != '' AND similarity(body, $3) > 0.7)
-       ) LIMIT 1`,
-      [user.id, title, description || null]
-    )
-    if (duplicate) {
-      return NextResponse.json({ error: 'duplicateRequest' }, { status: 409 })
+      // Anti-spam: cooldown (3 minutes between published requests)
+      const lastRequest = await queryOne<{ created_at: string }>(
+        `SELECT created_at FROM requests WHERE author_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+        [user.id]
+      )
+      if (lastRequest) {
+        const diff = Date.now() - new Date(lastRequest.created_at).getTime()
+        if (diff < 3 * 60 * 1000) {
+          return NextResponse.json({ error: 'requestCooldown' }, { status: 429 })
+        }
+      }
+
+      // Anti-spam: fuzzy duplicate detection (similar title OR body in last 24h)
+      const duplicate = await queryOne<{ id: string }>(
+        `SELECT id FROM requests
+         WHERE author_id = $1 AND created_at > NOW() - INTERVAL '1 day'
+         AND (
+           similarity(LOWER(title), LOWER($2)) > 0.7
+           OR ($3::text IS NOT NULL AND $3::text != '' AND similarity(body, $3::text) > 0.7)
+         ) LIMIT 1`,
+        [user.id, title, description || null]
+      )
+      if (duplicate) {
+        return NextResponse.json({ error: 'duplicateRequest' }, { status: 409 })
+      }
     }
 
     const structuredTags: { id?: number; slug: string }[] = body.structured_tags || []
 
     const row = await withTransaction(async (client) => {
       const res = await client.query(
-        `INSERT INTO requests (author_id, title, body, type, content_level, fandom_type, pairing, tags, is_public, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        `INSERT INTO requests (author_id, title, body, type, content_level, fandom_type, pairing, language, tags, is_public, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [user.id, title, sanitizeBody(description), type, content_level,
-         fandom_type || 'original', pairing || 'any',
+         fandom_type || 'original', pairing || 'any', language || 'ru',
          tagsArr, is_public ?? true, status || 'draft']
       )
       const request = res.rows[0]

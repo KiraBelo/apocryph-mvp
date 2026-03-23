@@ -87,14 +87,14 @@ export default function AdminUsers() {
   }
 
   const roleBadge = (role: string) => {
-    if (role === 'admin') return <span className="badge" style={{ background: '#8b1a1a22', color: '#8b1a1a' }}>admin</span>
-    if (role === 'moderator') return <span className="badge" style={{ background: '#2980b922', color: '#2980b9' }}>mod</span>
+    if (role === 'admin') return <span className="badge badge-admin">admin</span>
+    if (role === 'moderator') return <span className="badge badge-mod">mod</span>
     return null
   }
 
   return (
-    <div className="max-w-[900px] mx-auto py-12 px-6">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-[900px] mx-auto py-8 px-6">
+      <div className="flex items-center justify-between mb-5">
         <h1 className="page-title">{t('admin.users') as string}</h1>
         <Link href="/admin" className="link-accent text-ink-2 font-mono text-[0.75rem]">
           ← {t('admin.dashboard') as string}
@@ -122,7 +122,7 @@ export default function AdminUsers() {
                   <span className="font-mono text-[0.85rem] text-ink truncate">{u.email}</span>
                   {roleBadge(u.role)}
                   {u.banned_at && (
-                    <span className="badge" style={{ background: '#c0392b22', color: '#c0392b' }}>
+                    <span className="badge badge-danger">
                       {t('admin.banned') as string}
                     </span>
                   )}

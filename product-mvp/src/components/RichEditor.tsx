@@ -11,6 +11,7 @@ import Underline from '@tiptap/extension-underline'
 import { useState, useEffect, useRef } from 'react'
 import { FONT_GROUPS } from '@/lib/fonts'
 import { useT } from './SettingsContext'
+import { X, Music, MessageSquareCheck, Smile, Dice5 } from 'lucide-react'
 
 // Custom TipTap node for SMS meta line (time + checkmarks)
 const SMSMeta = Node.create({
@@ -264,21 +265,22 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
       type="button"
       onClick={onClick}
       title={title}
-      className={`font-mono text-[0.75rem] border-none p-[0.25rem_0.45rem] cursor-pointer rounded-[2px] leading-none
+      className={`font-mono border-none p-[0.05rem_0.15rem] cursor-pointer rounded-[2px] leading-none min-w-[16px] text-center
         ${active ? 'font-bold bg-accent-dim text-accent' : 'font-normal bg-transparent text-ink-2'}`}
+      style={{ fontSize: 'var(--game-toolbar-btn)' }}
     >
       {children}
     </button>
   )
 
   const sep = () => (
-    <span className="w-px bg-edge mx-[0.2rem] self-stretch" />
+    <span className="w-px bg-edge mx-[0.1rem] self-stretch" />
   )
 
   return (
     <div className="border border-edge bg-surface-2">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-[0.15rem] p-[0.45rem_0.65rem] border-b border-edge bg-surface-3">
+      <div className="flex flex-wrap items-center gap-[0.05rem] border-b border-edge bg-surface-3" style={{ padding: '0.2rem var(--game-editor-px)' }}>
         {/* Text style */}
         {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), <strong>B</strong>, t('editor.boldCtrl') as string)}
         {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), <em>I</em>, t('editor.italicCtrl') as string)}
@@ -318,14 +320,14 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
         {sep()}
 
         {/* Font family */}
-        <div className="relative" ref={fontMenuRef}>
+        <div className="relative flex items-center" ref={fontMenuRef}>
           <button
             type="button"
             onClick={() => setFontMenuOpen(!fontMenuOpen)}
             title={t('editor.font') as string}
-            className="text-[0.68rem] border border-edge p-[0.2rem_0.4rem] cursor-pointer rounded-[2px] leading-none
-              hover:bg-accent-dim/20 transition-colors max-w-[100px] truncate"
-            style={{ fontFamily: editor.getAttributes('textStyle')?.fontFamily || 'var(--site-font)' }}
+            className="border-none p-[0.05rem_0.15rem] cursor-pointer rounded-[2px]
+              bg-transparent text-ink-2 hover:text-ink transition-colors max-w-[90px] truncate font-heading italic leading-none"
+            style={{ fontSize: 'calc(var(--game-toolbar-btn) + 0.1rem)', fontWeight: 'normal' }}
           >
             {FONT_GROUPS.flatMap(g => g.fonts).find(f => f.value === editor.getAttributes('textStyle')?.fontFamily)?.label || 'шрифт'}
           </button>
@@ -402,8 +404,8 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
         {sep()}
 
         {/* Clear + Music embed + SMS + Emoji */}
-        {btn(false, () => editor.chain().focus().unsetAllMarks().clearNodes().run(), '✕', t('editor.clearFormatting') as string)}
-        {btn(musicOpen, () => { setMusicOpen(m => !m); setEmbedError('') }, <span className="text-[1rem] leading-none">♫</span>, t('editor.embedMusic') as string)}
+        {btn(false, () => editor.chain().focus().unsetAllMarks().clearNodes().run(), <X size={13} strokeWidth={2} />, t('editor.clearFormatting') as string)}
+        {btn(musicOpen, () => { setMusicOpen(m => !m); setEmbedError('') }, <Music size={14} strokeWidth={1.8} />, t('editor.embedMusic') as string)}
         {btn(editor.isActive('smsBlock'), () => {
           // Check if any content is already inside smsBlock
           let hasSms = false
@@ -431,9 +433,9 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
             editor.commands.setContent(patched)
             editor.commands.focus('end')
           }
-        }, <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="12" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/></svg>, t('editor.smsBubble') as string)}
+        }, <MessageSquareCheck size={14} strokeWidth={1.8} />, t('editor.smsBubble') as string)}
         <div ref={emojiRef} className="relative inline-flex">
-          {btn(emojiOpen, () => setEmojiOpen(o => !o), <span className="text-[0.9rem] leading-none">☺</span>, t('editor.emoji') as string)}
+          {btn(emojiOpen, () => setEmojiOpen(o => !o), <Smile size={14} strokeWidth={1.8} />, t('editor.emoji') as string)}
           {emojiOpen && <EmojiDropdown onSelect={(emoji: string) => { editor.chain().focus().insertContent(emoji).run(); setEmojiOpen(false) }} />}
         </div>
         {/* Translator button hidden for now — translateContent() is available */}
@@ -442,17 +444,10 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
             type="button"
             onClick={onDiceClick}
             title={t('editor.rollDice') as string}
-            className={`border-none p-[0.25rem_0.45rem] cursor-pointer rounded-[2px] leading-none inline-flex items-center
+            className={`border-none p-[0.05rem_0.15rem] cursor-pointer rounded-[2px] leading-none inline-flex items-center
               ${diceActive ? 'bg-accent-dim text-accent' : 'bg-transparent text-ink-2'}`}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="3"/>
-              <circle cx="8" cy="8" r="1.3" fill="currentColor"/>
-              <circle cx="16" cy="8" r="1.3" fill="currentColor"/>
-              <circle cx="8" cy="16" r="1.3" fill="currentColor"/>
-              <circle cx="16" cy="16" r="1.3" fill="currentColor"/>
-              <circle cx="12" cy="12" r="1.3" fill="currentColor"/>
-            </svg>
+            <Dice5 size={14} strokeWidth={1.8} />
           </button>
         )}
       </div>

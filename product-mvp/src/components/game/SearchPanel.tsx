@@ -1,6 +1,7 @@
 'use client'
 import { useT } from '../SettingsContext'
 import { htmlToText } from '@/lib/game-utils'
+import { X } from 'lucide-react'
 import type { SearchResult, NoteEntry } from './types'
 
 interface SearchPanelProps {
@@ -42,7 +43,7 @@ export default function SearchPanel({
             </button>
           ))}
         </div>
-        <button onClick={onClose} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.9rem]">✕</button>
+        <button onClick={onClose} className="bg-transparent border-none text-ink-2 cursor-pointer flex items-center"><X size={14} strokeWidth={2} aria-hidden="true" /></button>
       </div>
 
       {/* Search results */}

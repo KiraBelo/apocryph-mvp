@@ -125,8 +125,8 @@ export default function AdminStopList() {
   }
 
   return (
-    <div className="max-w-[900px] mx-auto py-12 px-6">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-[900px] mx-auto py-8 px-6">
+      <div className="flex items-center justify-between mb-5">
         <h1 className="page-title">{t('admin.stopList') as string}</h1>
         <Link href="/admin" className="link-accent text-ink-2 font-mono text-[0.75rem]">
           ← {t('admin.dashboard') as string}
@@ -194,7 +194,7 @@ export default function AdminStopList() {
                     <div className="flex items-center gap-2">
                       <code className="font-mono text-[0.85rem] text-ink">{p.phrase}</code>
                       {!p.is_active && (
-                        <span className="badge" style={{ background: 'var(--bg-3)', color: 'var(--text-2)' }}>
+                        <span className="badge badge-muted">
                           OFF
                         </span>
                       )}
@@ -242,7 +242,7 @@ export default function AdminStopList() {
                         <code className="font-mono text-[0.8rem] text-accent">{v.phrase}</code>
                         <span className="badge badge-tag">{v.message_type.toUpperCase()}</span>
                         {v.auto_hidden && (
-                          <span className="badge" style={{ background: '#c0392b22', color: '#c0392b' }}>
+                          <span className="badge badge-danger">
                             {t('admin.stopAutoHidden') as string}
                           </span>
                         )}

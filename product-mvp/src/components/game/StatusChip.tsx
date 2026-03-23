@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '../SettingsContext'
 import type { GameStatus } from '@/types/api'
+import { ChevronDown } from 'lucide-react'
 
 interface StatusChipProps {
   gameStatus: GameStatus
@@ -32,7 +33,7 @@ export default function StatusChip({
   // Admin freeze takes priority
   if (isFrozen) {
     return (
-      <span className={`${chipBase} text-ink-2`} style={{ cursor: 'default' }}>
+      <span className={`${chipBase} text-ink-2 chip-static`}>
         {t('game.chipFrozen') as string}
       </span>
     )
@@ -41,7 +42,7 @@ export default function StatusChip({
   // On moderation — static label
   if (gameStatus === 'moderation') {
     return (
-      <span className={`${chipBase} text-ink-2`} style={{ cursor: 'default' }}>
+      <span className={`${chipBase} text-ink-2 chip-static`}>
         {t('game.chipModeration') as string}
       </span>
     )
@@ -58,7 +59,7 @@ export default function StatusChip({
             setOpen(o => !o)
           }}
         >
-          {t('game.chipPublished') as string} ▾
+          {t('game.chipPublished') as string} <ChevronDown size={10} className="inline" aria-hidden="true" />
         </button>
         {open && (
           <DropdownMenu onClose={() => setOpen(false)} skipCloseRef={skipCloseRef}>
@@ -84,7 +85,7 @@ export default function StatusChip({
             setOpen(o => !o)
           }}
         >
-          {t('game.chipPreparing') as string} ▾
+          {t('game.chipPreparing') as string} <ChevronDown size={10} className="inline" aria-hidden="true" />
         </button>
         {open && (
           <DropdownMenu onClose={() => setOpen(false)} skipCloseRef={skipCloseRef}>
@@ -115,8 +116,8 @@ export default function StatusChip({
             setOpen(o => !o)
           }}
         >
-          {t('game.chipPublishRequest') as string} ▾
-          <span className="ml-[0.3em] inline-block w-[5px] h-[5px] rounded-full align-middle" style={{ background: 'var(--accent)', marginBottom: '1px' }} />
+          {t('game.chipPublishRequest') as string} <ChevronDown size={10} className="inline" aria-hidden="true" />
+          <span className="ml-[0.3em] dot-accent" />
         </button>
         {open && (
           <DropdownMenu onClose={() => setOpen(false)} skipCloseRef={skipCloseRef}>
@@ -169,8 +170,7 @@ function DropdownMenu({ children, onClose, skipCloseRef }: {
   return (
     <div
       ref={ref}
-      className="absolute top-full left-0 mt-[2px] min-w-[160px] border border-edge bg-surface z-50 flex flex-col"
-      style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
+      className="absolute top-full left-0 mt-[2px] min-w-[160px] border border-edge bg-surface z-50 flex flex-col dropdown-shadow"
     >
       {children}
     </div>

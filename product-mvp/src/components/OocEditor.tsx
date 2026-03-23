@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import { Mark, mergeAttributes } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { useEffect } from 'react'
+import { X } from 'lucide-react'
 import { useT } from './SettingsContext'
 
 // Custom mark for spoiler text
@@ -90,7 +91,7 @@ export default function OocEditor({ content, onChange, placeholder }: Props) {
           t('editor.spoilerTitle') as string
         )}
         {sep()}
-        {btn(false, () => editor.chain().focus().unsetAllMarks().run(), '✕', t('editor.clearFormatting') as string)}
+        {btn(false, () => editor.chain().focus().unsetAllMarks().run(), <X size={13} strokeWidth={2} />, t('editor.clearFormatting') as string)}
       </div>
       <EditorContent editor={editor} />
     </div>

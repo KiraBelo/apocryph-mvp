@@ -39,7 +39,7 @@ export default function LoginPage() {
         <h1 className="font-heading text-[2.4rem] italic mb-2 text-ink">
           {t('auth.loginTitle') as string}
         </h1>
-        <p className="text-ink-2 mb-10 font-body">
+        <p className="text-ink-2 mb-6 font-body">
           &nbsp;
         </p>
 

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useSettings, useT } from './SettingsContext'
+import { Settings, LogOut, X, Menu } from 'lucide-react'
 
 interface UnreadGame { id: string; title: string | null; ic_unread: string; ooc_unread: string }
 interface Proposal { id: string; title: string | null; type: 'finish' | 'publish' }
@@ -348,10 +349,7 @@ export default function Nav({ user }: Props) {
           className="bg-transparent border-none text-ink-2 p-[0.2rem] cursor-pointer flex items-center"
           aria-label={t('nav.settings') as string}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
+          <Settings size={18} strokeWidth={1.8} aria-hidden="true" />
         </button>
 
         {user ? (
@@ -361,11 +359,7 @@ export default function Nav({ user }: Props) {
               className="bg-transparent border-none text-ink-2 p-[0.2rem] cursor-pointer flex items-center"
               aria-label={t('nav.logout') as string}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/>
-                <path d="M17 8l4 4-4 4"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
+              <LogOut size={18} strokeWidth={1.8} aria-hidden="true" />
             </button>
           </form>
         ) : (
@@ -388,18 +382,10 @@ export default function Nav({ user }: Props) {
           aria-label={mobileOpen ? t('nav.closeMenu') as string : t('nav.openMenu') as string}
           aria-expanded={mobileOpen}
         >
-          {mobileOpen ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <line x1="3" y1="6" x2="21" y2="6"/>
-              <line x1="3" y1="12" x2="21" y2="12"/>
-              <line x1="3" y1="18" x2="21" y2="18"/>
-            </svg>
-          )}
+          {mobileOpen
+            ? <X size={22} strokeWidth={2} aria-hidden="true" />
+            : <Menu size={22} strokeWidth={2} aria-hidden="true" />
+          }
         </button>
       </div>
 
@@ -436,10 +422,7 @@ export default function Nav({ user }: Props) {
               className="bg-transparent border-none text-ink-2 p-[0.2rem] cursor-pointer flex items-center"
               aria-label={t('nav.settings') as string}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
+              <Settings size={20} strokeWidth={1.8} aria-hidden="true" />
             </button>
             {user ? (
               <form action="/api/auth/logout" method="POST">
@@ -448,11 +431,7 @@ export default function Nav({ user }: Props) {
                   className="bg-transparent border-none text-ink-2 p-[0.2rem] cursor-pointer flex items-center"
                   aria-label={t('nav.logout') as string}
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/>
-                    <path d="M17 8l4 4-4 4"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                  </svg>
+                  <LogOut size={20} strokeWidth={1.8} aria-hidden="true" />
                 </button>
               </form>
             ) : (

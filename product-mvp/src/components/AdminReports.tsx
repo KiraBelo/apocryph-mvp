@@ -77,8 +77,8 @@ export default function AdminReports() {
   }
 
   return (
-    <div className="max-w-[900px] mx-auto py-12 px-6">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-[900px] mx-auto py-8 px-6">
+      <div className="flex items-center justify-between mb-5">
         <h1 className="page-title">{t('admin.reports') as string}</h1>
         <Link href="/admin" className="link-accent text-ink-2 font-mono text-[0.75rem]">
           ← {t('admin.dashboard') as string}
@@ -119,7 +119,7 @@ export default function AdminReports() {
                       {r.pending_count} {t('admin.reportCount') as string}
                     </span>
                     {r.moderation_status !== 'visible' && (
-                      <span className="badge" style={{ background: '#c0392b22', color: '#c0392b' }}>
+                      <span className="badge badge-danger">
                         {r.moderation_status}
                       </span>
                     )}

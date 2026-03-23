@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback, memo } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
-import { feedPostBg } from '@/lib/game-utils'
 import PublicComments from './game/PublicComments'
+import { Heart } from 'lucide-react'
 
-const MsgContent = memo(function MsgContent({ html, className, style }: { html: string; className?: string; style?: React.CSSProperties }) {
-  return <div className={className} style={style} dangerouslySetInnerHTML={{ __html: html }} />
+const MsgContent = memo(function MsgContent({ html, className }: { html: string; className?: string }) {
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
 }, (prev, next) => prev.html === next.html && prev.className === next.className)
 
 interface Participant {
@@ -39,15 +39,12 @@ interface GameData {
   total: number
 }
 
-type Layout = 'dialog' | 'feed' | 'book'
-
 export default function PublicGameViewer({ gameId, userId }: { gameId: string; userId: string | null }) {
   const t = useT()
   const [data, setData] = useState<GameData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [page, setPage] = useState(1)
-  const [layout, setLayout] = useState<Layout>('feed')
   const [likesCount, setLikesCount] = useState(0)
   const [liked, setLiked] = useState(false)
   const [likeLoading, setLikeLoading] = useState(false)
@@ -91,7 +88,7 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
 
   if (loading && !data) {
     return (
-      <div className="max-w-[1400px] mx-auto px-7 py-12">
+      <div className="max-w-[920px] mx-auto px-8 py-12">
         <p className="text-ink-2 font-heading italic">{t('library.loading') as string}</p>
       </div>
     )
@@ -99,7 +96,7 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
 
   if (error || !data) {
     return (
-      <div className="max-w-[1400px] mx-auto px-7 py-12">
+      <div className="max-w-[920px] mx-auto px-8 py-12">
         <p className="text-ink-2 font-heading italic">{t('library.notFound') as string}</p>
         <Link href="/library" className="link-accent no-underline mt-4 inline-block">
           {t('library.backToLibrary') as string}
@@ -110,6 +107,12 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
 
   const { game, request, participants, messages, totalPages } = data
   const authorUserIds = game.author_user_ids ?? []
+
+  // Build participant→side map: first participant = A (left), second = B (right)
+  const participantIds = [...new Set(messages.map(m => m.participant_id))]
+  const sideMap = new Map<string, 'a' | 'b'>()
+  participantIds.forEach((id, i) => sideMap.set(id, i === 0 ? 'a' : 'b'))
+
   const participantMap = new Map(participants.map(p => [p.id, p]))
 
   const contentLabels: Record<string, string> = {
@@ -118,215 +121,146 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
     flexible: t('filters.nsfwFlexible') as string,
   }
 
+  const metaParts = [
+    request?.type && (request.type === 'duo' ? t('filters.duo') as string : t('filters.multiplayer') as string),
+    request?.fandom_type && (request.fandom_type === 'fandom' ? t('filters.fandom') as string : t('filters.original') as string),
+    request?.pairing && request.pairing !== 'any' && (
+      request.pairing === 'sl' ? 'M/M' : request.pairing === 'fm' ? 'F/F' : request.pairing === 'gt' ? 'M/F' : request.pairing
+    ),
+    request?.content_level && (contentLabels[request.content_level] ?? request.content_level),
+  ].filter(Boolean) as string[]
+
+  const tags = request?.tags ?? []
+
   return (
-    <div className="max-w-[1400px] mx-auto px-7 py-12">
-      {/* Back link */}
-      <Link href="/library" className="link-accent no-underline text-[0.85rem] mb-6 inline-block">
-        ← {t('library.backToLibrary') as string}
-      </Link>
+    <div>
+      {/* ── Header ── */}
+      <div className="max-w-[920px] mx-auto px-8 pt-12">
+        <Link href="/library" className="link-accent no-underline mb-8 inline-block">
+          ← {t('library.backToLibrary') as string}
+        </Link>
 
-      {/* Banner */}
-      {game.banner_url && (
-        <div className="mb-6 rounded overflow-hidden" style={{ maxHeight: '200px' }}>
-          <img src={game.banner_url} alt="" className="w-full object-cover" style={{ maxHeight: '200px' }} />
-        </div>
-      )}
+        {/* Title */}
+        <h1 className="font-heading text-[2.4rem] italic font-light text-ink leading-[1.2] text-center mb-2">
+          {request?.title ?? t('nav.untitled') as string}
+        </h1>
 
-      {/* Title */}
-      <h1 className="page-title mb-4">
-        {request?.title ?? t('nav.untitled') as string}
-      </h1>
+        {/* Meta line */}
+        <p className="font-mono text-[0.6rem] tracking-[0.1em] uppercase text-ink-3 text-center mb-1">
+          {metaParts.join(' / ')}
+        </p>
 
-      {/* Badges */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        {request?.type && (
-          <span className="badge badge-type">
-            {request.type === 'duo' ? t('filters.duo') as string : t('filters.multiplayer') as string}
-          </span>
-        )}
-        {request?.fandom_type && (
-          <span className="badge badge-fandom">
-            {request.fandom_type === 'fandom' ? t('filters.fandom') as string : t('filters.original') as string}
-          </span>
-        )}
-        {request?.pairing && request.pairing !== 'any' && (
-          <span className="badge badge-fandom">
-            {request.pairing === 'sl' ? 'M/M' : request.pairing === 'fm' ? 'F/F' : request.pairing === 'gt' ? 'M/F' : request.pairing}
-          </span>
-        )}
-        {request?.content_level && (
-          <span className="badge badge-content">{contentLabels[request.content_level] ?? request.content_level}</span>
-        )}
-        {(request?.tags ?? []).map(tag => (
-          <span key={tag} className="badge badge-tag">#{tag.toLowerCase()}</span>
-        ))}
-      </div>
+        {/* Authors */}
+        <p className="font-heading text-[1.1rem] italic text-ink-2 text-center mb-3">
+          {participants.map(p => p.nickname).join('  &  ')}
+        </p>
 
-      {/* Participants */}
-      <div className="flex items-center gap-3 mb-6">
-        <span className="section-label">{t('library.participants') as string}</span>
-        {participants.map(p => (
-          <span key={p.id} className="flex items-center gap-1.5">
-            {p.avatar_url ? (
-              <img src={p.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-            ) : (
-              <span className="w-5 h-5 rounded-full bg-surface-3 flex items-center justify-center font-mono text-[0.5rem] text-ink-2">
-                {p.nickname[0]?.toUpperCase()}
+        {/* Tags */}
+        {tags.length > 0 && (
+          <div className="flex justify-center flex-wrap gap-[0.4rem] mb-4">
+            {tags.map(tag => (
+              <span key={tag} className="font-mono text-[0.55rem] tracking-[0.05em] uppercase p-[0.12rem_0.4rem] text-ink-3 border border-edge">
+                {tag.toLowerCase()}
               </span>
-            )}
-            <span className="font-body text-[0.85rem] text-ink">{p.nickname}</span>
-          </span>
-        ))}
-      </div>
+            ))}
+          </div>
+        )}
 
-      {/* Like button */}
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={toggleLike}
-          disabled={!userId || likeLoading}
-          className="flex items-center gap-1.5 font-mono text-[0.65rem] tracking-[0.08em] border border-edge px-3 py-1.5 cursor-pointer transition-colors duration-150"
-          style={{
-            background: liked ? 'var(--accent-dim)' : 'transparent',
-            color: liked ? 'var(--accent)' : 'var(--text-2)',
-            borderColor: liked ? 'var(--accent)' : 'var(--border)',
-            cursor: userId ? 'pointer' : 'default',
-          }}
-          title={!userId ? (t('game.likeLoginHint') as string) : undefined}
-        >
-          <span>{liked ? '♥' : '♡'}</span>
-          <span>{t('game.likeButton') as string}</span>
-          {likesCount > 0 && <span className="opacity-60">({likesCount})</span>}
-        </button>
-      </div>
+        {/* Epigraph (request body preview) */}
+        {request?.body && (
+          <p className="font-heading italic text-[0.95rem] text-ink-2 leading-[1.65] max-w-[500px] mx-auto text-center mb-5 line-clamp-3">
+            {request.body.replace(/<[^>]+>/g, '').slice(0, 200)}
+          </p>
+        )}
 
-      {/* Layout switcher */}
-      <div className="flex items-center gap-2 mb-6">
-        <span className="section-label mr-2">{t('library.layout') as string}</span>
-        {([['dialog', t('game.layoutDialog')], ['feed', t('game.layoutFeed')], ['book', t('game.layoutBook')]] as [Layout, string][]).map(([l, label]) => (
+        {/* Like button */}
+        <div className="flex justify-center mb-4">
           <button
-            key={l}
-            onClick={() => setLayout(l)}
-            className={`font-mono text-[0.6rem] tracking-[0.1em] uppercase border-none cursor-pointer py-1 px-2
-              ${layout === l ? 'bg-accent text-white' : 'bg-transparent text-ink-2 hover:text-ink'}`}
+            onClick={toggleLike}
+            disabled={!userId || likeLoading}
+            className={`flex items-center gap-[0.4rem] font-mono text-[0.62rem] tracking-[0.08em] border px-3 py-[0.3rem] transition-colors duration-150
+              ${liked ? 'bg-accent-dim text-accent border-accent' : 'bg-transparent text-ink-2 border-edge'}
+              ${userId ? 'cursor-pointer' : 'cursor-default'}`}
+            title={!userId ? (t('game.likeLoginHint') as string) : undefined}
           >
-            {label}
+            <Heart size={14} strokeWidth={1.6} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
+            {t('game.likeButton') as string}
+            {likesCount > 0 && <span className="opacity-60">({likesCount})</span>}
           </button>
-        ))}
+        </div>
       </div>
 
-      {/* Messages */}
-      <div className={`flex flex-col gap-0 mx-auto w-full ${layout === 'feed' ? 'max-w-[1050px]' : ''}`}>
-        {messages.map((msg, idx) => {
-          const author = participantMap.get(msg.participant_id)
-          const nickname = author?.nickname ?? msg.nickname
-          const avatarUrl = author?.avatar_url ?? msg.avatar_url
-          const isFirst = idx === 0 || messages[idx - 1].participant_id !== msg.participant_id
-          const initial = nickname[0]?.toUpperCase() ?? '?'
+      {/* ── Divider ── */}
+      <div className="max-w-[920px] mx-auto border-t border-edge my-6" />
 
-          if (layout === 'book') {
+      {/* ── Reading area ── */}
+      <div className="max-w-[920px] mx-auto px-8 pb-12">
+        <div className="flex flex-col">
+          {messages.map(msg => {
+            const author = participantMap.get(msg.participant_id)
+            const nickname = author?.nickname ?? msg.nickname
+            const side = sideMap.get(msg.participant_id) ?? 'a'
+
             return (
-              <div key={msg.id} className="py-3 border-b border-edge">
-                {isFirst && (
-                  <p className="font-mono text-[0.6rem] tracking-[0.12em] uppercase text-ink-2 mb-1">{nickname}</p>
-                )}
-                <MsgContent html={msg.content} className="font-body text-[0.95rem] text-ink leading-relaxed tiptap-content" />
+              <div key={msg.id} className="mb-5">
+                <p className={`font-heading text-[0.85rem] italic mb-[0.3rem] ${side === 'a' ? 'text-accent-2' : 'text-accent text-right'}`}>
+                  {nickname}
+                </p>
+                <MsgContent
+                  html={msg.content}
+                  className="tiptap-content text-[1.05rem] leading-[1.85] text-ink"
+                  /* justify + hyphens via inline since tiptap-content sets font */
+                />
               </div>
             )
-          }
+          })}
+        </div>
 
-          if (layout === 'feed') {
-            const isEven = idx % 2 === 0
-            return (
-              <div
-                key={msg.id}
-                className="flex gap-3 py-3 px-4"
-                style={{
-                  flexDirection: isEven ? 'row' : 'row-reverse',
-                  background: feedPostBg(msg.participant_id),
-                }}
-              >
-                {isFirst && (
-                  <div className="shrink-0">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                      <span className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center font-mono text-[0.55rem] text-ink-2">
-                        {initial}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {!isFirst && <div className="w-8 shrink-0" />}
-                <div className="flex-1 min-w-0" style={{ textAlign: isEven ? 'left' : 'right' }}>
-                  {isFirst && (
-                    <p className="font-mono text-[0.6rem] tracking-[0.12em] uppercase text-ink-2 mb-1">{nickname}</p>
-                  )}
-                  <MsgContent html={msg.content} className="font-body text-[0.95rem] text-ink leading-relaxed tiptap-content" />
-                </div>
-              </div>
-            )
-          }
-
-          // dialog layout
-          const isMine = idx % 2 === 0
-          return (
-            <div
-              key={msg.id}
-              className="flex gap-3 py-3 px-4"
-              style={{ justifyContent: isMine ? 'flex-end' : 'flex-start' }}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-[0.5rem] pt-6 border-t border-edge mt-8">
+            <button
+              onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+              disabled={page === 1}
+              className="page-btn"
             >
-              {!isMine && isFirst && (
-                avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+              .reduce<(number | 'dots')[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1]) > 1) acc.push('dots')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((item, i) =>
+                item === 'dots' ? (
+                  <span key={`d-${i}`} className="font-mono text-[0.6rem] text-ink-2 px-1">&hellip;</span>
                 ) : (
-                  <span className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center font-mono text-[0.55rem] text-ink-2 shrink-0">
-                    {initial}
-                  </span>
+                  <button
+                    key={item}
+                    onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                    className={`page-btn ${item === page ? 'page-btn-active' : ''}`}
+                  >
+                    {item}
+                  </button>
                 )
               )}
-              {!isMine && !isFirst && <div className="w-8 shrink-0" />}
-              <div className="max-w-[75%] min-w-0">
-                {isFirst && (
-                  <p className={`font-mono text-[0.6rem] tracking-[0.12em] uppercase text-ink-2 mb-1 ${isMine ? 'text-right' : ''}`}>
-                    {nickname}
-                  </p>
-                )}
-                <div
-                  className="p-3 rounded"
-                  style={{ background: isMine ? 'var(--accent-dim)' : 'var(--bg-3)' }}
-                >
-                  <MsgContent html={msg.content} className="font-body text-[0.95rem] text-ink leading-relaxed tiptap-content" />
-                </div>
-              </div>
-            </div>
-          )
-        })}
+            <button
+              onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+              disabled={page === totalPages}
+              className="page-btn"
+            >
+              ›
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-8">
-          <button
-            onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-            disabled={page === 1}
-            className="btn-ghost text-[0.65rem] tracking-[0.1em] p-[0.35rem_0.8rem] disabled:opacity-30"
-          >
-            {t('feed.prev') as string}
-          </button>
-          <span className="font-mono text-[0.7rem] text-ink-2">
-            {page} / {totalPages}
-          </span>
-          <button
-            onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-            disabled={page === totalPages}
-            className="btn-ghost text-[0.65rem] tracking-[0.1em] p-[0.35rem_0.8rem] disabled:opacity-30"
-          >
-            {t('feed.next') as string}
-          </button>
-        </div>
-      )}
-
-      <PublicComments gameId={gameId} userId={userId} authorUserIds={authorUserIds} />
+      {/* Comments */}
+      <div className="max-w-[920px] mx-auto px-8 pb-12">
+        <PublicComments gameId={gameId} userId={userId} authorUserIds={authorUserIds} />
+      </div>
     </div>
   )
 }

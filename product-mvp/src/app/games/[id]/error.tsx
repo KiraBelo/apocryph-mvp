@@ -12,7 +12,7 @@ export default function GameError({ reset }: { reset: () => void }) {
         <h1 className="font-heading text-[clamp(2rem,6vw,3.5rem)] italic font-light text-ink mb-4">
           Не удалось загрузить игру
         </h1>
-        <p className="text-ink-2 font-body text-[1.05rem] max-w-[400px] mx-auto mb-8">
+        <p className="text-ink-2 font-body text-[1.05rem] max-w-[400px] mx-auto mb-5">
           Произошла ошибка при загрузке игрового диалога. Попробуйте обновить страницу или вернуться к списку игр.
         </p>
         <div className="flex gap-6 justify-center">

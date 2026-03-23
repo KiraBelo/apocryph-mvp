@@ -9,7 +9,7 @@ import ConfirmDialog from './ConfirmDialog'
 
 interface Request {
   id: string; title: string; body: string | null; type: string; content_level: string
-  fandom_type: string; pairing: string; tags: string[]; status: string; author_id: string; is_public: boolean
+  fandom_type: string; pairing: string; language: string; tags: string[]; status: string; author_id: string; is_public: boolean
 }
 
 interface Props {
@@ -46,6 +46,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
     sl: 'M/M', fm: 'F/F', gt: 'M/F',
     any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string,
   }
+  const languageLabels: Record<string, string> = { ru: t('filters.langRu') as string, en: t('filters.langEn') as string }
 
   async function toggleBookmark() {
     const method = bookmarked ? 'DELETE' : 'POST'
@@ -120,7 +121,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
   }
 
   return (
-    <div className="max-w-[1050px] mx-auto px-7 py-12">
+    <div className="max-w-[1050px] mx-auto px-7 py-8">
       {/* Breadcrumbs */}
       <Breadcrumbs items={[
         { label: t('nav.feed') as string, href: '/feed' },
@@ -141,18 +142,19 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
       </div>
 
       {/* Tags */}
-      <div className="flex flex-wrap gap-2 mb-8">
+      <div className="flex flex-wrap gap-2 mb-5">
         <span className="badge badge-type">{typeLabels[request.type]}</span>
         <span className="badge badge-fandom">{fandomTypeLabels[request.fandom_type]}</span>
         {request.pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[request.pairing]}</span>}
         <span className="badge badge-content">{contentLabels[request.content_level]}</span>
+        <span className="badge badge-fandom">{languageLabels[request.language]}</span>
         {request.tags.map(tg => <span key={tg} className="badge text-ink-2 border-transparent bg-surface-3">{tg.toLowerCase()}</span>)}
       </div>
 
       {/* Body */}
       {request.body && (
         <div
-          className="tiptap-content mb-10 p-6 bg-surface-2 border border-edge"
+          className="tiptap-content mb-6 p-6 bg-surface-2 border border-edge"
           onClick={e => { const el = e.target as HTMLElement; if (el.classList.contains('ooc-spoiler')) el.classList.toggle('ooc-spoiler-open') }}
           dangerouslySetInnerHTML={{ __html: request.body }}
         />

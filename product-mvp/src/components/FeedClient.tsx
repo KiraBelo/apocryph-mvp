@@ -88,6 +88,7 @@ export default function FeedClient({ user }: Props) {
   const [fandomType, setFandomType] = useState('')
   const [pairing, setPairing] = useState('')
   const [content, setContent] = useState('')
+  const [language, setLanguage] = useState('')
   const [filterTags, setFilterTags] = useState<TagItem[]>([])
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set())
   const [blacklist, setBlacklist] = useState<string[]>([])
@@ -113,6 +114,7 @@ export default function FeedClient({ user }: Props) {
       if (fandomType) params.set('fandom_type', fandomType)
       if (pairing)    params.set('pairing', pairing)
       if (content)    params.set('content', content)
+      if (language)   params.set('language', language)
       if (tagsString) params.set('tags', tagsString)
       params.set('page', String(page))
       const res = await fetch(`/api/requests?${params}`)
@@ -124,12 +126,12 @@ export default function FeedClient({ user }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [q, type, fandomType, pairing, content, tagsString, page])
+  }, [q, type, fandomType, pairing, content, language, tagsString, page])
 
   useEffect(() => { load() }, [load])
 
   // Reset page when filters change
-  useEffect(() => { setPage(1) }, [q, type, fandomType, pairing, content, tagsString])
+  useEffect(() => { setPage(1) }, [q, type, fandomType, pairing, content, language, tagsString])
 
   useEffect(() => {
     if (!user) return
@@ -214,24 +216,24 @@ export default function FeedClient({ user }: Props) {
   const showPresetPanel = hasPresets || showSavePreset
 
   return (
-    <div className="max-w-[1050px] mx-auto px-7 py-12">
+    <div className="max-w-[1050px] mx-auto px-7 py-8">
       {/* Header */}
-      <div className="flex items-baseline justify-between mb-10 gap-4">
-        <div>
-          <p className="section-label mb-2">{t('feed.sectionLabel') as string}</p>
+      <div className="mb-6">
+        <p className="section-label mb-2">{t('feed.sectionLabel') as string}</p>
+        <div className="flex items-baseline justify-between gap-4">
           <h1 className="page-title text-[clamp(2rem,5vw,3rem)]">
             {t('feed.title') as string}
           </h1>
+          {user && (
+            <Link href="/requests/new" className="btn-primary text-[0.95rem] py-2 px-5 shrink-0">
+              {t('feed.createRequest') as string}
+            </Link>
+          )}
         </div>
-        {user && (
-          <Link href="/requests/new" className="btn-primary text-[0.95rem] py-2 px-5 shrink-0">
-            {t('feed.createRequest') as string}
-          </Link>
-        )}
       </div>
 
       {/* Filters */}
-      <div className={`flex flex-wrap gap-3 p-[1.25rem_1.5rem] bg-surface-2 border border-edge ${showPresetPanel || user ? '' : 'mb-8'}`}>
+      <div className={`flex flex-wrap gap-3 p-[0.75rem_1rem] bg-surface-2 border border-edge ${showPresetPanel || user ? '' : 'mb-5'}`}>
         <input
           type="search"
           placeholder={t('feed.searchPlaceholder') as string}
@@ -275,26 +277,24 @@ export default function FeedClient({ user }: Props) {
           onChange={setContent}
           options={CONTENT_LEVELS}
         />
-        <div className="flex gap-1.5 flex-[1_1_250px] items-center">
-          <TagAutocomplete
-            selectedTags={filterTags}
-            onTagsChange={setFilterTags}
-            maxTags={10}
-            allowCreate={false}
-            placeholder={t('feed.filterTagsPlaceholder') as string}
-            className="flex-1 min-w-0"
-            chipsOutside
-          />
-          <button
-            onClick={openSavePreset}
-            disabled={!tagsString}
-            title={tagsString ? t('feed.saveAsPreset') as string : t('feed.enterTagsToSave') as string}
-            className="btn-ghost text-[0.85rem] tracking-normal py-1.5 px-2.5 shrink-0 leading-none"
-            style={{ opacity: tagsString ? 1 : 0.35, cursor: tagsString ? 'pointer' : 'default' }}
-          >
-            +
-          </button>
-        </div>
+        <FilterSelect
+          value={language}
+          onChange={setLanguage}
+          options={[
+            { value: '', label: t('filters.anyLanguage') as string },
+            { value: 'ru', label: t('filters.langRu') as string },
+            { value: 'en', label: t('filters.langEn') as string },
+          ]}
+        />
+        <TagAutocomplete
+          selectedTags={filterTags}
+          onTagsChange={setFilterTags}
+          maxTags={10}
+          allowCreate={false}
+          placeholder={t('feed.filterTagsPlaceholder') as string}
+          className="flex-[1_1_250px] min-w-0"
+          chipsOutside
+        />
         <button onClick={load} className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5">
           {t('feed.find') as string}
         </button>
@@ -314,19 +314,33 @@ export default function FeedClient({ user }: Props) {
               <button
                 type="button"
                 onClick={() => setFilterTags(filterTags.filter(t => t.slug !== tag.slug))}
-                className="ml-0.5 opacity-50 hover:opacity-100 cursor-pointer"
-                style={{ fontSize: '0.8rem', lineHeight: 1 }}
+                className="ml-0.5 opacity-50 hover:opacity-100 cursor-pointer chip-close"
               >
                 ×
               </button>
             </span>
           ))}
+          {user && (
+            <button
+              onClick={openSavePreset}
+              title={t('feed.saveAsPreset') as string}
+              className="tag-chip tag-chip-action flex items-center cursor-pointer transition-opacity"
+            >
+              +
+            </button>
+          )}
+          <button
+            onClick={() => setFilterTags([])}
+            className="tag-chip tag-chip-action flex items-center cursor-pointer transition-opacity"
+          >
+            {t('feed.clearAll') as string} ×
+          </button>
         </div>
       )}
 
       {/* Preset panel */}
       {showPresetPanel && (
-        <div className={`bg-surface-2 border border-edge border-t-0 ${user ? '' : 'mb-8'}`}>
+        <div className={`bg-surface-2 border border-edge border-t-0 ${user ? '' : 'mb-5'}`}>
           {hasPresets && (
             <div className={`px-6 py-2 flex items-center gap-2 flex-wrap ${showSavePreset ? 'border-b border-edge' : ''}`}>
               <span className="font-mono text-[0.6rem] tracking-[0.18em] uppercase text-accent-2 shrink-0">
@@ -394,7 +408,7 @@ export default function FeedClient({ user }: Props) {
 
       {/* Blacklist panel */}
       {user && (
-        <div className="mb-8 bg-surface-2 border border-edge border-t-0">
+        <div className="mb-5 bg-surface-2 border border-edge border-t-0">
           <div className="flex items-center justify-between px-6 py-2">
             <button
               onClick={() => setIsBlacklistOpen(o => !o)}

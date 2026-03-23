@@ -114,13 +114,7 @@ export default function MessageFeed({
                 key={p}
                 onClick={() => onGoToPage(isOoc ? 'ooc' : 'ic', p as number)}
                 disabled={pageLoading}
-                className="font-mono text-[0.65rem] border p-[0.2rem_0.45rem] cursor-pointer min-w-[1.6rem] text-center"
-                style={{
-                  background: p === currentPage ? 'var(--accent-dim)' : 'transparent',
-                  borderColor: p === currentPage ? 'var(--accent)' : 'var(--border)',
-                  color: p === currentPage ? 'var(--accent)' : 'var(--text-2)',
-                  fontWeight: p === currentPage ? 600 : 400,
-                }}
+                className={`page-btn ${p === currentPage ? 'page-btn-active' : ''}`}
               >{p}</button>
             )
           )}

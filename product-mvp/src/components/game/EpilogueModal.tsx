@@ -1,5 +1,5 @@
 'use client'
-import { useT } from '../SettingsContext'
+import { useT, usePlural } from '../SettingsContext'
 import { MIN_IC_POSTS } from '@/lib/constants'
 
 interface EpilogueModalProps {
@@ -17,14 +17,14 @@ export default function EpilogueModal({
   publishLoading, onPublish, onPrepare, onSkip,
 }: EpilogueModalProps) {
   const t = useT()
+  const tPlural = usePlural()
   const canPublish = icPostCount >= MIN_IC_POSTS
 
   return (
     <div
-      className="fixed inset-0 z-[600] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.65)' }}
+      className="fixed inset-0 z-[600] flex items-center justify-center p-4 overlay-heavy"
     >
-      <div className="w-full max-w-[460px] text-center" style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '3rem 2.5rem' }}>
+      <div className="w-full max-w-[460px] text-center epilogue-box">
 
         {/* Decorative line */}
         <div className="mx-auto mb-6 w-12 border-t border-edge" />
@@ -45,12 +45,12 @@ export default function EpilogueModal({
         </p>
 
         {/* Post count */}
-        <p className="font-mono text-[0.6rem] text-ink-2 tracking-wide mb-8">
-          {icPostCount} {t('game.epiloguePosts') as string}
+        <p className="font-mono text-[0.6rem] text-ink-2 tracking-wide mb-5">
+          {tPlural(icPostCount, 'game.epiloguePosts')}
         </p>
 
         {/* Decorative line */}
-        <div className="mx-auto mb-8 w-16 border-t border-edge" />
+        <div className="mx-auto mb-5 w-16 border-t border-edge" />
 
         {/* Buttons */}
         <div className="flex flex-col gap-3">

@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   const pairing = sp.get('pairing')
   const content = sp.get('content')
   const tags = sp.get('tags')
+  const language = sp.get('language')
   const q = sp.get('q')
 
   const conditions: string[] = [
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
   if (fandomType) { conditions.push(`r.fandom_type = $${p++}`); params.push(fandomType) }
   if (pairing) { conditions.push(`r.pairing = $${p++}`); params.push(pairing) }
   if (content) { conditions.push(`r.content_level = $${p++}`); params.push(content) }
+  if (language) { conditions.push(`r.language = $${p++}`); params.push(language) }
 
   if (tags) {
     const tagList = tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
@@ -67,13 +69,13 @@ export async function GET(req: NextRequest) {
       id: string; published_at: string; banner_url: string | null;
       request_title: string | null; request_type: string | null;
       request_fandom_type: string | null; request_pairing: string | null;
-      request_content_level: string | null; request_tags: string[] | null;
+      request_content_level: string | null; request_language: string | null; request_tags: string[] | null;
       ic_count: string; likes_count: string; participants: string
     }>(
       `SELECT g.id, g.published_at, g.banner_url,
               r.title as request_title, r.type as request_type,
               r.fandom_type as request_fandom_type, r.pairing as request_pairing,
-              r.content_level as request_content_level, r.tags as request_tags,
+              r.content_level as request_content_level, r.language as request_language, r.tags as request_tags,
               COALESCE(mc.ic_count, 0)::text as ic_count,
               COALESCE(lc.likes_count, 0)::text as likes_count,
               COALESCE(pp.participants, '[]')::text as participants

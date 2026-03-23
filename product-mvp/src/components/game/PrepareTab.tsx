@@ -4,6 +4,7 @@ import { useT } from '../SettingsContext'
 import { paginationRange } from '@/lib/game-utils'
 import RichEditor from '../RichEditor'
 import MsgContent from './MsgContent'
+import { Pencil } from 'lucide-react'
 import type { Message } from './types'
 
 interface PrepareTabProps {
@@ -126,13 +127,10 @@ export default function PrepareTab({
                       setEditContent(msg.content)
                       setErrorMsg(null)
                     }}
-                    className="bg-transparent border-none cursor-pointer p-0 leading-none"
-                    style={{ color: 'var(--text-2)' }}
+                    className="bg-transparent border-none cursor-pointer p-0 leading-none text-ink-2"
                     title={t('game.editNote') as string}
                   >
-                    <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z" />
-                    </svg>
+                    <Pencil size={11} strokeWidth={1.5} aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -157,7 +155,7 @@ export default function PrepareTab({
                     </button>
                   </div>
                   {errorMsg && (
-                    <p className="font-mono text-[0.65rem] mt-1" style={{ color: '#c0392b' }}>{errorMsg}</p>
+                    <p className="font-mono text-[0.65rem] mt-1 text-error">{errorMsg}</p>
                   )}
                 </div>
               ) : (
@@ -192,13 +190,7 @@ export default function PrepareTab({
                 key={p}
                 onClick={() => onGoToPage(p as number)}
                 disabled={pageLoading}
-                className="font-mono text-[0.65rem] border p-[0.2rem_0.45rem] cursor-pointer min-w-[1.6rem] text-center"
-                style={{
-                  background: p === currentPage ? 'var(--accent-dim)' : 'transparent',
-                  borderColor: p === currentPage ? 'var(--accent)' : 'var(--border)',
-                  color: p === currentPage ? 'var(--accent)' : 'var(--text-2)',
-                  fontWeight: p === currentPage ? 600 : 400,
-                }}
+                className={`page-btn ${p === currentPage ? 'page-btn-active' : ''}`}
               >
                 {p}
               </button>

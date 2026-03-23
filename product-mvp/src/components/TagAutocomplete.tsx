@@ -191,8 +191,12 @@ export default function TagAutocomplete({
       e.preventDefault()
       if (activeIndex >= 0 && activeIndex < suggestions.length) {
         addTag(suggestions[activeIndex])
+      } else if (suggestions.length > 0) {
+        addTag(suggestions[0])
       } else if (input.trim().length >= 2 && allowCreate) {
         startCreateTag(input.trim().toLowerCase())
+      } else if (input.trim().length >= 2 && !allowCreate) {
+        addTag({ slug: input.trim().toLowerCase(), name: input.trim().toLowerCase() })
       }
     } else if (e.key === 'Escape') {
       if (pendingCategory) {

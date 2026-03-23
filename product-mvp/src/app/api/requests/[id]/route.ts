@@ -8,7 +8,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const user = await getUser()
   try {
     const row = await queryOne(
-      `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.tags, r.is_public, r.status, r.author_id, r.created_at, r.updated_at
+      `SELECT r.id, r.title, r.body, r.type, r.content_level, r.fandom_type, r.pairing, r.language, r.tags, r.is_public, r.status, r.author_id, r.created_at, r.updated_at
        FROM requests r WHERE r.id = $1`,
       [id]
     )
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // Full update — require essential fields to prevent accidental data loss
-  const { title, description, type, content_level, fandom_type, pairing, tags, is_public, status } = body
+  const { title, description, type, content_level, fandom_type, pairing, language, tags, is_public, status } = body
 
   if (!title || !type || !content_level || is_public === undefined) {
     return NextResponse.json({ error: 'fillRequired' }, { status: 400 })
@@ -89,10 +89,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const res = await client.query(
         `UPDATE requests SET
            title=$2, body=$3, type=$4, content_level=$5, fandom_type=$6, pairing=$7,
-           tags=$8, is_public=$9, status=$10, updated_at=NOW()
+           language=$8, tags=$9, is_public=$10, status=$11, updated_at=NOW()
          WHERE id=$1 RETURNING *`,
         [id, title, sanitizeBody(description), type, content_level,
-         fandom_type || 'original', pairing || 'any',
+         fandom_type || 'original', pairing || 'any', language || 'ru',
          tagsArr, is_public, status]
       )
 

@@ -10,7 +10,7 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
 
   const request = await queryOne<{
     id: string; title: string; body: string | null; type: string; content_level: string
-    fandom_type: string; pairing: string; tags: string[]; is_public: boolean; status: string; author_id: string
+    fandom_type: string; pairing: string; language: string; tags: string[]; is_public: boolean; status: string; author_id: string
   }>('SELECT * FROM requests WHERE id=$1', [id])
 
   if (!request || request.author_id !== user.id) notFound()

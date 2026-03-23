@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSettings, useT, type Settings } from './SettingsContext'
 import type { TagPreset } from './SettingsContext'
 import { FONT_GROUPS } from '@/lib/fonts'
+import { X, ChevronDown } from 'lucide-react'
 import type { Lang } from '@/i18n'
 
 function BtnGroup<T extends string>({ current, options, onSelect }: {
@@ -162,8 +163,8 @@ export default function SettingsPanel() {
           <h2 className="font-heading italic font-light text-[1.3rem] text-ink">
             {t('settings.title') as string}
           </h2>
-          <button onClick={closePanel} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.9rem] leading-none p-[0.2rem]">
-            ✕
+          <button onClick={closePanel} className="bg-transparent border-none text-ink-2 cursor-pointer leading-none p-[0.2rem] flex items-center">
+            <X size={16} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
 
@@ -301,16 +302,16 @@ export default function SettingsPanel() {
                       <button
                         onClick={e => { e.stopPropagation(); clearPreset(i) }}
                         title={t('settings.clearPreset') as string}
-                        className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.7rem] px-[0.2rem] py-[0.1rem] leading-none opacity-50 hover:opacity-100"
+                        className="bg-transparent border-none text-ink-2 cursor-pointer px-[0.2rem] py-[0.1rem] leading-none opacity-50 hover:opacity-100 flex items-center"
                       >
-                        ✕
+                        <X size={11} strokeWidth={2} aria-hidden="true" />
                       </button>
                     )}
                     <span
-                      className="font-mono text-[0.55rem] text-ink-2 transition-transform duration-150 inline-block"
+                      className="text-ink-2 transition-transform duration-150 inline-flex"
                       style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }}
                     >
-                      ▾
+                      <ChevronDown size={10} aria-hidden="true" />
                     </span>
                   </div>
                 </div>

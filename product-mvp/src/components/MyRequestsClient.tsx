@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
 import { useToast } from './ToastProvider'
+import { Link2, Pencil, X, Check, Play, Pause, ChevronRight } from 'lucide-react'
 
 export interface MyRequest {
   id: string; title: string; body: string | null; type: string; content_level: string
@@ -16,12 +17,10 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
   const [requests, setRequests] = useState(initial)
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'inactive'>(initialTab)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [copied, setCopied] = useState<string | null>(null)
   const [inviteUrlFor, setInviteUrlFor] = useState<{ id: string; url: string } | null>(null)
 
   const statusLabel: Record<string, string> = { draft: t('myRequests.drafts') as string, active: t('myRequests.inFeed') as string, inactive: t('myRequests.inactive') as string }
-  const statusColor: Record<string, string> = { draft: 'var(--text-2)', active: 'var(--accent)', inactive: 'var(--text-2)' }
   const typeLabels: Record<string, string> = { duo: t('filters.duo') as string, multiplayer: t('filters.multiplayer') as string }
   const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
   const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string }
@@ -99,7 +98,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-12">
+        <div className="text-center py-8">
           <p className="text-ink-2 font-heading italic mb-4">{t('myRequests.noRequests') as string}</p>
           <Link href="/requests/new" className="btn-primary inline-block no-underline py-2.5 px-6 text-[0.9rem]">
             {t('myRequests.createFirst') as string}
@@ -107,112 +106,199 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
         </div>
       )}
 
-      <div className="flex flex-col gap-[var(--game-gap,1rem)]">
-        {filtered.map(r => {
-          const plainText = (r.body ?? '').replace(/<[^>]+>/g, '')
-          const isLong = plainText.length > 1000
-          const exp = expanded.has(r.id)
-          return (
-            <div key={r.id} className="bg-surface-2 border border-edge p-[1.25rem_1.5rem]">
-
-              {/* Invite URL (shown when clipboard unavailable) */}
-              {inviteUrlFor?.id === r.id && (
-                <div className="mb-2 p-2.5 bg-surface-3 border border-edge flex items-center gap-2">
-                  <code className="font-mono text-[0.75rem] text-accent break-all select-all flex-1">{inviteUrlFor.url}</code>
-                  <button onClick={() => setInviteUrlFor(null)} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.7rem] shrink-0">✕</button>
-                </div>
-              )}
-
-              {/* Icons + status row */}
-              <div className="flex justify-end gap-1 items-center mb-2 relative">
-                <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase mr-1" style={{ color: statusColor[r.status] }}>
-                  {statusLabel[r.status]}
-                </span>
-                <button onClick={() => copyInvite(r.id)} title={t('card.copyInvite') as string} aria-label={t('card.copyInvite') as string}
-                  className={`bg-transparent border-none p-0 leading-none cursor-pointer flex items-center transition-[color,opacity] duration-150
-                    ${copied === r.id ? 'text-accent' : 'text-ink-2 icon-dim'}`}
-                >{copied === r.id ? '✓' : <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}</button>
-                <Link href={`/requests/${r.id}/edit`} title={t('card.edit') as string} aria-label={t('card.edit') as string}
-                  className="font-mono text-[0.9rem] text-ink-2 p-[0.2rem_0.3rem] leading-none icon-dim no-underline inline-block scale-x-[-1]"
-                >✎</Link>
-                <button onClick={() => setConfirmDelete(r.id)} title={t('detail.deleteButton') as string} aria-label={t('detail.deleteButton') as string}
-                  className="bg-transparent border-none font-mono text-[0.75rem] text-ink-2 p-[0.2rem_0.3rem] leading-none cursor-pointer opacity-50 hover:opacity-100 hover:text-accent"
-                >✕</button>
-
-                {/* Delete confirmation */}
-                {confirmDelete === r.id && (
-                  <div className="absolute top-full right-0 z-10 bg-surface border border-accent p-[0.6rem_0.9rem] flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.12)]">
-                    <span className="meta-text text-ink">{t('myRequests.deleteConfirm') as string}</span>
-                    <button onClick={() => deleteRequest(r.id)} className="meta-text bg-accent text-white border-none py-1 px-2.5 cursor-pointer">
-                      {t('myRequests.yes') as string}
-                    </button>
-                    <button onClick={() => setConfirmDelete(null)} className="btn-ghost py-1 px-2.5">
-                      {t('myRequests.no') as string}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Title + tags row */}
-              <div className="flex items-start gap-3">
-                {r.status === 'active'
-                  ? <button onClick={() => changeStatus(r.id, 'inactive')} title={t('myRequests.unpublish') as string} aria-label={t('myRequests.unpublish') as string} className="icon-action-btn">⏸</button>
-                  : <button onClick={() => changeStatus(r.id, 'active')} title={t('myRequests.publishToFeed') as string} aria-label={t('myRequests.publishToFeed') as string} className="icon-action-btn text-accent border-accent-dim hover:border-accent">▶</button>
-                }
-                <div className="flex-1">
-                  <div className="mb-1">
-                    <Link href={`/requests/${r.id}`} className="font-heading text-[1.1rem] text-ink break-words">
-                      {r.title}
-                    </Link>
-                  </div>
-                  <div className="flex gap-1.5 flex-wrap">
-                    <span className="badge badge-type">{typeLabels[r.type] ?? r.type}</span>
-                    <span className="badge badge-fandom">{fandomTypeLabels[r.fandom_type] ?? r.fandom_type}</span>
-                    {r.pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[r.pairing] ?? r.pairing}</span>}
-                    <span className="badge badge-content">{contentLabels[r.content_level] ?? r.content_level}</span>
-                    {r.tags.slice(0, 4).map(tg => (
-                      <span key={tg} className="badge badge-tag">{tg.toLowerCase()}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Body preview */}
-              {r.body && (
-                <div className="mt-3 pl-11">
-                  <div className="relative">
-                    {!isLong || exp ? (
-                      <div
-                        className="text-ink-2 text-[0.9rem] leading-relaxed break-words"
-                        dangerouslySetInnerHTML={{ __html: r.body }}
-                      />
-                    ) : (
-                      <>
-                        <div className="text-ink-2 text-[0.9rem] leading-relaxed whitespace-pre-wrap break-words">
-                          {plainText.slice(0, 1000)}
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-b from-transparent to-surface-2 pointer-events-none" />
-                      </>
-                    )}
-                  </div>
-                  {isLong && (
-                    <button
-                      onClick={() => setExpanded(prev => {
-                        const next = new Set(prev)
-                        exp ? next.delete(r.id) : next.add(r.id)
-                        return next
-                      })}
-                      className="link-accent bg-transparent border-none cursor-pointer block pt-[0.2rem] text-[0.62rem]"
-                    >
-                      {exp ? t('card.collapse') as string : t('card.readMore') as string}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
+      <div className="grid gap-[var(--game-gap,1rem)]">
+        {filtered.map(r => (
+          <MyRequestCard
+            key={r.id}
+            r={r}
+            statusLabel={statusLabel}
+            typeLabels={typeLabels}
+            fandomTypeLabels={fandomTypeLabels}
+            pairingLabels={pairingLabels}
+            contentLabels={contentLabels}
+            copied={copied === r.id}
+            inviteUrl={inviteUrlFor?.id === r.id ? inviteUrlFor.url : null}
+            confirmDelete={confirmDelete === r.id}
+            onCopyInvite={() => copyInvite(r.id)}
+            onCloseInvite={() => setInviteUrlFor(null)}
+            onChangeStatus={changeStatus}
+            onDeleteRequest={deleteRequest}
+            onConfirmDelete={() => setConfirmDelete(r.id)}
+            onCancelDelete={() => setConfirmDelete(null)}
+            t={t}
+          />
+        ))}
       </div>
     </div>
+  )
+}
+
+function MyRequestCard({ r, statusLabel, typeLabels, fandomTypeLabels, pairingLabels, contentLabels, copied, inviteUrl, confirmDelete, onCopyInvite, onCloseInvite, onChangeStatus, onDeleteRequest, onConfirmDelete, onCancelDelete, t }: {
+  r: MyRequest
+  statusLabel: Record<string, string>
+  typeLabels: Record<string, string>
+  fandomTypeLabels: Record<string, string>
+  pairingLabels: Record<string, string>
+  contentLabels: Record<string, string>
+  copied: boolean
+  inviteUrl: string | null
+  confirmDelete: boolean
+  onCopyInvite: () => void
+  onCloseInvite: () => void
+  onChangeStatus: (id: string, status: string) => void
+  onDeleteRequest: (id: string) => void
+  onConfirmDelete: () => void
+  onCancelDelete: () => void
+  t: (key: string) => unknown
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [isLong, setIsLong] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      const style = getComputedStyle(document.documentElement)
+      const maxBody = parseFloat(style.getPropertyValue('--card-body-size')) * 1.65 * parseFloat(style.getPropertyValue('--card-body-lines'))
+      const rootFontSize = parseFloat(style.fontSize)
+      const maxPx = maxBody * rootFontSize
+      setIsLong(el.scrollHeight > maxPx + 1)
+    })
+  }, [r.body])
+
+  const metaParts = [
+    typeLabels[r.type],
+    fandomTypeLabels[r.fandom_type],
+    r.pairing !== 'any' ? pairingLabels[r.pairing] : null,
+    contentLabels[r.content_level],
+  ].filter(Boolean)
+
+  return (
+    <article className="card">
+      {/* Invite URL (shown when clipboard unavailable) */}
+      {inviteUrl && (
+        <div className="p-2.5 bg-surface-3 border border-edge flex items-center gap-2">
+          <code className="font-mono text-[0.75rem] text-accent break-all select-all flex-1">{inviteUrl}</code>
+          <button onClick={onCloseInvite} className="bg-transparent border-none text-ink-2 cursor-pointer shrink-0 flex items-center"><X size={12} aria-hidden="true" /></button>
+        </div>
+      )}
+
+      {/* Header: status + meta + actions */}
+      <div className="card-header">
+        <div className="card-meta">
+          <span className={`card-status ${r.status === 'active' ? 'card-status-active' : 'card-status-dim'}`}>
+            {statusLabel[r.status]}
+          </span>
+          <span className="sep">|</span>
+          {metaParts.map((label, i) => (
+            <span key={i}>
+              {i > 0 && <span className="sep">/</span>}
+              {label}
+            </span>
+          ))}
+        </div>
+        <div className="card-actions">
+          <button
+            onClick={onCopyInvite}
+            title={t('card.copyInvite') as string}
+            aria-label={t('card.copyInvite') as string}
+            className={copied ? 'bookmarked' : ''}
+          >
+            {copied ? <Check size={13} aria-hidden="true" /> : <Link2 size={13} aria-hidden="true" />}
+          </button>
+          <Link
+            href={`/requests/${r.id}/edit`}
+            title={t('card.edit') as string}
+            className="action-link"
+            aria-label={t('card.edit') as string}
+          >
+            <Pencil size={12} aria-hidden="true" />
+          </Link>
+          <button
+            onClick={onConfirmDelete}
+            title={t('detail.deleteButton') as string}
+            aria-label={t('detail.deleteButton') as string}
+          >
+            <X size={12} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="flex items-center gap-3 p-[0.5rem_var(--card-px)] bg-accent-dim border-b border-accent">
+          <span className="meta-text text-ink flex-1">{t('myRequests.deleteConfirm') as string}</span>
+          <button onClick={() => onDeleteRequest(r.id)} className="font-mono text-[0.62rem] tracking-[0.08em] bg-accent text-white border-none py-1 px-2.5 cursor-pointer">
+            {t('myRequests.yes') as string}
+          </button>
+          <button onClick={onCancelDelete} className="btn-ghost py-1 px-2.5">
+            {t('myRequests.no') as string}
+          </button>
+        </div>
+      )}
+
+      {/* Title */}
+      <Link href={`/requests/${r.id}`} className="card-title">
+        {r.title}
+      </Link>
+
+      {/* Tags */}
+      {r.tags.length > 0 && (
+        <div className="card-tags">
+          {r.tags.map(tg => (
+            <span key={tg} className="tag tag-user">{tg.toLowerCase()}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Body preview */}
+      {r.body && (
+        <>
+          <div>
+            <div
+              ref={bodyRef}
+              className={`card-body break-words ${isLong && !expanded ? 'card-body-clamped' : ''}`}
+              onClick={() => { if (isLong) setExpanded(x => !x) }}
+              dangerouslySetInnerHTML={{ __html: r.body }}
+            />
+            {isLong && !expanded && <div className="card-body-fade" />}
+          </div>
+          {isLong && !expanded && (
+            <div className="card-body-dots" onClick={() => setExpanded(true)}>
+              ···
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Footer: status toggle */}
+      <div className="card-footer">
+        <span className="card-own-label">
+          {t('card.ownRequest') as string}
+        </span>
+        {r.status === 'active' ? (
+          <button
+            onClick={() => onChangeStatus(r.id, 'inactive')}
+            title={t('myRequests.unpublish') as string}
+            aria-label={t('myRequests.unpublish') as string}
+            className="respond-pill"
+          >
+            {t('myRequests.unpublish') as string}
+            <Pause size={11} strokeWidth={2} aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            onClick={() => onChangeStatus(r.id, 'active')}
+            title={t('myRequests.publishToFeed') as string}
+            aria-label={t('myRequests.publishToFeed') as string}
+            className="respond-pill"
+          >
+            {t('myRequests.publishToFeed') as string}
+            <Play size={11} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    </article>
   )
 }

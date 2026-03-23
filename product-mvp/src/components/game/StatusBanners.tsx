@@ -20,7 +20,7 @@ export default function StatusBanners({
     <>
       {/* Moderation freeze banner */}
       {isFrozen && (
-        <div className="px-6 py-2 text-center border-b border-edge font-mono text-[0.7rem] text-ink-2 tracking-wide" style={{ background: 'var(--bg-2)' }}>
+        <div className="game-banner game-banner-muted">
           {moderationStatus === 'hidden'
             ? t('admin.gameHiddenBanner') as string
             : t('admin.gameResolvedBanner') as string}
@@ -29,12 +29,12 @@ export default function StatusBanners({
 
       {/* Partner proposes publish — slim action bar */}
       {!isLeft && partnerWantsPublish && (
-        <div className="px-6 py-1.5 flex items-center justify-center gap-3 border-b border-edge font-mono text-[0.7rem] text-ink-2 tracking-wide" style={{ background: 'var(--bg-2)' }}>
-          <span>{t('game.partnerWantsPublish') as string}</span>
+        <div className="game-banner">
+          <span>{t('game.publishBannerQuestion') as string}</span>
           <button
             disabled={publishLoading}
             onClick={onOpenPublishModal}
-            className="btn-primary p-[0.2rem_0.6rem] text-[0.65rem]"
+            className="game-banner-btn"
           >
             {t('game.publishToo') as string}
           </button>

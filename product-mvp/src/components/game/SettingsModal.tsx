@@ -80,7 +80,7 @@ export default function SettingsModal({
             <span className="font-mono text-[0.62rem] tracking-[0.1em] text-ink-2">{t('game.layoutLabel') as string}</span>
             <div className="flex gap-2">
               {([['dialog', t('game.layoutDialog') as string], ['feed', t('game.layoutFeed') as string], ['book', t('game.layoutBook') as string]] as const).map(([val, label]) => (
-                <button key={val} onClick={() => set('gameLayout', val as 'dialog' | 'feed' | 'book')} className="flex-1 font-heading italic text-[0.95rem] border p-[0.45rem_0.5rem] cursor-pointer transition-all duration-150" style={{ background: gameLayout === val ? 'var(--accent-dim)' : 'var(--bg-2)', borderColor: gameLayout === val ? 'var(--accent)' : 'var(--border)', color: gameLayout === val ? 'var(--accent)' : 'var(--text)' }}>
+                <button key={val} onClick={() => set('gameLayout', val as 'dialog' | 'feed' | 'book')} className={`game-sp-layout-btn text-[0.95rem] p-[0.45rem_0.5rem] ${gameLayout === val ? 'game-sp-layout-btn-active' : ''}`}>
                   {label}
                 </button>
               ))}
@@ -101,7 +101,7 @@ export default function SettingsModal({
           <div className="flex gap-3">
             {([['own', t('game.bannerOwn') as string], ['partner', t('game.bannerPartner') as string], ['none', t('game.bannerNone') as string]] as const).map(([val, label]) => (
               <label key={val} className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="banner_pref" checked={bannerPref === val} onChange={() => setBannerPref(val as 'own' | 'partner' | 'none')} className="w-[13px] h-[13px] shrink-0" style={{ accentColor: 'var(--text-2)' }} />
+                <input type="radio" name="banner_pref" checked={bannerPref === val} onChange={() => setBannerPref(val as 'own' | 'partner' | 'none')} className="w-[13px] h-[13px] shrink-0 accent-muted" />
                 <span className="font-mono text-[0.7rem] text-ink">{label}</span>
               </label>
             ))}
@@ -112,12 +112,12 @@ export default function SettingsModal({
         <div className="flex flex-col gap-2">
           <span className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-ink-2 border-b border-edge pb-1">{t('game.tabsSection') as string}</span>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={oocEnabled} onChange={e => setOocEnabled(e.target.checked)} className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }} />
+            <input type="checkbox" checked={oocEnabled} onChange={e => setOocEnabled(e.target.checked)} className="w-[14px] h-[14px] shrink-0 accent-muted" />
             <span className="font-mono text-[0.7rem] text-ink">{t('game.oocTab') as string}</span>
             <span className="font-mono text-[0.55rem] text-ink-2">{t('game.oocDesc') as string}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={notesEnabled} onChange={e => set('notesEnabled', e.target.checked)} className="w-[14px] h-[14px] shrink-0" style={{ accentColor: 'var(--text-2)' }} />
+            <input type="checkbox" checked={notesEnabled} onChange={e => set('notesEnabled', e.target.checked)} className="w-[14px] h-[14px] shrink-0 accent-muted" />
             <span className="font-mono text-[0.7rem] text-ink">{t('game.notesTab') as string}</span>
             <span className="font-mono text-[0.55rem] text-ink-2">{t('game.notesDesc') as string}</span>
           </label>

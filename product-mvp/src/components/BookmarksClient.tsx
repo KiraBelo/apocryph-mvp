@@ -34,13 +34,12 @@ export default function BookmarksClient({ requests, likedGames, userId: _userId 
   }
 
   return (
-    <div className="max-w-[1050px] mx-auto p-[3rem_1.75rem]">
-      <p className="section-label text-accent-2 mb-2">{t('bookmarks.sectionLabel') as string}</p>
-      <h1 className="font-heading text-[clamp(1.8rem,4vw,2.8rem)] italic font-light text-ink mb-8">
+    <div className="max-w-[1050px] mx-auto px-7 py-8">
+      <h1 className="page-title mb-5">
         {t('bookmarks.title') as string}
       </h1>
 
-      <div className="flex gap-8 mb-8 border-b border-edge">
+      <div className="flex gap-5 mb-5 border-b border-edge">
         <button onClick={() => setTab('requests')} className={tabCls(tab === 'requests')}>
           {t('bookmarks.tabRequests') as string} <span className="opacity-60">({requests.length})</span>
         </button>

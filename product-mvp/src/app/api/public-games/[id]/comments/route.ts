@@ -15,17 +15,46 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     )
     if (!game) return NextResponse.json({ error: 'notFound' }, { status: 404 })
 
-    const comments = await query<{
-      id: string; content: string; parent_id: string | null; approved_at: string; created_at: string
+    // Get author user_id → nickname map
+    const authorRows = await query<{ user_id: string; nickname: string }>(
+      'SELECT user_id, nickname FROM game_participants WHERE game_id=$1',
+      [gameId]
+    )
+    const authorNicknames = new Map(authorRows.map(r => [r.user_id, r.nickname]))
+
+    const rows = await query<{
+      id: string; content: string; parent_id: string | null; user_id: string; created_at: string
     }>(
-      `SELECT id, content, parent_id, approved_at, created_at
+      `SELECT id, content, parent_id, user_id, created_at
        FROM game_comments
        WHERE game_id=$1 AND approved_at IS NOT NULL
        ORDER BY created_at ASC`,
       [gameId]
     )
 
-    return NextResponse.json({ comments })
+    type CommentItem = { id: string; content: string; created_at: string; is_author: boolean; author_nickname: string | null; replies: CommentItem[] }
+
+    const topLevel: CommentItem[] = []
+    const byId = new Map<string, CommentItem>()
+
+    for (const r of rows) {
+      const isAuthor = authorNicknames.has(r.user_id)
+      const item: CommentItem = {
+        id: r.id, content: r.content, created_at: r.created_at,
+        is_author: isAuthor,
+        author_nickname: isAuthor ? (authorNicknames.get(r.user_id) ?? null) : null,
+        replies: [],
+      }
+      if (!r.parent_id) {
+        topLevel.push(item)
+        byId.set(r.id, item)
+      } else {
+        const parent = byId.get(r.parent_id)
+        if (parent) parent.replies.push(item)
+      }
+    }
+
+    return NextResponse.json({ comments: topLevel })
   } catch (error) {
     console.error('[API /api/public-games/[id]/comments] GET:', error)
     return NextResponse.json({ error: 'serverError' }, { status: 500 })

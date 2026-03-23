@@ -5,7 +5,7 @@ import RequestDetailClient from '@/components/RequestDetailClient'
 
 interface Request {
   id: string; title: string; body: string | null; type: string; content_level: string
-  fandom_type: string; pairing: string; tags: string[]; status: string; author_id: string; is_public: boolean; created_at: string
+  fandom_type: string; pairing: string; language: string; tags: string[]; status: string; author_id: string; is_public: boolean; created_at: string
 }
 
 export default async function RequestPage({ params }: { params: Promise<{ id: string }> }) {

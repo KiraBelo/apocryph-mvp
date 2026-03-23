@@ -3,6 +3,7 @@ import { useT } from '../SettingsContext'
 import RichEditor from '../RichEditor'
 import { htmlToText, NOTE_COLLAPSE_CHARS } from '@/lib/game-utils'
 import type { NoteEntry } from './types'
+import { Pencil, X } from 'lucide-react'
 
 interface NotesTabProps {
   notes: NoteEntry[]
@@ -89,7 +90,7 @@ export default function NotesTab({
             day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
           })
           return (
-            <div key={note.id} data-note-id={note.id} className="bg-surface-2" style={{ border: `1px solid ${isEditing ? 'var(--accent-2)' : 'var(--border)'}` }}>
+            <div key={note.id} data-note-id={note.id} className={`bg-surface-2 border ${isEditing ? 'border-accent-2' : 'border-edge'}`}>
               <div className="px-3 py-[0.4rem] border-b border-edge flex justify-between items-center bg-surface-3">
                 <div className="flex flex-col gap-[0.1rem] min-w-0">
                   {note.title && (
@@ -102,8 +103,8 @@ export default function NotesTab({
                 </div>
                 {!isEditing && !isDeleteConfirm && (
                   <div className="flex gap-[0.1rem]">
-                    <button onClick={() => onStartNoteEdit(note)} title={t('game.editNote') as string} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.78rem] p-[0.1rem_0.25rem] leading-none">✎</button>
-                    <button onClick={() => setDeleteConfirmId(note.id)} title={t('game.deleteNote') as string} className="bg-transparent border-none text-ink-2 cursor-pointer text-[0.78rem] p-[0.1rem_0.25rem] leading-none">✕</button>
+                    <button onClick={() => onStartNoteEdit(note)} title={t('game.editNote') as string} className="bg-transparent border-none text-ink-2 cursor-pointer p-[0.1rem_0.25rem] leading-none flex items-center"><Pencil size={12} strokeWidth={1.5} aria-hidden="true" /></button>
+                    <button onClick={() => setDeleteConfirmId(note.id)} title={t('game.deleteNote') as string} className="bg-transparent border-none text-ink-2 cursor-pointer p-[0.1rem_0.25rem] leading-none flex items-center"><X size={12} strokeWidth={2} aria-hidden="true" /></button>
                   </div>
                 )}
                 {isDeleteConfirm && (
@@ -125,7 +126,7 @@ export default function NotesTab({
                 </div>
               ) : (
                 <div>
-                  <div className="tiptap-content p-[0.75rem_0.9rem] relative" style={{ maxHeight: isLong && !isExpanded ? '8em' : 'none', overflow: isLong && !isExpanded ? 'hidden' : 'visible' }} dangerouslySetInnerHTML={{ __html: note.content }} />
+                  <div className={`tiptap-content p-[0.75rem_0.9rem] relative ${isLong && !isExpanded ? 'max-h-[8em] overflow-hidden' : ''}`} dangerouslySetInnerHTML={{ __html: note.content }} />
                   {isLong && (
                     <button onClick={() => onToggleExpand(note.id)} className="block w-full text-center font-mono text-[0.6rem] tracking-[0.08em] text-accent-2 bg-transparent border-none border-t border-edge p-[0.35rem] cursor-pointer">
                       {isExpanded ? t('game.noteCollapse') as string : t('game.noteExpand') as string}
@@ -157,7 +158,7 @@ export default function NotesTab({
               {fullscreen && (
                 <button onClick={() => setEditorCollapsed(true)} title={t('game.collapseEditor') as string} className="bg-transparent border-none text-ink-2 cursor-pointer font-mono text-[0.75rem] p-[0.2rem_0.5rem]">{t('game.collapseEditor') as string}</button>
               )}
-              <button onClick={onSubmitNote} disabled={newNoteSending || !newNoteContent.trim() || newNoteContent === '<p></p>'} className="bg-accent-2 text-white font-heading italic text-[0.95rem] border-none p-[0.55rem_1.5rem] cursor-pointer" style={{ opacity: (newNoteSending || !newNoteContent.trim() || newNoteContent === '<p></p>') ? 0.6 : 1 }}>
+              <button onClick={onSubmitNote} disabled={newNoteSending || !newNoteContent.trim() || newNoteContent === '<p></p>'} className="bg-accent-2 text-white font-heading italic text-[0.95rem] border-none p-[0.55rem_1.5rem] cursor-pointer disabled:opacity-60">
                 {newNoteSending ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('game.addNoteButton') as string}
               </button>
             </div>

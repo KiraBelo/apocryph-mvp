@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useT } from './SettingsContext'
+import { useT, usePlural } from './SettingsContext'
 import { useToast } from './ToastProvider'
+import { Star, X } from 'lucide-react'
 
 interface GameRow {
   id: string
@@ -41,6 +42,7 @@ type MainTab = 'active' | 'inactive' | 'starred' | 'published'
 
 export default function MyGamesClient({ games: initialGames, userId }: Props) {
   const t = useT()
+  const tPlural = usePlural()
   const { addToast } = useToast()
   const router = useRouter()
   const [games, setGames] = useState(initialGames)
@@ -51,11 +53,6 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
   const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
   const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string }
   const contentLabels: Record<string, string> = { none: t('filters.noNsfw') as string, rare: t('filters.nsfwRare') as string, often: t('filters.nsfwOften') as string, core: t('filters.nsfwCore') as string, flexible: t('filters.nsfwFlexible') as string }
-
-  function pluralActive(n: number): string {
-    if (n === 1) return `${n} ${t('myGames.activeParticipant') as string}`
-    return `${n} ${t('myGames.activeParticipants') as string}`
-  }
 
   const visible = games.filter(g => !g.hidden_at)
 
@@ -128,11 +125,10 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
     : waitingThem
 
   return (
-    <div className="max-w-[1050px] mx-auto px-7 py-12">
-      <p className="section-label mb-2">{t('myGames.sectionLabel') as string}</p>
-      <h1 className="page-title mb-10">{t('myGames.title') as string}</h1>
+    <div className="max-w-[1050px] mx-auto px-7 py-8">
+      <h1 className="page-title mb-6">{t('myGames.title') as string}</h1>
 
-      <div className="flex gap-8 mb-1 border-b border-edge flex-wrap">
+      <div className="flex gap-5 mb-1 border-b border-edge flex-wrap">
         <button onClick={() => setMainTab('active')} className={tabCls(mainTab === 'active')}>
           {t('myGames.active') as string} <span className="opacity-60">({active.length})</span>
         </button>
@@ -148,7 +144,7 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
       </div>
 
       {mainTab === 'active' && (
-        <div className="flex gap-8 mb-8 mt-5">
+        <div className="flex gap-5 mb-5 mt-5">
           <button onClick={() => setSubTab('waiting-me')} className={subTabCls(subTab === 'waiting-me')}>
             {t('myGames.waitingMyPost') as string} <span className="opacity-60">({waitingMe.length})</span>
           </button>
@@ -158,10 +154,10 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
         </div>
       )}
 
-      {mainTab !== 'active' && <div className="mb-8" />}
+      {mainTab !== 'active' && <div className="mb-5" />}
 
       {currentGames.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="text-center py-8">
           <p className="text-ink-2 font-heading italic mb-4">{t('myGames.empty') as string}</p>
           <Link href="/feed" className="btn-primary inline-block no-underline py-2.5 px-6 text-[0.9rem]">
             {t('myGames.goToFeed') as string}
@@ -177,97 +173,102 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
             return (
               <article
                 key={g.id}
-                className="card p-7 relative cursor-pointer"
+                className="card cursor-pointer"
                 onClick={() => router.push(`/games/${g.id}`)}
                 style={{
                   opacity: isInactive ? 0.7 : 1,
-                  borderLeft: parseInt(g.ic_unread) > 0
-                    ? '3px solid var(--accent)'
+                  borderLeftWidth: 'var(--card-stripe-w)',
+                  borderLeftStyle: 'solid',
+                  borderLeftColor: parseInt(g.ic_unread) > 0
+                    ? 'var(--accent)'
                     : parseInt(g.ooc_unread) > 0
-                    ? '3px solid var(--text-2)'
-                    : '3px solid transparent',
+                    ? 'var(--text-2)'
+                    : 'transparent',
                 }}
               >
                 {/* Publish proposal banner */}
                 {!isInactive && g.partner_publish_consent && g.status === 'active' && (
-                  <div className="flex items-center gap-2 -mx-7 -mt-7 mb-4 px-5 py-2 font-mono text-[0.65rem] tracking-[0.08em]"
-                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', borderBottom: '1px solid var(--accent)' }}>
+                  <div className="card-banner-publish">
                     {t('myGames.publishProposed') as string}
                   </div>
                 )}
 
-                {/* Header row */}
-                <div className="flex items-center justify-between gap-4 mb-3">
-                  <h3 className="font-heading text-[1.2rem] font-normal text-ink leading-tight break-words">
-                    {g.request_title ?? t('nav.untitled') as string}
-                  </h3>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {g.status === 'preparing' && (
-                      <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase text-accent">
-                        {t('game.chipPreparing') as string}
-                      </span>
+                {/* Header: meta + actions */}
+                <div className="card-header">
+                  <div className="card-meta">
+                    {g.status !== 'active' && (
+                      <>
+                        <span className="card-status card-status-active">
+                          {g.status === 'preparing' && (t('game.chipPreparing') as string)}
+                          {g.status === 'moderation' && (t('game.chipModeration') as string)}
+                          {g.status === 'published' && (t('game.chipPublished') as string)}
+                        </span>
+                        <span className="sep">|</span>
+                      </>
                     )}
-                    {g.status === 'moderation' && (
-                      <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase text-accent">
-                        {t('game.chipModeration') as string}
-                      </span>
-                    )}
-                    {g.status === 'published' && (
-                      <span className="font-mono text-[0.6rem] tracking-[0.1em] uppercase text-accent">
-                        {t('game.chipPublished') as string}
-                      </span>
-                    )}
+                    {g.request_type && <span>{typeLabels[g.request_type] ?? g.request_type}</span>}
+                    {g.request_fandom_type && <><span className="sep">/</span><span>{fandomTypeLabels[g.request_fandom_type] ?? g.request_fandom_type}</span></>}
+                    {g.request_pairing && g.request_pairing !== 'any' && <><span className="sep">/</span><span>{pairingLabels[g.request_pairing] ?? g.request_pairing}</span></>}
+                    {g.request_content_level && <><span className="sep">/</span><span>{contentLabels[g.request_content_level] ?? g.request_content_level}</span></>}
+                  </div>
+                  <div className="card-actions">
                     {isInactive && (
                       <button
                         onClick={e => { e.stopPropagation(); hideGame(g.id) }}
                         title={t('myGames.hideFromList') as string}
-                        className="bg-transparent border-none cursor-pointer text-ink-2 text-[0.85rem] leading-none opacity-50 hover:opacity-100 hover:text-accent p-[0.2rem_0.3rem]"
                       >
-                        ✕
+                        <X size={12} aria-hidden="true" />
                       </button>
                     )}
                     <button
                       onClick={e => { e.stopPropagation(); toggleStar(g.id) }}
                       title={g.starred_at ? t('myGames.removeFromStarred') as string : t('myGames.addToStarred') as string}
-                      className={`bg-transparent border-none cursor-pointer text-[1.1rem] p-0 leading-none ${g.starred_at ? 'text-accent' : 'text-ink-2'}`}
+                      className={g.starred_at ? 'bookmarked' : ''}
                     >
-                      {g.starred_at ? '★' : '☆'}
+                      <Star size={13} fill={g.starred_at ? 'currentColor' : 'none'} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
 
-                {/* Badges + tags row */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {g.request_type && <span className="badge badge-type">{typeLabels[g.request_type] ?? g.request_type}</span>}
-                  {g.request_fandom_type && <span className="badge badge-fandom">{fandomTypeLabels[g.request_fandom_type] ?? g.request_fandom_type}</span>}
-                  {g.request_pairing && g.request_pairing !== 'any' && <span className="badge badge-fandom">{pairingLabels[g.request_pairing] ?? g.request_pairing}</span>}
-                  {g.request_content_level && <span className="badge badge-content">{contentLabels[g.request_content_level] ?? g.request_content_level}</span>}
-                  {tags.map(tg => (
-                    <span key={tg} className="badge badge-tag">#{tg.toLowerCase()}</span>
-                  ))}
-                </div>
+                {/* Title */}
+                <span className="card-title">
+                  {g.request_title ?? t('nav.untitled') as string}
+                </span>
 
-                {/* Meta line */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="meta-text">
-                    {t('myGames.nickname') as string} {g.my_nickname} &nbsp;·&nbsp; {g.message_count} {t('myGames.posts') as string} &nbsp;·&nbsp; {pluralActive(activeCount)}
-                  </p>
-                  {g.ooc_enabled && (
-                    <Link
-                      href={`/games/${g.id}?tab=ooc`}
-                      onClick={e => { e.stopPropagation() }}
-                      className={`font-mono text-[0.58rem] tracking-[0.06em] py-[0.05rem] px-1.5 rounded-sm no-underline
-                      ${parseInt(g.ooc_unread) > 0
-                        ? 'text-white bg-accent border-none'
-                        : 'text-ink-2 bg-transparent border border-edge'}`}>
-                      {t('game.offtop') as string}
-                    </Link>
-                  )}
-                  {parseInt(g.ic_unread) > 0 && (
-                    <span className="font-mono text-[0.58rem] tracking-[0.06em] text-white bg-accent py-[0.05rem] px-1.5 rounded-sm">
-                      {t('myGames.newPostsBadge') as string}
-                    </span>
-                  )}
+                {/* Tags */}
+                {tags.length > 0 && (
+                  <div className="card-tags">
+                    {tags.map(tg => (
+                      <span key={tg} className="tag tag-user">{tg.toLowerCase()}</span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Footer: meta line */}
+                <div className="card-footer">
+                  <div className="card-meta">
+                    <span>{g.my_nickname}</span>
+                    <span className="sep">·</span>
+                    <span>{tPlural(parseInt(g.message_count) || 0, 'myGames.posts')}</span>
+                    <span className="sep">·</span>
+                    <span>{tPlural(activeCount, 'myGames.activeParticipant')}</span>
+                  </div>
+                  <div className="card-actions">
+                    {g.ooc_enabled && (
+                      <Link
+                        href={`/games/${g.id}?tab=ooc`}
+                        onClick={e => { e.stopPropagation() }}
+                        className={`card-micro-badge ${parseInt(g.ooc_unread) > 0 ? 'card-micro-badge-active' : ''}`}
+                      >
+                        {t('game.offtop') as string}
+                      </Link>
+                    )}
+                    {parseInt(g.ic_unread) > 0 && (
+                      <span className="card-micro-badge card-micro-badge-active">
+                        {t('myGames.newPostsBadge') as string}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
               </article>

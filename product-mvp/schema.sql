@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS requests (
   fandom_type   TEXT NOT NULL DEFAULT 'original' CHECK (fandom_type IN ('fandom','original')),
   pairing       TEXT NOT NULL DEFAULT 'any' CHECK (pairing IN ('sl','fm','gt','any','multi','other')),
   tags          TEXT[] NOT NULL DEFAULT '{}',
+  language      TEXT NOT NULL DEFAULT 'ru' CHECK (language IN ('ru','en')),
   is_public     BOOLEAN NOT NULL DEFAULT true,
   status        TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','inactive')),
   created_at    TIMESTAMPTZ DEFAULT NOW(),
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS requests (
 -- Migration for existing databases (safe to re-run)
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS fandom_type TEXT NOT NULL DEFAULT 'original' CHECK (fandom_type IN ('fandom','original'));
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS pairing TEXT NOT NULL DEFAULT 'any' CHECK (pairing IN ('sl','fm','gt','any','multi','other'));
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'ru' CHECK (language IN ('ru','en'));
 -- Extend content_level and pairing constraints
 ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_content_level_check;
 ALTER TABLE requests ADD CONSTRAINT requests_content_level_check CHECK (content_level IN ('none','rare','often','core','flexible'));
