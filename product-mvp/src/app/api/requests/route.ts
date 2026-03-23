@@ -92,9 +92,8 @@ export async function GET(req: NextRequest) {
     const total = rows.length > 0 ? parseInt(rows[0]._total) : 0
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
     // Sanitize body on read to protect against stored XSS from old data
-    const safeRows = rows.map(r => ({
+    const safeRows = rows.map(({ _total, ...r }) => ({
       ...r,
-      _total: undefined,
       body: r.body ? sanitizeBody(r.body) : r.body,
     }))
     return NextResponse.json({ requests: safeRows, total, page, totalPages })

@@ -93,9 +93,8 @@ export async function GET(req: NextRequest) {
     const total = games.length > 0 ? parseInt(games[0]._total) : 0
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-    const safeGames = games.map(g => ({
+    const safeGames = games.map(({ _total, ...g }) => ({
       ...g,
-      _total: undefined,
       participants: g.participants ? JSON.parse(g.participants) : [],
     }))
 

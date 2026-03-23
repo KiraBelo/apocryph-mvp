@@ -77,7 +77,7 @@ export default async function MyGamesPage() {
         GROUP BY m.game_id
      ),
      partner_consent AS (
-       SELECT c.game_id
+       SELECT DISTINCT c.game_id
          FROM game_publish_consent c
          JOIN game_participants gp4 ON gp4.id = c.participant_id
         WHERE gp4.user_id != $1

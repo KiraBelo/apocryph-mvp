@@ -160,9 +160,34 @@ describe('POST /api/requests', () => {
   })
 
   describe('success → 201', () => {
-    it('returns 201 with created request when all checks pass', async () => {
+    it('returns 201 with created draft request (no anti-spam)', async () => {
       mockWithTransaction.mockResolvedValue({
         id: 'new-id',
+        title: 'Test',
+        type: 'duo',
+        content_level: 'none',
+        fandom_type: 'original',
+        pairing: 'any',
+        tags: [],
+        is_public: true,
+        status: 'draft',
+        created_at: new Date().toISOString(),
+      })
+
+      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none' })
+      const res = await POST(req)
+      const data = await res.json()
+
+      expect(res.status).toBe(201)
+      expect(data.id).toBe('new-id')
+    })
+
+    it('returns 201 with active request after anti-spam checks pass', async () => {
+      mockQueryOne.mockResolvedValueOnce({ count: '0' }) // daily limit check passes
+      mockQueryOne.mockResolvedValueOnce(null) // no recent request (cooldown passes)
+      mockQueryOne.mockResolvedValueOnce(null) // no duplicate
+      mockWithTransaction.mockResolvedValue({
+        id: 'active-id',
         title: 'Test',
         type: 'duo',
         content_level: 'none',
@@ -174,12 +199,12 @@ describe('POST /api/requests', () => {
         created_at: new Date().toISOString(),
       })
 
-      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none' })
+      const req = makeRequest({ title: 'Test', type: 'duo', content_level: 'none', status: 'active' })
       const res = await POST(req)
       const data = await res.json()
 
       expect(res.status).toBe(201)
-      expect(data.id).toBe('new-id')
+      expect(data.id).toBe('active-id')
     })
   })
 })
