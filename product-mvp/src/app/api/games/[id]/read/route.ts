@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { query } from '@/lib/db'
 import { requireParticipant } from '@/lib/auth'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
   const { id } = await params
 
   let tab = 'ic'
@@ -15,19 +16,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch { /* no body */ }
 
   // Verify user is a participant of this game
-  const participant = await requireParticipant(id, user.id)
+  const participant = await requireParticipant(id, user!.id)
   if (!participant) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   try {
     if (tab === 'ooc') {
       await query(
         `UPDATE game_participants SET last_read_ooc_at = NOW() WHERE game_id = $1 AND user_id = $2`,
-        [id, user.id]
+        [id, user!.id]
       )
     } else {
       await query(
         `UPDATE game_participants SET last_read_at = NOW() WHERE game_id = $1 AND user_id = $2`,
-        [id, user.id]
+        [id, user!.id]
       )
     }
     return NextResponse.json({ ok: true })

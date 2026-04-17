@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 import { requireParticipant } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 
 // GET — загрузить все свои заметки к игре (новые сверху)
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
   const { id: gameId } = await params
 
   try {
-    const member = await requireParticipant(gameId, user.id)
+    const member = await requireParticipant(gameId, user!.id)
     if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const notes = await query<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
       'SELECT id, title, content, created_at, updated_at FROM game_notes WHERE game_id=$1 AND user_id=$2 ORDER BY created_at DESC',
-      [gameId, user.id]
+      [gameId, user!.id]
     )
-    return NextResponse.json({ notes })
+    // Defence in depth: повторно санитизируем контент при чтении на случай если
+    // в БД попали данные до внедрения sanitizeBody (исторические записи или баг в санитайзере).
+    return NextResponse.json({ notes: notes.map(n => ({ ...n, content: sanitizeBody(n.content) ?? '' })) })
   } catch (error) {
     console.error('[API /api/games/[id]/notes] GET:', error)
     return NextResponse.json({ error: 'serverError' }, { status: 500 })
@@ -28,10 +31,11 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
 // POST — создать новую заметку
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
-  const { allowed } = rateLimit(`notes:${user.id}`, 20, 60_000)
+  const { allowed } = rateLimit(`notes:${user!.id}`, 20, 60_000)
   if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
 
   const { id: gameId } = await params
@@ -50,12 +54,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   try {
-    const member = await requireParticipant(gameId, user.id)
+    const member = await requireParticipant(gameId, user!.id)
     if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const note = await queryOne<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
       'INSERT INTO game_notes (game_id, user_id, title, content) VALUES ($1, $2, $3, $4) RETURNING id, title, content, created_at, updated_at',
-      [gameId, user.id, title ?? '', sanitizeBody(content ?? '')]
+      [gameId, user!.id, title ?? '', sanitizeBody(content ?? '')]
     )
     return NextResponse.json({ note })
   } catch (error) {

@@ -6,6 +6,16 @@ import { queryOne } from './db'
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
   throw new Error('SESSION_SECRET must be set and at least 32 characters')
 }
+// Placeholder-guard: не допустить деплой с дефолтным значением из .env.example.
+// Знание секрета = полный захват любого аккаунта (можно подделать session cookie).
+const WEAK_SECRET_MARKERS = ['change-this', 'your-secret', 'example', 'placeholder', 'random-32-char']
+const secretLower = process.env.SESSION_SECRET.toLowerCase()
+if (WEAK_SECRET_MARKERS.some(m => secretLower.includes(m))) {
+  throw new Error(
+    'SESSION_SECRET looks like a placeholder (contains "change-this"/"example"/etc). ' +
+    'Generate a real random secret (openssl rand -base64 32) before running.'
+  )
+}
 
 export type Role = 'user' | 'moderator' | 'admin'
 

@@ -148,6 +148,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'gameFinished' }, { status: 403 })
     }
 
+    // Проверка участия ДО стоп-листа: иначе неучастник мог бы записывать
+    // stop_violations на чужую игру и спровоцировать её автоскрытие.
+    const participant = await requireParticipant(gameId, user.id)
+    if (!participant) {
+      return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
+    }
+
     // Stop-list check
     const stopPhrases = await getActiveStopPhrases()
     if (stopPhrases.length > 0) {
@@ -171,12 +178,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
         return NextResponse.json({ error: 'stopListBlocked' }, { status: 422 })
       }
-    }
-
-    // Найти participant (kept at same position — after stop-list check)
-    const participant = await requireParticipant(gameId, user.id)
-    if (!participant) {
-      return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
     }
 
     const message = await queryOne(
