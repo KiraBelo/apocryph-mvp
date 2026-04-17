@@ -181,6 +181,19 @@ describe('DELETE /api/games/[id]/publish-consent', () => {
     expect(data.error).toBe('forbidden')
   })
 
+  it('returns 403 when user left the game (left_at IS NOT NULL filtered out)', async () => {
+    // Участник вышел — запрос с AND left_at IS NULL возвращает пусто
+    mockClient.query.mockResolvedValueOnce({ rows: [] })
+
+    const res = await DELETE(makeDeleteReq(), { params: Promise.resolve({ id: GAME_ID }) })
+
+    expect(res.status).toBe(403)
+    const data = await res.json()
+    expect(data.error).toBe('forbidden')
+    // Убеждаемся что SQL содержит фильтр left_at IS NULL
+    expect(mockClient.query.mock.calls[0][0]).toContain('left_at IS NULL')
+  })
+
   it('returns 403 when user is banned', async () => {
     mockRequireUser.mockResolvedValueOnce({ error: 'banned', user: null, banReason: null })
 

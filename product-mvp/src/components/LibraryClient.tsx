@@ -1,61 +1,14 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useT, usePlural } from './SettingsContext'
 import TagAutocomplete, { type TagItem } from './TagAutocomplete'
 import { ChevronRight, Heart } from 'lucide-react'
+import SharedFilterSelect from './FilterSelect'
 
-function FilterSelect({ value, onChange, options }: {
-  value: string
-  onChange: (v: string) => void
-  options: { value: string; label: string }[]
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const selected = options.find(o => o.value === value) ?? options[0]
-
-  useEffect(() => {
-    if (!open) return
-    function close(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
-
-  return (
-    <div ref={ref} className="relative min-w-[130px]">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className={`filter-input w-full flex items-center justify-between gap-2 cursor-pointer pr-3.5 ${open ? 'border-accent' : ''}`}
-      >
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{selected.label}</span>
-        <span className="text-[0.5rem] opacity-60 shrink-0">{open ? '▲' : '▼'}</span>
-      </button>
-      {open && (
-        <div className="absolute top-[calc(100%+2px)] left-0 right-0 z-100 bg-surface border border-accent shadow-[0_4px_16px_rgba(0,0,0,0.15)]">
-          {options.map(o => (
-            <button
-              key={o.value}
-              onClick={() => { onChange(o.value); setOpen(false) }}
-              className={`block w-full py-[0.45rem] px-3 border-none font-body text-[0.9rem] text-left cursor-pointer transition-[background,color] duration-100
-                ${o.value === value ? 'bg-accent-dim text-accent' : 'bg-transparent text-ink hover:bg-accent hover:text-white'}`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+function FilterSelect(props: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+  return <SharedFilterSelect {...props} variant="filter" />
 }
 
 interface PublicGame {

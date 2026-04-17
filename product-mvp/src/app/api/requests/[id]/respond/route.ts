@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne, withTransaction } from '@/lib/db'
+import { queryOne, withTransaction } from '@/lib/db'
 import { requireUser, handleAuthError } from '@/lib/session'
 import { escapeHtml } from '@/lib/game-utils'
 
@@ -92,6 +92,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
 
+      // Проверяем не является ли пользователь уже участником этой игры.
+      // Для multiplayer игра могла быть создана ранее и пользователь уже откликнулся.
+      const already = await client.query(
+        'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2',
+        [game!.id, user.id]
+      )
+      if (already.rows[0]) {
+        throw new Error('ALREADY_PARTICIPANT')
+      }
+
       // Добавляем откликнувшегося
       await client.query(
         `INSERT INTO game_participants (game_id, user_id, nickname)
@@ -101,11 +111,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       return game!.id
     }).catch(err => {
-      if (err.message === 'REQUEST_UNAVAILABLE') return null
+      if (err.message === 'REQUEST_UNAVAILABLE') return { notActive: true }
+      if (err.message === 'ALREADY_PARTICIPANT') return { alreadyParticipant: true }
       throw err
     })
 
-    if (!gameId) return NextResponse.json({ error: 'requestNotActive' }, { status: 404 })
+    if (typeof gameId === 'object' && gameId !== null) {
+      if ('notActive' in gameId) return NextResponse.json({ error: 'requestNotActive' }, { status: 404 })
+      if ('alreadyParticipant' in gameId) return NextResponse.json({ error: 'alreadyResponded' }, { status: 409 })
+    }
     return NextResponse.json({ gameId })
   } catch (error) {
     console.error('[API /api/requests/[id]/respond] POST:', error)
