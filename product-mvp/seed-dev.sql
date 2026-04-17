@@ -182,5 +182,43 @@ INSERT INTO game_publish_consent (game_id, participant_id, consented) VALUES
   ('aaaa2222-2222-2222-2222-222222222222', 'bb222222-2222-2222-2222-222222222222', true)
 ON CONFLICT DO NOTHING;
 
+-- Game 3: Luna + Starfall — "Станция «Предел»" (active, Starfall proposed to publish)
+INSERT INTO games (id, request_id, ooc_enabled, status)
+SELECT 'aaaa3333-3333-3333-3333-333333333333',
+       r.id, true, 'active'
+FROM requests r WHERE r.title = 'Станция «Предел» — 400 дней до связи'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO game_participants (id, game_id, user_id, nickname, avatar_url) VALUES
+  ('bb333333-1111-1111-1111-111111111111', 'aaaa3333-3333-3333-3333-333333333333',
+   '11111111-1111-1111-1111-111111111111', 'Навигатор Рен', NULL),
+  ('bb333333-2222-2222-2222-222222222222', 'aaaa3333-3333-3333-3333-333333333333',
+   '44444444-4444-4444-4444-444444444444', 'Инженер Кай', NULL)
+ON CONFLICT DO NOTHING;
+
+-- 24 IC messages alternating between participants
+INSERT INTO messages (game_id, participant_id, content, type, created_at)
+SELECT 'aaaa3333-3333-3333-3333-333333333333',
+  CASE WHEN i % 2 = 1
+    THEN 'bb333333-1111-1111-1111-111111111111'::uuid
+    ELSE 'bb333333-2222-2222-2222-222222222222'::uuid
+  END,
+  CASE (i % 6)
+    WHEN 0 THEN '<p>Рен проснулся от тишины. Не от звука — именно от её отсутствия. Гул вентиляции, ставший частью сознания за 312 дней, смолк.</p>'
+    WHEN 1 THEN '<p>Кай проверил панель: все системы в норме. Вентиляция работала. Но показания расходились с тем, что слышали уши.</p>'
+    WHEN 2 THEN '<p>— Ты двигал мою кружку? — спросил Рен за завтраком. Кружка стояла на левом краю стола. Он всегда ставил на правый.</p>'
+    WHEN 3 THEN '<p>— Не трогал. — Кай поднял глаза от планшета. — Но у меня тоже. Отвёртка лежала в ящике B, хотя я точно оставлял в C.</p>'
+    WHEN 4 THEN '<p>Журнал показаний за последние сутки: температура отсека 3 дважды подскочила на 0.7 градуса. Без видимой причины. Рен записал и перечитал запись трижды.</p>'
+    WHEN 5 THEN '<p>Кай нашёл царапину на переборке у шлюза. Свежую. Ни один из них не помнил, чтобы задевал стену чем-то острым.</p>'
+  END,
+  'ic',
+  NOW() - ((24 - i) * INTERVAL '5 hours')
+FROM generate_series(1, 24) AS i;
+
+-- Starfall proposed to publish — Luna sees the banner
+INSERT INTO game_publish_consent (game_id, participant_id, consented) VALUES
+  ('aaaa3333-3333-3333-3333-333333333333', 'bb333333-2222-2222-2222-222222222222', true)
+ON CONFLICT DO NOTHING;
+
 -- Seed: luna = admin
 UPDATE users SET role = 'admin' WHERE email = 'luna@apocryph.test';
