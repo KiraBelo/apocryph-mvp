@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useT, usePlural } from './SettingsContext'
 import { useToast } from './ToastProvider'
 import { Star, X } from 'lucide-react'
+import Breadcrumbs from './Breadcrumbs'
 
 interface GameRow {
   id: string
@@ -126,6 +127,10 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
 
   return (
     <div className="max-w-[1050px] mx-auto px-7 py-8">
+      <Breadcrumbs items={[
+        { label: t('nav.feed') as string, href: '/' },
+        { label: t('myGames.title') as string },
+      ]} />
       <h1 className="page-title mb-6">{t('myGames.title') as string}</h1>
 
       <div className="flex gap-5 mb-1 border-b border-edge flex-wrap">

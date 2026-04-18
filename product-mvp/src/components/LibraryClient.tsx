@@ -256,7 +256,7 @@ export default function LibraryClient() {
             disabled={page === 1}
             className="btn-ghost text-[0.65rem] tracking-[0.1em] p-[0.35rem_0.8rem] disabled:opacity-30"
           >
-            {t('feed.prev') as string}
+            {t('feed.prevPage') as string}
           </button>
           {paginationItems.map((item, i) =>
             item === 'dots' ? (
@@ -277,7 +277,7 @@ export default function LibraryClient() {
             disabled={page === totalPages}
             className="btn-ghost text-[0.65rem] tracking-[0.1em] p-[0.35rem_0.8rem] disabled:opacity-30"
           >
-            {t('feed.next') as string}
+            {t('feed.nextPage') as string}
           </button>
         </div>
       )}

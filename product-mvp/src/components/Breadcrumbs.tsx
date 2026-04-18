@@ -15,7 +15,7 @@ export default function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
           {item.href ? (
             <Link href={item.href} className="hover:text-accent transition-colors">{item.label}</Link>
           ) : (
-            <span className="text-ink-3">{item.label}</span>
+            <span aria-current="page" className="text-ink-3">{item.label}</span>
           )}
         </span>
       ))}

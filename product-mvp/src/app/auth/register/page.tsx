@@ -18,11 +18,19 @@ export default function RegisterPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true); setError('')
+    setError('')
+    const emailTrim = email.trim()
+    if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+      setError(t('errors.invalidEmail') as string); return
+    }
+    if (password.length < 6) {
+      setError(t('auth.resetTooShort') as string); return
+    }
+    setLoading(true)
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: emailTrim, password }),
     })
     const data = await res.json()
     if (!res.ok) { setError(t(`errors.${data.error}`) as string || data.error); setLoading(false); return }
