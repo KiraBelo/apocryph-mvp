@@ -8,16 +8,13 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/session', () => ({
-  requireMod: vi.fn().mockResolvedValue({ error: 'forbidden', user: null }),
-  handleAuthError: (error: string | null) => {
-    const { NextResponse } = require('next/server')
-    if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-    if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
-    if (error === 'forbidden') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-    return null
-  },
-}))
+vi.mock('@/lib/session', async () => {
+  const { handleAuthErrorMock } = await import('@/test/mocks/session-helpers')
+  return {
+    requireMod: vi.fn().mockResolvedValue({ error: 'forbidden', user: null }),
+    handleAuthError: handleAuthErrorMock,
+  }
+})
 
 import { query } from '@/lib/db'
 import { requireMod } from '@/lib/session'

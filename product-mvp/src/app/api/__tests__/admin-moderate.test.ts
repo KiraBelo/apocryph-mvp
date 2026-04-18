@@ -9,26 +9,23 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/session', () => ({
-  requireUser: vi.fn().mockResolvedValue({
-    error: null,
-    user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
-    banReason: null,
-  }),
-  requireMod: vi.fn().mockResolvedValue({
-    error: null,
-    user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
-  }),
-  getUser: vi.fn().mockResolvedValue({ id: 'user-id', email: 'a@b.com', role: 'user' }),
-  getSession: vi.fn().mockResolvedValue({ userId: 'user-id', email: 'a@b.com', role: 'user', save: vi.fn() }),
-  handleAuthError: (error: string | null) => {
-    const { NextResponse } = require('next/server')
-    if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-    if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
-    if (error === 'forbidden') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-    return null
-  },
-}))
+vi.mock('@/lib/session', async () => {
+  const { handleAuthErrorMock } = await import('@/test/mocks/session-helpers')
+  return {
+    requireUser: vi.fn().mockResolvedValue({
+      error: null,
+      user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
+      banReason: null,
+    }),
+    requireMod: vi.fn().mockResolvedValue({
+      error: null,
+      user: { id: 'user-id', email: 'a@b.com', role: 'admin' },
+    }),
+    getUser: vi.fn().mockResolvedValue({ id: 'user-id', email: 'a@b.com', role: 'user' }),
+    getSession: vi.fn().mockResolvedValue({ userId: 'user-id', email: 'a@b.com', role: 'user', save: vi.fn() }),
+    handleAuthError: handleAuthErrorMock,
+  }
+})
 
 vi.mock('@/lib/sse', () => ({
   notifyGame: vi.fn(),

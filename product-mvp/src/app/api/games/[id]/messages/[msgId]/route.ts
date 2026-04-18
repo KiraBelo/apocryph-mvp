@@ -39,8 +39,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (existing.published_at || existing.status === 'moderation' || existing.status === 'published') return NextResponse.json({ error: 'gameAlreadyPublished' }, { status: 403 })
     if (existing.type === 'dice') return NextResponse.json({ error: 'cannotEditDice' }, { status: 400 })
 
-    const updated = await withTransaction(async (client) => {
-      const result = await client.query(
+    const updated = await withTransaction<{ id: string; content: string; edited_at: string } | undefined>(async (client) => {
+      const result = await client.query<{ id: string; content: string; edited_at: string }>(
         `UPDATE messages SET content = $1, edited_at = NOW() WHERE id = $2 RETURNING id, content, edited_at`,
         [sanitized, msgId]
       )
@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return result.rows[0]
     })
 
-    notifyGame(gameId, { _type: 'edit', ...(updated as object) })
+    if (updated) notifyGame(gameId, { _type: 'edit', ...updated })
 
     return NextResponse.json(updated)
   } catch (error) {

@@ -44,21 +44,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const safeNickname = sanitizeNickname(participant.nickname)
     const content = JSON.stringify({ sides: s, result, roller: safeNickname })
 
-    const message = await queryOne(
+    const message = await queryOne<{ id: string }>(
       `INSERT INTO messages (game_id, participant_id, content, type)
-       VALUES ($1, $2, $3, 'dice') RETURNING *`,
+       VALUES ($1, $2, $3, 'dice') RETURNING id`,
       [gameId, participant.id, content]
     )
+    if (!message) return NextResponse.json({ error: 'serverError' }, { status: 500 })
 
-    const full = await queryOne(
+    const full = await queryOne<Record<string, unknown>>(
       `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
        FROM messages m
        JOIN game_participants gp ON gp.id = m.participant_id
        WHERE m.id = $1`,
-      [(message as { id: string }).id]
+      [message.id]
     )
 
-    notifyGame(gameId, { _type: 'new', ...(full as object) })
+    if (full) notifyGame(gameId, { _type: 'new', ...full })
 
     return NextResponse.json({ sides: s, result, roller: safeNickname }, { status: 201 })
   } catch (error) {

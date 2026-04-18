@@ -40,6 +40,9 @@ export default function Nav({ user }: Props) {
 
   const unreadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Основной polling — запускается один раз на сессию пользователя.
+  // Раньше path был в deps, из-за чего каждая навигация останавливала и
+  // перезапускала интервал → всплеск запросов при быстрых переходах.
   useEffect(() => {
     if (!user) return
 
@@ -65,6 +68,15 @@ export default function Nav({ user }: Props) {
       if (unreadIntervalRef.current) clearInterval(unreadIntervalRef.current)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchUnread новая ссылка на каждый рендер, но стабильна по семантике (read globals). Перезапуск при каждом ререндере не нужен.
+  }, [user])
+
+  // Лёгкое обновление при смене маршрута: только fetchUnread(), без перезапуска
+  // интервала — чтобы сразу увидеть актуальные счётчики после перехода.
+  useEffect(() => {
+    if (!user) return
+    fetchUnread()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchUnread новая ссылка на каждый рендер, но стабильна по семантике.
   }, [user, path])
 
   useEffect(() => {

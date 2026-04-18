@@ -115,9 +115,9 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
     else if (activeTab === 'ic') fetch(`/api/games/${gameId}/read`, { method: 'POST' }).catch(() => {}) // fire-and-forget: read marker is non-critical
   }, [activeTab, gameId])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- notesHook.loadNotes это новая функция на каждый рендер (создаётся в useGameNotes). Включение её в deps вызвало бы бесконечную перезагрузку. notesLoaded гвард защищает от повторных вызовов.
   useEffect(() => { if (activeTab === 'notes' && notesEnabled && !notesHook.notesLoaded) notesHook.loadNotes() }, [activeTab, notesEnabled, notesHook.notesLoaded])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- chat.loadOocHistory новая функция на каждый рендер. oocLoaded гвард защищает от повторных вызовов.
   useEffect(() => { if (activeTab === 'ooc' && !chat.oocLoaded) chat.loadOocHistory() }, [activeTab, chat.oocLoaded])
   // Auto-switch away from prepare tab if no longer in preparing status
   useEffect(() => { if (activeTab === 'prepare' && !isPreparing) setActiveTab('ic') }, [isPreparing, activeTab])

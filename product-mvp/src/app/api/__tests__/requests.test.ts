@@ -9,17 +9,14 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/session', () => ({
-  requireUser: vi.fn().mockResolvedValue({ error: null, user: { id: 'user-id', email: 'a@b.com', role: 'user' }, banReason: null }),
-  getUser: vi.fn().mockResolvedValue(null),
-  handleAuthError: (error: string | null) => {
-    const { NextResponse } = require('next/server')
-    if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
-    if (error === 'banned') return NextResponse.json({ error: 'banned' }, { status: 403 })
-    if (error === 'forbidden') return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-    return null
-  },
-}))
+vi.mock('@/lib/session', async () => {
+  const { handleAuthErrorMock } = await import('@/test/mocks/session-helpers')
+  return {
+    requireUser: vi.fn().mockResolvedValue({ error: null, user: { id: 'user-id', email: 'a@b.com', role: 'user' }, banReason: null }),
+    getUser: vi.fn().mockResolvedValue(null),
+    handleAuthError: handleAuthErrorMock,
+  }
+})
 
 vi.mock('@/lib/sanitize', () => ({
   sanitizeBody: vi.fn((html: string) => html),
