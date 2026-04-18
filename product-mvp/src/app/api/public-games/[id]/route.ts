@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { sanitizeBody } from '@/lib/sanitize'
 import { PAGE_SIZE } from '@/lib/constants'
+import { getUser } from '@/lib/session'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: gameId } = await params
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') || '1'))
+  const viewer = await getUser()
 
   try {
     const game = await queryOne<{
@@ -35,12 +37,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       [gameId]
     )
 
-    // Author user IDs (for comment reply permissions — not exposing nicknames/emails)
-    const authorRows = await query<{ user_id: string }>(
-      'SELECT user_id FROM game_participants WHERE game_id=$1',
-      [gameId]
-    )
-    const authorUserIds = authorRows.map(r => r.user_id)
+    // Считаем флаг isAuthor на сервере и отдаём только его. Раньше отдавали
+    // массив user_id всех участников (author_user_ids) — это деанонимизация:
+    // зная user_id из комментариев в другой игре, можно было определить,
+    // в каких ещё играх участвовал тот же человек.
+    const isAuthor = viewer
+      ? Boolean(await queryOne<{ id: string }>(
+          'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2 LIMIT 1',
+          [gameId, viewer.id]
+        ))
+      : false
 
     // IC messages count
     const countRes = await queryOne<{ count: string }>(
@@ -76,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         id: game.id,
         banner_url: game.banner_url,
         published_at: game.published_at,
-        author_user_ids: authorUserIds,
+        isAuthor,
       },
       request: request ? {
         title: request.title,

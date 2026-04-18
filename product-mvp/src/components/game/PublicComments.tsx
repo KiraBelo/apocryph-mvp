@@ -14,10 +14,10 @@ interface Comment {
 interface PublicCommentsProps {
   gameId: string
   userId: string | null
-  authorUserIds: string[]
+  isAuthor: boolean
 }
 
-export default function PublicComments({ gameId, userId, authorUserIds }: PublicCommentsProps) {
+export default function PublicComments({ gameId, userId, isAuthor }: PublicCommentsProps) {
   const t = useT()
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,7 +29,8 @@ export default function PublicComments({ gameId, userId, authorUserIds }: Public
   const [replySubmitting, setReplySubmitting] = useState(false)
   const [replySubmitted, setReplySubmitted] = useState<string | null>(null)
 
-  const isAuthor = userId !== null && authorUserIds.includes(userId)
+  // isAuthor — теперь приходит с сервера (не дешифровывается из user_id).
+  // Это закрывает деанонимизацию: раньше клиент получал список user_id участников.
 
   useEffect(() => {
     fetch(`/api/public-games/${gameId}/comments`)

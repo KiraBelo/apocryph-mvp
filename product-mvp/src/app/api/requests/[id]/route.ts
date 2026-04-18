@@ -53,6 +53,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!validStatuses.includes(body.status)) {
       return NextResponse.json({ error: 'invalidStatus' }, { status: 400 })
     }
+
+    // Антиспам: те же проверки, что и в POST /api/requests при is publishing.
+    // Иначе пользователь мог создать драфт и через PATCH status=active
+    // обходил бы лимит 5/день, кулдаун 3 минуты и duplicate detection.
+    if (body.status === 'active' && process.env.NODE_ENV !== 'development') {
+      const recentCount = await queryOne<{ count: string }>(
+        `SELECT COUNT(*) as count FROM requests WHERE author_id = $1 AND status = 'active' AND created_at > NOW() - INTERVAL '1 day' AND id <> $2`,
+        [user!.id, id]
+      )
+      if (recentCount && parseInt(recentCount.count) >= 5) {
+        return NextResponse.json({ error: 'requestLimitReached' }, { status: 429 })
+      }
+      const lastRequest = await queryOne<{ created_at: string }>(
+        `SELECT created_at FROM requests WHERE author_id = $1 AND status = 'active' AND id <> $2 ORDER BY created_at DESC LIMIT 1`,
+        [user!.id, id]
+      )
+      if (lastRequest) {
+        const diff = Date.now() - new Date(lastRequest.created_at).getTime()
+        if (diff < 3 * 60 * 1000) {
+          return NextResponse.json({ error: 'requestCooldown' }, { status: 429 })
+        }
+      }
+    }
+
     try {
       const row = await queryOne(
         `UPDATE requests SET status=$2, updated_at=NOW() WHERE id=$1 RETURNING *`,

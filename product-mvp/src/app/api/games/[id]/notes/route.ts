@@ -5,7 +5,9 @@ import { sanitizeBody } from '@/lib/sanitize'
 import { requireParticipant } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 
-// GET — загрузить все свои заметки к игре (новые сверху)
+// GET — загрузить все свои заметки к игре (новые сверху).
+// Включаем left-участников: личные заметки автора должны быть доступны
+// и после выхода из игры.
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error, user } = await requireUser()
   const authErr = handleAuthError(error)
@@ -13,7 +15,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { id: gameId } = await params
 
   try {
-    const member = await requireParticipant(gameId, user!.id)
+    const member = await requireParticipant(gameId, user!.id, { includeLeft: true })
     if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const notes = await query<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(

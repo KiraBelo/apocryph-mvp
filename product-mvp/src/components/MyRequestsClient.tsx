@@ -252,7 +252,11 @@ function MyRequestCard({ r, statusLabel, typeLabels, fandomTypeLabels, pairingLa
         </div>
       )}
 
-      {/* Body preview */}
+      {/* Body preview.
+          XSS: r.body приходит из /api/requests — там sanitizeBody применяется
+          при чтении (requests/route.ts). Если появится новый источник
+          (кэш, localStorage, другой API) — обязательно санитизировать перед
+          рендером. */}
       {r.body && (
         <>
           <div>

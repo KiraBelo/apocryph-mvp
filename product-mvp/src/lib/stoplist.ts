@@ -5,8 +5,16 @@ interface StopPhrase {
   phrase: string
 }
 
+// In-process cache. Ограничения:
+// 1. На multi-process/serverless каждый процесс имеет свой cache.
+//    invalidateStopPhraseCache() работает только в текущем процессе —
+//    новая фраза из стоп-листа может не блокироваться в других воркерах
+//    до истечения TTL. 10 секунд — приемлемый лаг; для полной синхронизации
+//    нужен Redis pub/sub или вынос в БД-функцию.
+// 2. Dev HMR создаёт новый модуль → новый cache каждый горячий рестарт.
+//    Для MVP приемлемо.
 let cache: { phrases: StopPhrase[]; ts: number } | null = null
-const CACHE_TTL = 60_000
+const CACHE_TTL = 10_000
 
 export async function getActiveStopPhrases(): Promise<StopPhrase[]> {
   if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.phrases

@@ -141,7 +141,8 @@ ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_url TEXT;
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS banner_pref TEXT NOT NULL DEFAULT 'own' CHECK (banner_pref IN ('own','partner','none'));
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS starred_at TIMESTAMPTZ;
 ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;
-ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS prepare_for_publish BOOLEAN NOT NULL DEFAULT false;
+-- Колонка prepare_for_publish удалена в lifecycle v3 ниже (DROP COLUMN).
+-- Не воссоздаём её при первом запуске schema.sql на чистой БД.
 
 -- ── STRUCTURED TAGS (Фаза 3) ───────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -306,7 +307,8 @@ ALTER TABLE games ADD CONSTRAINT games_status_check
   CHECK (status IN ('active', 'preparing', 'moderation', 'published'));
 -- Migrate existing finished games → active
 UPDATE games SET status = 'active' WHERE status = 'finished';
--- Drop per-participant prepare flag (now game-level status)
+-- Per-participant prepare flag — устаревший, статус публикации теперь на уровне games.
+-- DROP оставлен для миграции старых баз; в новых установках колонки нет (см. выше).
 ALTER TABLE game_participants DROP COLUMN IF EXISTS prepare_for_publish;
 
 -- ── GAME LIKES ────────────────────────────────────────────────

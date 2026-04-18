@@ -26,7 +26,7 @@ interface Message {
 }
 
 interface GameData {
-  game: { id: string; banner_url: string | null; published_at: string; author_user_ids?: string[] }
+  game: { id: string; banner_url: string | null; published_at: string; isAuthor?: boolean }
   request: {
     title: string | null; type: string | null; fandom_type: string | null
     pairing: string | null; content_level: string | null
@@ -106,7 +106,7 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
   }
 
   const { game, request, participants, messages, totalPages } = data
-  const authorUserIds = game.author_user_ids ?? []
+  const isAuthor = game.isAuthor ?? false
 
   // Build participant→side map: first participant = A (left), second = B (right)
   const participantIds = [...new Set(messages.map(m => m.participant_id))]
@@ -259,7 +259,7 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
 
       {/* Comments */}
       <div className="max-w-[920px] mx-auto px-8 pb-12">
-        <PublicComments gameId={gameId} userId={userId} authorUserIds={authorUserIds} />
+        <PublicComments gameId={gameId} userId={userId} isAuthor={isAuthor} />
       </div>
     </div>
   )
