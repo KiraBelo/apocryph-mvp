@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { queryOne, withTransaction } from '@/lib/db'
 import { rateLimit } from '@/lib/rate-limit'
+import { getClientIp } from '@/lib/client-ip'
 
 export async function POST(req: NextRequest) {
   // Rate-limit по IP: перебор одноразовых токенов не опасен (128 бит энтропии),
   // но защита от DoS и замедление нецелевого brute-force.
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const ip = getClientIp(req.headers)
   const { allowed } = rateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000)
   if (!allowed) {
     return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })

@@ -18,12 +18,16 @@ export function useGameSSE({ gameId, isLeft, onNewMessage, onEditMessage, onDice
   const onPublishRequestRef = useRef(onPublishRequest)
   const onPublishRevokedRef = useRef(onPublishRevoked)
 
-  onNewMessageRef.current = onNewMessage
-  onEditMessageRef.current = onEditMessage
-  onDiceMessageRef.current = onDiceMessage
-  onStatusChangedRef.current = onStatusChanged
-  onPublishRequestRef.current = onPublishRequest
-  onPublishRevokedRef.current = onPublishRevoked
+  // Обновляем ref-ы в effect (а не в render) — React 19 запрещает мутации
+  // refs во время render. Effect выполняется после коммита, до него
+  // callbacks в EventSource используют прежние значения (безопасно, т.к.
+  // EventSource тоже подключается в другом effect).
+  useEffect(() => { onNewMessageRef.current = onNewMessage })
+  useEffect(() => { onEditMessageRef.current = onEditMessage })
+  useEffect(() => { onDiceMessageRef.current = onDiceMessage })
+  useEffect(() => { onStatusChangedRef.current = onStatusChanged })
+  useEffect(() => { onPublishRequestRef.current = onPublishRequest })
+  useEffect(() => { onPublishRevokedRef.current = onPublishRevoked })
 
   useEffect(() => {
     if (isLeft) return

@@ -64,6 +64,8 @@ const en: Translations = {
     resetExpired: 'Link expired or invalid.',
     resetMismatch: 'Passwords do not match',
     resetTooShort: 'Minimum 6 characters',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
   },
 
   // ── Feed ──

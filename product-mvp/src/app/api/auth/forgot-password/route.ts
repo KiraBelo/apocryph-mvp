@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
+import { getClientIp } from '@/lib/client-ip'
 
 export async function POST(req: NextRequest) {
   let email: string
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const ip = getClientIp(req.headers)
   const { allowed } = rateLimit(`forgot:${ip}`, 3, 15 * 60 * 1000)
   if (!allowed) {
     return NextResponse.json({ error: 'tooManyAttempts' }, { status: 429 })

@@ -6,6 +6,17 @@
 -- Seed users: luna/wolf/ember/starfall@apocryph.test, password: apocryph123
 -- ================================================================
 
+-- Защита от случайного применения на production:
+-- Имя БД для dev — 'apocryph'. На prod рекомендуется другое имя (apocryph_prod,
+-- apocryph_live и т.п.). Этот блок упадёт с ошибкой если применить seed к базе
+-- с именем, начинающимся с 'prod'/'live' или содержащим 'production'.
+DO $$
+BEGIN
+  IF current_database() ~* '(^prod|^live|production)' THEN
+    RAISE EXCEPTION 'seed-dev.sql rejected: database "%" looks like production. This file is DEV ONLY.', current_database();
+  END IF;
+END $$;
+
 INSERT INTO users (id, email, password_hash) VALUES
   ('11111111-1111-1111-1111-111111111111', 'luna@apocryph.test',   '$2b$10$LJujy1aUfL4B1AfUT1hGvO7w01xomCAu4HDOqcqwrwRX289NALe0O'),
   ('22222222-2222-2222-2222-222222222222', 'wolf@apocryph.test',   '$2b$10$LJujy1aUfL4B1AfUT1hGvO7w01xomCAu4HDOqcqwrwRX289NALe0O'),

@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
   let body
@@ -121,11 +121,11 @@ export async function POST(req: NextRequest) {
   const name = (body.name || slug).trim()
 
   if (!slug || slug.length < 2 || slug.length > 50) {
-    return NextResponse.json({ error: 'Invalid tag' }, { status: 400 })
+    return NextResponse.json({ error: 'invalidTag' }, { status: 400 })
   }
 
   if (name.length > 100) {
-    return NextResponse.json({ error: 'Name too long' }, { status: 400 })
+    return NextResponse.json({ error: 'nameTooLong' }, { status: 400 })
   }
 
   // Check existing tag by slug
@@ -151,6 +151,11 @@ export async function POST(req: NextRequest) {
        WHERE t.id = $1`,
       [aliasMatch.tag_id]
     )
+    // Parent tag может быть удалён между SELECT alias и SELECT tag (гонка).
+    // В таком случае возвращаем notFound — клиент попробует создать заново.
+    if (!parent) {
+      return NextResponse.json({ error: 'notFound' }, { status: 404 })
+    }
     return NextResponse.json(parent)
   }
 

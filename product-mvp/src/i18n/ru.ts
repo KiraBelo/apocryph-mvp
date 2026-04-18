@@ -62,6 +62,8 @@ const ru = {
     resetExpired: 'Ссылка истекла или недействительна.',
     resetMismatch: 'Пароли не совпадают',
     resetTooShort: 'Минимум 6 символов',
+    showPassword: 'Показать пароль',
+    hidePassword: 'Скрыть пароль',
   },
 
   // ── Feed ──
@@ -136,7 +138,7 @@ const ru = {
 
   // ── Request Form ──
   form: {
-    newSectionLabel: '',
+    newSectionLabel: '§ Новая заявка',
     newTitle: 'Новая заявка',
     editSectionLabel: '',
     editTitle: 'Редактирование заявки',

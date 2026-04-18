@@ -6,7 +6,7 @@ import { useSettings, useT } from './SettingsContext'
 import { Settings, LogOut, X, Menu } from 'lucide-react'
 
 interface UnreadGame { id: string; title: string | null; ic_unread: string; ooc_unread: string }
-interface Proposal { id: string; title: string | null; type: 'finish' | 'publish' }
+interface Proposal { id: string; title: string | null; type: 'publish' }
 
 interface Props {
   user: { id: string; email: string; role?: string } | null
@@ -218,7 +218,7 @@ export default function Nav({ user }: Props) {
   const totalBadge = icGames.length + oocGames.length + proposals.length
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-200 h-[60px] bg-surface border-b border-edge flex items-center justify-between px-7 transition-[background,border-color] duration-300">
+    <nav className="fixed top-0 left-0 right-0 z-[200] h-[60px] bg-surface border-b border-edge flex items-center justify-between px-7 transition-[background,border-color] duration-300">
       <Link href="/feed" className="font-heading text-[1.2rem] italic text-ink">
         <em className="text-accent">{t('nav.brandAccent') as string}</em>{t('nav.brand') as string}
       </Link>
@@ -343,7 +343,7 @@ export default function Nav({ user }: Props) {
                           {p.title ? truncate(p.title) : t('nav.untitled') as string}
                         </span>
                         <span className="block font-mono text-[0.55rem] tracking-[0.08em] text-ink-2 mt-0.5">
-                          {p.type === 'finish' ? t('nav.proposalFinish') as string : t('nav.proposalPublish') as string}
+                          {t('nav.proposalPublish') as string}
                         </span>
                       </Link>
                     ))}

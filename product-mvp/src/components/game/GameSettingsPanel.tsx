@@ -116,7 +116,7 @@ export default function GameSettingsPanel({
           <h2 className="font-heading italic font-light text-[1.1rem] text-ink">
             {t('game.settingsTitle') as string}
           </h2>
-          <button onClick={onClose} className="bg-transparent border-none text-ink-2 cursor-pointer leading-none p-[0.2rem] flex items-center">
+          <button onClick={onClose} aria-label={t('common.close') as string} className="bg-transparent border-none text-ink-2 cursor-pointer leading-none p-[0.2rem] flex items-center">
             <X size={14} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>

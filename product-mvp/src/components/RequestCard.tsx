@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useT } from './SettingsContext'
 import { useToast } from './ToastProvider'
 import { Link2, Pencil, Star, ChevronRight, Check } from 'lucide-react'
+import type { RequestStatus } from '@/types/api'
 
 export interface Request {
   id: string
@@ -16,7 +17,7 @@ export interface Request {
   pairing: 'sl' | 'fm' | 'gt' | 'any' | 'multi' | 'other'
   language: 'ru' | 'en'
   tags: string[]
-  status: string
+  status: RequestStatus
   created_at: string
 }
 

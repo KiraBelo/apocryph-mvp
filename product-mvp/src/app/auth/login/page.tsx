@@ -66,6 +66,7 @@ export default function LoginPage() {
                 className="input-base text-[1rem] p-[0.65rem_0.9rem] pr-10 w-full" placeholder={t('auth.passwordPlaceholder') as string}
               />
               <button type="button" onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? t('auth.hidePassword') as string : t('auth.showPassword') as string}
                 className="absolute right-[0.6rem] top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-ink-2 p-[0.1rem] leading-none flex items-center">
                 {showPassword ? (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

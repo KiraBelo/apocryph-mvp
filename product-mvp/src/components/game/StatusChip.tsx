@@ -153,9 +153,11 @@ function DropdownMenu({ children, onClose, skipCloseRef }: {
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
-  // Click-outside via document listener (skipCloseRef pattern per CLAUDE.md)
+  // Click-outside via document listener (skipCloseRef pattern per CLAUDE.md).
+  // onCloseRef хранит актуальный onClose — обновляется в useEffect, а не в render
+  // (React 19 запрещает мутации refs во время render).
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -165,7 +167,7 @@ function DropdownMenu({ children, onClose, skipCloseRef }: {
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [skipCloseRef])
 
   return (
     <div

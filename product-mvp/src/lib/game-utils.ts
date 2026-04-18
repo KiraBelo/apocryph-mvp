@@ -20,9 +20,23 @@ export function feedPostBg(userId: string): string {
 export const NOTE_COLLAPSE_CHARS = 350
 
 export function htmlToText(html: string): string {
-  const div = document.createElement('div')
-  div.innerHTML = html
-  return div.textContent ?? div.innerText ?? ''
+  if (typeof document !== 'undefined') {
+    const div = document.createElement('div')
+    div.innerHTML = html
+    return div.textContent ?? div.innerText ?? ''
+  }
+  // Server-side fallback: простая очистка тегов + декодирование базовых entities.
+  // Без DOM не можем корректно распарсить HTML, но для текстовых нужд достаточно.
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function isSMSOnly(html: string): boolean {

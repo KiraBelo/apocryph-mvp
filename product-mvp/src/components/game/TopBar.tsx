@@ -145,7 +145,16 @@ export default function TopBar({
                   className={`game-avatar ${p.user_id === userId ? 'game-avatar-mine' : ''}`}
                 >
                   {p.avatar_url
-                    ? <img src={p.avatar_url} alt={p.nickname} className="w-full h-full object-cover" />
+                    ? <img
+                        src={p.avatar_url}
+                        alt={p.nickname}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Невалидный URL — скрываем <img>, следующий <span> будет виден.
+                          // Обёртка показывает инициал через CSS.
+                          (e.target as HTMLImageElement).style.display = 'none'
+                        }}
+                      />
                     : <span className="font-heading text-[0.7rem] text-ink-2">{p.nickname[0]}</span>
                   }
                 </div>
