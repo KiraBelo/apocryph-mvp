@@ -1,9 +1,10 @@
 'use client'
 import { useT } from '../SettingsContext'
+import type { ModerationStatus } from '@/types/api'
 
 interface StatusBannersProps {
   isFrozen: boolean
-  moderationStatus?: string
+  moderationStatus?: ModerationStatus
   isLeft: boolean
   partnerWantsPublish: boolean
   publishLoading: boolean

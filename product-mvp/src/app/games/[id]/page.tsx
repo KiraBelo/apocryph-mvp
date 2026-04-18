@@ -2,13 +2,15 @@ import { redirect, notFound } from 'next/navigation'
 import { getUser } from '@/lib/session'
 import { queryOne, query } from '@/lib/db'
 import GameDialogClient from '@/components/GameDialogClient'
+import type { GameStatus, ModerationStatus } from '@/types/api'
+import { PAGE_SIZE } from '@/lib/constants'
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id: gameId } = await params
   const user = await getUser()
   if (!user) redirect('/auth/login')
 
-  const game = await queryOne<{ id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; created_at: string; moderation_status: string; status: string; finished_at: string | null; published_at: string | null }>(
+  const game = await queryOne<{ id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; created_at: string; moderation_status: ModerationStatus; status: GameStatus; published_at: string | null }>(
     'SELECT * FROM games WHERE id=$1', [gameId]
   )
   if (!game) notFound()
@@ -36,8 +38,6 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     ...p,
     user_id: p.user_id === user.id ? p.user_id : p.id, // replace other users' real user_id with participant id
   }))
-
-  const PAGE_SIZE = 30
 
   // Count IC messages (excluding ooc and dice)
   const countRes = await queryOne<{ count: string }>(

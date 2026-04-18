@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSettings, useT } from '../SettingsContext'
 import { useToast } from '../ToastProvider'
 import type { Participant } from './types'
+import type { GameStatus } from '@/types/api'
 import { X, ChevronRight } from 'lucide-react'
 import { MIN_IC_POSTS } from '@/lib/constants'
 
@@ -26,7 +27,7 @@ interface GameSettingsPanelProps {
   onLeave: () => void
   onClose: () => void
   // Publish
-  gameStatus: string
+  gameStatus: GameStatus
   icPostCount: number
   myPublishConsent: boolean
   publishLoading: boolean

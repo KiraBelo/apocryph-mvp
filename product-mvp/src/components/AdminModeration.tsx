@@ -52,6 +52,8 @@ export default function AdminModerationClient({
       } else {
         addToast(t('errors.generic') as string, 'error')
       }
+    } catch {
+      addToast(t('errors.networkError') as string, 'error')
     } finally {
       setLoading(null)
     }
@@ -63,6 +65,8 @@ export default function AdminModerationClient({
       const res = await fetch(`/api/admin/comments/${commentId}`, { method: 'POST' })
       if (res.ok) setComments(prev => prev.filter(c => c.id !== commentId))
       else addToast(t('errors.generic') as string, 'error')
+    } catch {
+      addToast(t('errors.networkError') as string, 'error')
     } finally {
       setLoading(null)
     }
@@ -74,6 +78,8 @@ export default function AdminModerationClient({
       const res = await fetch(`/api/admin/comments/${commentId}`, { method: 'DELETE' })
       if (res.ok) setComments(prev => prev.filter(c => c.id !== commentId))
       else addToast(t('errors.generic') as string, 'error')
+    } catch {
+      addToast(t('errors.networkError') as string, 'error')
     } finally {
       setLoading(null)
     }

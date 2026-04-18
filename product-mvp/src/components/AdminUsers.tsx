@@ -42,28 +42,40 @@ export default function AdminUsers() {
 
   async function handleBan(userId: string) {
     if (!banReason.trim()) return
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'ban', reason: banReason.trim() }),
-    })
-    if (res.ok) {
-      setBanModal(null)
-      setBanReason('')
-      load()
-    } else {
-      const data = await res.json()
-      addToast(data.error || 'Error', 'error')
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ban', reason: banReason.trim() }),
+      })
+      if (res.ok) {
+        setBanModal(null)
+        setBanReason('')
+        load()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        addToast(data.error || 'Error', 'error')
+      }
+    } catch {
+      addToast(t('errors.networkError') as string, 'error')
     }
   }
 
   async function handleUnban(userId: string) {
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'unban' }),
-    })
-    if (res.ok) load()
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unban' }),
+      })
+      if (res.ok) load()
+      else {
+        const data = await res.json().catch(() => ({}))
+        addToast(data.error || 'Error', 'error')
+      }
+    } catch {
+      addToast(t('errors.networkError') as string, 'error')
+    }
   }
 
   function handleRole(userId: string, role: string) {

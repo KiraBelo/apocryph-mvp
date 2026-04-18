@@ -100,13 +100,14 @@ export default function FeedClient({ user }: Props) {
     const unique = parts.filter(t => !blacklist.includes(t))
     if (!unique.length) { setBlacklistInput(''); return }
     try {
-      for (const tag of unique) {
-        await fetch('/api/blacklist', {
+      // Параллельные запросы вместо последовательных — UI не ждёт N*RTT.
+      await Promise.all(unique.map(tag =>
+        fetch('/api/blacklist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tag }),
         })
-      }
+      ))
       setBlacklist(prev => [...prev, ...unique].sort())
       setBlacklistInput('')
       load()

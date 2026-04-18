@@ -32,32 +32,28 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (search.length >= 2) {
       const escaped = search.replace(/[%_\\]/g, '\\$&')
 
-      // We need row_num to compute which page each result is on
-      // First get total count for this type to compute pages
-      const countRes = await queryOne<{ count: string }>(
-        `SELECT COUNT(*) as count FROM messages m WHERE m.game_id = $1 AND ${typeFilter}`,
-        [gameId]
-      )
-      const total = parseInt(countRes?.count || '0', 10)
-
+      // Один запрос вместо двух: COUNT(*) OVER() внутри CTE возвращает общее
+      // число сообщений этого типа в каждой строке результата — используем
+      // для вычисления totalPages.
       const results = await query<{
-        id: string; content: string; created_at: string; nickname: string; global_row: number
+        id: string; content: string; created_at: string; nickname: string; global_row: number; _total: string
       }>(
         `WITH numbered AS (
           SELECT m.id, m.content, m.created_at, gp.nickname,
-                 ROW_NUMBER() OVER (ORDER BY m.created_at ASC, m.id ASC) as global_row
+                 ROW_NUMBER() OVER (ORDER BY m.created_at ASC, m.id ASC) as global_row,
+                 COUNT(*) OVER () as _total
           FROM messages m
           JOIN game_participants gp ON gp.id = m.participant_id
           WHERE m.game_id = $1 AND ${typeFilter}
         )
-        SELECT id, content, created_at, nickname, global_row
+        SELECT id, content, created_at, nickname, global_row, _total
         FROM numbered
         WHERE content ILIKE '%' || $2 || '%'
         ORDER BY created_at DESC
         LIMIT 50`,
         [gameId, escaped]
       )
-
+      const total = results.length > 0 ? parseInt(results[0]._total) : 0
       const totalPages = Math.max(1, Math.ceil(total / limit))
 
       return NextResponse.json({

@@ -1,3 +1,5 @@
+import type { GameStatus, ModerationStatus } from '@/types/api'
+
 export interface Message {
   id: string; participant_id: string; content: string; created_at: string;
   edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string;
@@ -18,7 +20,7 @@ export interface SearchResult {
 
 export interface GameDialogProps {
   gameId: string
-  game: { id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; moderation_status?: string; status?: string; finished_at?: string | null; published_at?: string | null }
+  game: { id: string; request_id: string | null; banner_url: string | null; ooc_enabled: boolean; moderation_status?: ModerationStatus; status?: GameStatus; published_at?: string | null }
   initialMessages: Message[]
   initialPage: number
   totalPages: number
