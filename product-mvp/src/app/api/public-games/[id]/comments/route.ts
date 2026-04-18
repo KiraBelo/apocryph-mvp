@@ -3,10 +3,13 @@ import { query, queryOne } from '@/lib/db'
 import { getUser } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
+import { PAGE_SIZE } from '@/lib/constants'
 
-// GET — approved comments + author replies
-export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// GET — approved comments + author replies (paginated top-level; replies loaded fully)
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: gameId } = await params
+  const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') || '1', 10))
+  const offset = (page - 1) * PAGE_SIZE
 
   try {
     const game = await queryOne<{ id: string }>(
@@ -22,39 +25,60 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     )
     const authorNicknames = new Map(authorRows.map(r => [r.user_id, r.nickname]))
 
-    const rows = await query<{
-      id: string; content: string; parent_id: string | null; user_id: string; created_at: string
+    // Пагинация по top-level комментариям; replies автора подгружаем полностью
+    // (их обычно в разы меньше, чем корневых комментариев).
+    const topRows = await query<{
+      id: string; content: string; parent_id: null; user_id: string; created_at: string; _total: string
     }>(
-      `SELECT id, content, parent_id, user_id, created_at
+      `SELECT id, content, parent_id, user_id, created_at, COUNT(*) OVER() as _total
        FROM game_comments
-       WHERE game_id=$1 AND approved_at IS NOT NULL
-       ORDER BY created_at ASC`,
-      [gameId]
+       WHERE game_id=$1 AND parent_id IS NULL AND approved_at IS NOT NULL
+       ORDER BY created_at ASC
+       LIMIT $2 OFFSET $3`,
+      [gameId, PAGE_SIZE, offset]
     )
+    const total = topRows.length > 0 ? parseInt(topRows[0]._total) : 0
+    const topIds = topRows.map(r => r.id)
+
+    const replyRows = topIds.length > 0
+      ? await query<{ id: string; content: string; parent_id: string; user_id: string; created_at: string }>(
+          `SELECT id, content, parent_id, user_id, created_at
+           FROM game_comments
+           WHERE game_id=$1 AND parent_id = ANY($2::uuid[]) AND approved_at IS NOT NULL
+           ORDER BY created_at ASC`,
+          [gameId, topIds]
+        )
+      : []
 
     type CommentItem = { id: string; content: string; created_at: string; is_author: boolean; author_nickname: string | null; replies: CommentItem[] }
 
-    const topLevel: CommentItem[] = []
-    const byId = new Map<string, CommentItem>()
-
-    for (const r of rows) {
+    function toItem(r: { id: string; content: string; user_id: string; created_at: string }): CommentItem {
       const isAuthor = authorNicknames.has(r.user_id)
-      const item: CommentItem = {
+      return {
         id: r.id, content: r.content, created_at: r.created_at,
         is_author: isAuthor,
         author_nickname: isAuthor ? (authorNicknames.get(r.user_id) ?? null) : null,
         replies: [],
       }
-      if (!r.parent_id) {
-        topLevel.push(item)
-        byId.set(r.id, item)
-      } else {
-        const parent = byId.get(r.parent_id)
-        if (parent) parent.replies.push(item)
-      }
     }
 
-    return NextResponse.json({ comments: topLevel })
+    const byId = new Map<string, CommentItem>()
+    const topLevel: CommentItem[] = topRows.map(r => {
+      const item = toItem(r)
+      byId.set(r.id, item)
+      return item
+    })
+    for (const r of replyRows) {
+      const parent = byId.get(r.parent_id)
+      if (parent) parent.replies.push(toItem(r))
+    }
+
+    return NextResponse.json({
+      comments: topLevel,
+      total,
+      page,
+      totalPages: Math.ceil(total / PAGE_SIZE),
+    })
   } catch (error) {
     console.error('[API /api/public-games/[id]/comments] GET:', error)
     return NextResponse.json({ error: 'serverError' }, { status: 500 })

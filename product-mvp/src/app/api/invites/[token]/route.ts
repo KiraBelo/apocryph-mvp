@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, withTransaction } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
+import { escapeHtml } from '@/lib/game-utils'
 
 // GET — информация об инвайте
 export async function GET(_: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -23,8 +24,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ token:
 
 // POST — принять инвайт
 export async function POST(_: NextRequest, { params }: { params: Promise<{ token: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { error, user } = await requireUser()
+  const authErr = handleAuthError(error)
+  if (authErr) return authErr
 
   const { token } = await params
 
@@ -49,7 +51,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ token
       if (!request) return { error: 'requestNotActive', status: 404 }
 
       // Author cannot accept their own invite
-      if (request.author_id === user.id) return { error: 'forbidden', status: 403 }
+      if (request.author_id === user!.id) return { error: 'forbidden', status: 403 }
 
       // Создаём или находим игру
       const gameRes = await client.query(
@@ -62,11 +64,30 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ token
           'INSERT INTO games (request_id) VALUES ($1) RETURNING id', [request.id]
         )
         gameId = newGame.rows[0].id
-        // Добавляем автора
-        await client.query(
-          "INSERT INTO game_participants (game_id, user_id, nickname) VALUES ($1,$2,'Игрок') ON CONFLICT DO NOTHING",
+        // Добавляем автора и получаем его participant.id для первого поста
+        const authorRes = await client.query(
+          `INSERT INTO game_participants (game_id, user_id, nickname)
+           VALUES ($1, $2, 'Игрок') ON CONFLICT (game_id, user_id) DO UPDATE SET game_id=$1 RETURNING id`,
           [gameId, request.author_id]
         )
+        const authorParticipant = authorRes.rows[0]
+
+        // Первый пост — текст заявки (как и в /requests/[id]/respond, чтобы игра
+        // через инвайт начиналась с того же контекста что и обычный отклик).
+        if (authorParticipant) {
+          const tagLine = request.tags?.length ? request.tags.map((t: string) => `#${t}`).join(' ') : ''
+          const parts = [`<h3>${escapeHtml(request.title)}</h3>`]
+          if (tagLine) parts.push(`<p>${tagLine}</p>`)
+          if (request.body) parts.push(request.body)
+          const firstPostContent = parts.join('\n')
+
+          await client.query(
+            `INSERT INTO messages (game_id, participant_id, content, type)
+             VALUES ($1, $2, $3, 'ic')`,
+            [gameId, authorParticipant.id, firstPostContent]
+          )
+        }
+
         // Для duo снимаем из ленты
         if (request.type === 'duo') {
           await client.query("UPDATE requests SET status='inactive' WHERE id=$1", [request.id])
@@ -75,7 +96,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ token
 
       await client.query(
         "INSERT INTO game_participants (game_id, user_id, nickname) VALUES ($1,$2,'Игрок') ON CONFLICT DO NOTHING",
-        [gameId, user.id]
+        [gameId, user!.id]
       )
 
       // Помечаем инвайт использованным

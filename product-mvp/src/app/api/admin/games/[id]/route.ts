@@ -23,7 +23,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
-    await query('UPDATE games SET moderation_status = $2 WHERE id = $1', [gameId, moderation_status])
+    const updated = await query<{ id: string }>(
+      'UPDATE games SET moderation_status = $2 WHERE id = $1 RETURNING id',
+      [gameId, moderation_status]
+    )
+    if (updated.length === 0) {
+      return NextResponse.json({ error: 'notFound' }, { status: 404 })
+    }
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[API /api/admin/games/[id]] PATCH:', error)
