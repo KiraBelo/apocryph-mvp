@@ -45,12 +45,9 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-[80vh] p-8">
       <div className="w-full max-w-[420px]">
-        <h1 className="font-heading text-[2.4rem] italic mb-2 text-ink">
+        <h1 className="font-heading text-[2.4rem] italic mb-6 text-ink">
           {t('auth.loginTitle') as string}
         </h1>
-        <p className="text-ink-2 mb-6 font-body">
-          &nbsp;
-        </p>
 
         <form onSubmit={submit} className="flex flex-col gap-5">
           <label className="flex flex-col gap-[0.4rem]">

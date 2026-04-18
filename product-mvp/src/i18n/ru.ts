@@ -5,6 +5,7 @@ const ru = {
     no: 'Нет',
     cancel: 'Отмена',
     ok: 'OK',
+    close: 'Закрыть',
   },
 
   // ── Nav ──
@@ -195,7 +196,8 @@ const ru = {
     allRequests: 'Все заявки',
     noRequests: 'Заявок нет.',
     createFirst: 'Создать заявку',
-    deleteConfirm: 'Удалить заявку?',
+    confirmTitle: 'Подтверждение',
+    deleteConfirm: 'Удалить заявку? Это действие нельзя отменить.',
     yes: 'Да',
     no: 'Нет',
     unpublish: 'Убрать из ленты',
@@ -507,6 +509,14 @@ const ru = {
   // ── Admin / Moderation ──
   admin: {
     dashboard: 'Панель модерации',
+    dashReports: 'Жалобы (ожидают)',
+    dashModeration: 'На модерации',
+    dashComments: 'Комментарии',
+    dashUsers: 'Пользователей',
+    dashBanned: 'Забанено',
+    dashHidden: 'Скрытых игр',
+    dashViolations: 'Нарушения (7д)',
+    moderation: 'Модерация',
     reports: 'Жалобы',
     users: 'Пользователи',
     pending: 'Ожидают',

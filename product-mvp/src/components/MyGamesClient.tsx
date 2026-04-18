@@ -175,11 +175,22 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
             const activeCount = parseInt(g.active_participants) || 0
             const isInactive = !!g.left_at
 
+            const openGame = () => router.push(`/games/${g.id}`)
+            const gameTitle = g.request_title ?? t('nav.untitled') as string
             return (
               <article
                 key={g.id}
                 className="card cursor-pointer"
-                onClick={() => router.push(`/games/${g.id}`)}
+                role="link"
+                tabIndex={0}
+                aria-label={gameTitle}
+                onClick={openGame}
+                onKeyDown={e => {
+                  if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                    e.preventDefault()
+                    openGame()
+                  }
+                }}
                 style={{
                   opacity: isInactive ? 0.7 : 1,
                   borderLeftWidth: 'var(--card-stripe-w)',

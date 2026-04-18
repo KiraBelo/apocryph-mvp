@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useT } from './SettingsContext'
 import { useToast } from './ToastProvider'
+import ConfirmDialog from './ConfirmDialog'
 import { Link2, Pencil, X, Check, Play, Pause, ChevronRight } from 'lucide-react'
 
 export interface MyRequest {
@@ -118,7 +119,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
             contentLabels={contentLabels}
             copied={copied === r.id}
             inviteUrl={inviteUrlFor?.id === r.id ? inviteUrlFor.url : null}
-            confirmDelete={confirmDelete === r.id}
+            confirmDelete={false}
             onCopyInvite={() => copyInvite(r.id)}
             onCloseInvite={() => setInviteUrlFor(null)}
             onChangeStatus={changeStatus}
@@ -129,6 +130,17 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
           />
         ))}
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={t('myRequests.confirmTitle') as string}
+        message={t('myRequests.deleteConfirm') as string}
+        confirmLabel={t('myRequests.yes') as string}
+        cancelLabel={t('myRequests.no') as string}
+        danger
+        onConfirm={() => confirmDelete && deleteRequest(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }
@@ -224,19 +236,6 @@ function MyRequestCard({ r, statusLabel, typeLabels, fandomTypeLabels, pairingLa
           </button>
         </div>
       </div>
-
-      {/* Delete confirmation */}
-      {confirmDelete && (
-        <div className="flex items-center gap-3 p-[0.5rem_var(--card-px)] bg-accent-dim border-b border-accent">
-          <span className="meta-text text-ink flex-1">{t('myRequests.deleteConfirm') as string}</span>
-          <button onClick={() => onDeleteRequest(r.id)} className="font-mono text-[0.62rem] tracking-[0.08em] bg-accent text-white border-none py-1 px-2.5 cursor-pointer">
-            {t('myRequests.yes') as string}
-          </button>
-          <button onClick={onCancelDelete} className="btn-ghost py-1 px-2.5">
-            {t('myRequests.no') as string}
-          </button>
-        </div>
-      )}
 
       {/* Title */}
       <Link href={`/requests/${r.id}`} className="card-title">

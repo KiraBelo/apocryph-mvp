@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useCallback, useContext, useState } from 'react'
 import { X } from 'lucide-react'
+import { useT } from './SettingsContext'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -37,6 +38,9 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
+  const t = useT()
+  const closeLabel = t('common.close') as string
+
   const typeStyles: Record<ToastType, string> = {
     success: 'border-l-[3px] border-l-[#2d8a4e]',
     error: 'border-l-[3px] border-l-[#c0392b]',
@@ -63,7 +67,7 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
               <button
                 onClick={() => removeToast(toast.id)}
                 className="bg-transparent border-none text-ink-2 cursor-pointer p-0 leading-none shrink-0 flex items-center"
-                aria-label="Close"
+                aria-label={closeLabel}
               >
                 <X size={13} strokeWidth={2} aria-hidden="true" />
               </button>

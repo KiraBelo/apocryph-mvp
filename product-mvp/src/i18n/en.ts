@@ -7,6 +7,7 @@ const en: Translations = {
     no: 'No',
     cancel: 'Cancel',
     ok: 'OK',
+    close: 'Close',
   },
 
   // ── Nav ──
@@ -197,7 +198,8 @@ const en: Translations = {
     allRequests: 'All requests',
     noRequests: 'No requests yet.',
     createFirst: 'Create a request',
-    deleteConfirm: 'Delete request?',
+    confirmTitle: 'Confirm',
+    deleteConfirm: 'Delete request? This cannot be undone.',
     yes: 'Yes',
     no: 'No',
     unpublish: 'Remove from feed',
@@ -507,6 +509,14 @@ const en: Translations = {
   // ── Admin / Moderation ──
   admin: {
     dashboard: 'Moderation panel',
+    dashReports: 'Reports (pending)',
+    dashModeration: 'In moderation',
+    dashComments: 'Comments',
+    dashUsers: 'Users',
+    dashBanned: 'Banned',
+    dashHidden: 'Hidden games',
+    dashViolations: 'Violations (7d)',
+    moderation: 'Moderation',
     reports: 'Reports',
     users: 'Users',
     pending: 'Pending',

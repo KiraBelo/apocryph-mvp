@@ -439,9 +439,17 @@ export default function FeedClient({ user }: Props) {
           ))}
         </div>
       ) : error ? (
-        <p className="text-ink-2 italic font-heading text-[1.1rem]">
-          {t('errors.networkError') as string}
-        </p>
+        <div className="text-center py-8">
+          <p className="text-ink-2 italic font-heading text-[1.1rem] mb-3">
+            {t('errors.networkError') as string}
+          </p>
+          <button
+            onClick={() => { setError(false); load() }}
+            className="btn-ghost px-5 py-2 text-[0.9rem]"
+          >
+            {t('errors.errorPageRetry') as string}
+          </button>
+        </div>
       ) : requests.length === 0 ? (
         <p className="text-ink-2 italic font-heading text-[1.1rem]">
           {t('feed.noResults') as string}

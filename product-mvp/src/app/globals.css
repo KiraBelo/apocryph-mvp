@@ -1409,46 +1409,6 @@ nav::after {
   animation: fadeInUp 0.3s ease both;
 }
 
-/* ═══════════════════════════════════════════════
-   Theme-specific effects
-   ═══════════════════════════════════════════════ */
-
-/* ── Красная комната: зигзаги ────────────────── */
-[data-theme='redroom'] body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    repeating-linear-gradient(
-      135deg,
-      transparent 0px,
-      transparent 18px,
-      rgba(204, 34, 34, 0.03) 18px,
-      rgba(204, 34, 34, 0.03) 20px
-    ),
-    repeating-linear-gradient(
-      45deg,
-      transparent 0px,
-      transparent 18px,
-      rgba(204, 34, 34, 0.03) 18px,
-      rgba(204, 34, 34, 0.03) 20px
-    );
-}
-
-/* ── Неон: glow-эффекты ──────────────────────── */
-[data-theme='neon'] a:hover {
-  text-shadow: 0 0 8px rgba(255, 45, 123, 0.3);
-}
-[data-theme='neon'] article:hover,
-[data-theme='neon'] .tiptap-content {
-  box-shadow: inset 0 0 30px rgba(0, 212, 255, 0.02);
-}
-[data-theme='neon'] ::-webkit-scrollbar-thumb {
-  background: #2a2a44;
-  box-shadow: 0 0 4px rgba(255, 45, 123, 0.2);
-}
-[data-theme='neon'] ::-webkit-scrollbar-thumb:hover {
-  box-shadow: 0 0 6px rgba(255, 45, 123, 0.4);
-}
+/* Темы redroom/neon удалены 2026-04-18 — в UI они были недостижимы
+   (тип Theme в SettingsContext включает только 'light' | 'sepia' | 'ink' | 'nocturne').
+   Если понадобится вернуть — восстановить из git history. */

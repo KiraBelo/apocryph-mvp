@@ -1,9 +1,12 @@
+'use client'
 import React, { useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
+import { useT } from '../SettingsContext'
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 export default function Modal({ onClose, title, children, wide }: { onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
+  const t = useT()
   const titleId = useId()
   const modalRef = useRef<HTMLDivElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -55,7 +58,7 @@ export default function Modal({ onClose, title, children, wide }: { onClose: () 
         aria-labelledby={titleId}
         className={`modal p-8 w-full max-h-[calc(100vh-2rem)] overflow-y-auto ${wide ? 'max-w-[680px]' : 'max-w-[480px]'}`}
       >
-        <button onClick={onClose} aria-label="Close" className="sticky top-0 float-right bg-transparent border-none text-ink-2 cursor-pointer z-10 flex items-center"><X size={18} strokeWidth={2} aria-hidden="true" /></button>
+        <button onClick={onClose} aria-label={t('common.close') as string} className="sticky top-0 float-right bg-transparent border-none text-ink-2 cursor-pointer z-10 flex items-center"><X size={18} strokeWidth={2} aria-hidden="true" /></button>
         <h2 id={titleId} className="font-heading text-2xl italic text-ink mb-5">{title}</h2>
         {children}
       </div>
