@@ -18,6 +18,7 @@ export default defineConfig({
           include: [
             'src/**/__tests__/**/*.test.ts',
             'src/**/*.server.test.ts',
+            '.conventions/**/*.test.ts',
           ],
           exclude: ['node_modules', '.next', 'e2e'],
         },
@@ -31,6 +32,7 @@ export default defineConfig({
           include: [
             'src/**/*.test.tsx',
             'src/**/__tests_client__/**/*.test.ts',
+            '.conventions/**/*.test.tsx',
           ],
           exclude: ['node_modules', '.next', 'e2e'],
         },

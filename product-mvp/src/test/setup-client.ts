@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 import { server } from './mocks/server'
 import './mocks/next'
@@ -57,6 +58,7 @@ class MockEventSource {
 // Start MSW before all tests, reset handlers between tests, close after all.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
+  cleanup()
   server.resetHandlers()
   MockEventSource.instances = []
   vi.clearAllMocks()
