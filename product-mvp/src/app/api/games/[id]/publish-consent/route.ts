@@ -64,7 +64,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const result = await withTransaction(async (client) => {
       const meRes = await client.query(
         'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2 AND left_at IS NULL',
-        [gameId, user.id]
+        [gameId, user!.id]
       )
       const me = meRes.rows[0]
       if (!me) return { error: 'forbidden', status: 403 }
@@ -121,7 +121,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const result = await withTransaction(async (client) => {
       const meRes = await client.query(
         'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2 AND left_at IS NULL',
-        [gameId, user.id]
+        [gameId, user!.id]
       )
       const me = meRes.rows[0]
       if (!me) return { error: 'forbidden', status: 403 }

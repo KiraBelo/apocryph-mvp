@@ -15,7 +15,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const result = await withTransaction(async (client) => {
       const meRes = await client.query(
         'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2 AND left_at IS NULL',
-        [gameId, user.id]
+        [gameId, user!.id]
       )
       if (!meRes.rows[0]) return { error: 'forbidden', status: 403 }
 
