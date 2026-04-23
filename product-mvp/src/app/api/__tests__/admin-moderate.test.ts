@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import type { PoolClient } from 'pg'
 
 // ── Mocks (must be declared before imports) ────────────────────────────────
 
@@ -62,7 +63,8 @@ beforeEach(() => {
     banReason: null,
   })
   mockGetUser.mockResolvedValue({ id: 'user-id', email: 'a@b.com', role: 'user' })
-  mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => Promise<unknown>) => fn(mockClient))
+  // Test mock — PoolClient shape not fully needed for these unit tests
+  mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────
