@@ -7,9 +7,9 @@ import { sanitizeBody } from '@/lib/sanitize'
 
 // PATCH — редактировать своё сообщение
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; msgId: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id: gameId, msgId } = await params
 
@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
        JOIN game_participants gp ON gp.id = m.participant_id
        JOIN games g ON g.id = m.game_id
        WHERE m.id = $1 AND m.game_id = $2 AND gp.user_id = $3`,
-      [msgId, gameId, user!.id]
+      [msgId, gameId, user.id]
     )
     if (!existing) return NextResponse.json({ error: 'notFound' }, { status: 404 })
     if (existing.published_at || existing.status === 'moderation' || existing.status === 'published') return NextResponse.json({ error: 'gameAlreadyPublished' }, { status: 403 })

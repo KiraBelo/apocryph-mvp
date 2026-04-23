@@ -4,14 +4,14 @@ import { requireMod, handleAuthError } from '@/lib/session'
 
 // PATCH /api/admin/users/[id] — ban, unban, set_role
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id: targetId } = await params
 
   // Cannot modify yourself
-  if (targetId === user!.id) {
+  if (targetId === user.id) {
     return NextResponse.json({ error: 'cannotModifySelf' }, { status: 400 })
   }
   let action: string, reason: string | undefined, newRole: string | undefined
@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // Role hierarchy: moderator cannot ban/modify moderator or admin
     const roleLevel = (r: string) => r === 'admin' ? 3 : r === 'moderator' ? 2 : 1
-    if (user!.role !== 'admin' && roleLevel(target.role) >= roleLevel(user!.role)) {
+    if (user.role !== 'admin' && roleLevel(target.role) >= roleLevel(user.role)) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 })
     }
 
@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (action === 'set_role') {
       // Only admin can change roles
-      if (user!.role !== 'admin') {
+      if (user.role !== 'admin') {
         return NextResponse.json({ error: 'forbidden' }, { status: 403 })
       }
       if (!newRole || !['user', 'moderator', 'admin'].includes(newRole)) {

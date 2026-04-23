@@ -29,16 +29,16 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id } = await params
   const request = await queryOne<{ author_id: string }>(
     'SELECT author_id FROM requests WHERE id = $1', [id]
   )
   if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-  if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (request.author_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   let body
   try {
@@ -60,14 +60,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (body.status === 'active' && process.env.NODE_ENV !== 'development') {
       const recentCount = await queryOne<{ count: string }>(
         `SELECT COUNT(*) as count FROM requests WHERE author_id = $1 AND status = 'active' AND created_at > NOW() - INTERVAL '1 day' AND id <> $2`,
-        [user!.id, id]
+        [user.id, id]
       )
       if (recentCount && parseInt(recentCount.count) >= 5) {
         return NextResponse.json({ error: 'requestLimitReached' }, { status: 429 })
       }
       const lastRequest = await queryOne<{ created_at: string }>(
         `SELECT created_at FROM requests WHERE author_id = $1 AND status = 'active' AND id <> $2 ORDER BY created_at DESC LIMIT 1`,
-        [user!.id, id]
+        [user.id, id]
       )
       if (lastRequest) {
         const diff = Date.now() - new Date(lastRequest.created_at).getTime()
@@ -159,9 +159,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id } = await params
   try {
@@ -169,7 +169,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
       'SELECT author_id FROM requests WHERE id = $1', [id]
     )
     if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-    if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    if (request.author_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     await query('DELETE FROM requests WHERE id=$1', [id])
     return NextResponse.json({ ok: true })

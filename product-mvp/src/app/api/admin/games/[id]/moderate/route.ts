@@ -5,9 +5,8 @@ import { notifyGame } from '@/lib/sse'
 
 // POST — admin approves or rejects a game in moderation queue
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const { id: gameId } = await params
   let action: string

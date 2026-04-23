@@ -5,9 +5,9 @@ import { notifyGame } from '@/lib/sse'
 
 // POST — submit a 'preparing' game to moderation queue
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id: gameId } = await params
 
@@ -15,7 +15,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const result = await withTransaction(async (client) => {
       const meRes = await client.query(
         'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2 AND left_at IS NULL',
-        [gameId, user!.id]
+        [gameId, user.id]
       )
       if (!meRes.rows[0]) return { error: 'forbidden', status: 403 }
 

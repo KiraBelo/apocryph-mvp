@@ -4,9 +4,8 @@ import { requireMod, handleAuthError } from '@/lib/session'
 
 // GET /api/admin/users?q=email&page=1
 export async function GET(req: NextRequest) {
-  const { error } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const sp = req.nextUrl.searchParams
   const q = sp.get('q') || ''

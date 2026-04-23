@@ -5,9 +5,9 @@ import { randomBytes } from 'crypto'
 
 // POST — создать инвайт-ссылку
 export async function POST(req: NextRequest) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   let requestId: string
   try {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       'SELECT author_id FROM requests WHERE id = $1', [requestId]
     )
     if (!request) return NextResponse.json({ error: 'notFound' }, { status: 404 })
-    if (request.author_id !== user!.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    if (request.author_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const token = randomBytes(16).toString('hex')
 

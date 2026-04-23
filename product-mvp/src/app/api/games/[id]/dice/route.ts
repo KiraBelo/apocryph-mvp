@@ -8,11 +8,11 @@ import { rateLimit } from '@/lib/rate-limit'
 import { sanitizeNickname } from '@/lib/sanitize'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
-  const { allowed } = rateLimit(`dice:${user!.id}`, 10, 60_000)
+  const { allowed } = rateLimit(`dice:${user.id}`, 10, 60_000)
   if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
 
   const { id: gameId } = await params
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!game) return NextResponse.json({ error: 'notFound' }, { status: 404 })
     if (game.status !== 'active') return NextResponse.json({ error: 'gameNotActive' }, { status: 403 })
 
-    const participant = await requireParticipant(gameId, user!.id)
+    const participant = await requireParticipant(gameId, user.id)
     if (!participant) {
       return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
     }

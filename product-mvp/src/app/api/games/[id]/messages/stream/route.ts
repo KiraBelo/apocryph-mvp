@@ -6,24 +6,27 @@ import { subscribe, canConnect, trackConnect, trackDisconnect } from '@/lib/sse'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  if (error === 'unauthorized') return new Response('Unauthorized', { status: 401 })
-  if (error === 'banned') return new Response('Banned', { status: 403 })
+  const auth = await requireUser()
+  if (auth.error) {
+    if (auth.error === 'banned') return new Response('Banned', { status: 403 })
+    return new Response('Unauthorized', { status: 401 })
+  }
+  const { user } = auth
 
   const { id: gameId } = await params
 
   // Verify user is a participant of this game (or a moderator)
-  const isMod = user!.role === 'moderator' || user!.role === 'admin'
+  const isMod = user.role === 'moderator' || user.role === 'admin'
   if (!isMod) {
-    const participant = await requireParticipant(gameId, user!.id, { includeLeft: true })
+    const participant = await requireParticipant(gameId, user.id, { includeLeft: true })
     if (!participant) return new Response('Forbidden', { status: 403 })
   }
 
-  if (!canConnect(user!.id)) {
+  if (!canConnect(user.id)) {
     return new Response('Too many connections', { status: 429 })
   }
 
-  const userId = user!.id
+  const userId = user.id
   const encoder = new TextEncoder()
   let unsubscribe: (() => void) | undefined
   let cleaned = false
