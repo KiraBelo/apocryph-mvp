@@ -118,6 +118,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(false)
   const [tagPresets, setTagPresets] = useState<TagPreset[]>(DEFAULT_PRESETS)
 
+  // Mount-only hydration из localStorage. Lazy initial state не подходит:
+  // localStorage недоступен на SSR, получили бы hydration mismatch при
+  // рендере темы/шрифта ещё до useEffect. setState после mount — осознанный выбор.
   useEffect(() => {
     const loaded: Settings = {
       lang: (() => {
@@ -138,6 +141,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       emailNotifs: localStorage.getItem(KEYS.emailNotifs) !== 'false',
       notesEnabled: localStorage.getItem(KEYS.notesEnabled) !== 'false',
     }
+    /* eslint-disable react-hooks/set-state-in-effect -- mount-only settings hydration from localStorage (SSR-safe) */
     setSettings(loaded)
     applyAllToDOM(loaded)
 
@@ -145,6 +149,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem(TAG_PRESETS_KEY)
       if (saved) setTagPresets(JSON.parse(saved))
     } catch { /* ignore */ }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
   function set<K extends keyof Settings>(key: K, value: Settings[K]) {
