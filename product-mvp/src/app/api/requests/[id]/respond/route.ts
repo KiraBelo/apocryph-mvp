@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Author cannot respond to their own request
-    if (request.author_id === user.id) {
+    if (request.author_id === user!.id) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 })
     }
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Для multiplayer игра могла быть создана ранее и пользователь уже откликнулся.
       const already = await client.query(
         'SELECT id FROM game_participants WHERE game_id=$1 AND user_id=$2',
-        [game!.id, user.id]
+        [game!.id, user!.id]
       )
       if (already.rows[0]) {
         throw new Error('ALREADY_PARTICIPANT')
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await client.query(
         `INSERT INTO game_participants (game_id, user_id, nickname)
          VALUES ($1, $2, $3) ON CONFLICT (game_id, user_id) DO NOTHING`,
-        [game!.id, user.id, nickname || 'Игрок']
+        [game!.id, user!.id, nickname || 'Игрок']
       )
 
       return game!.id

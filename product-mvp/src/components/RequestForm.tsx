@@ -47,15 +47,19 @@ export default function RequestForm({ initial }: Props) {
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
-  // Restore draft from localStorage (only for new requests)
+  // Restore draft from localStorage (only for new requests).
+  // localStorage недоступен на SSR, поэтому нельзя использовать lazy initial
+  // state — это вызвало бы hydration mismatch. Осознанное setState в mount-эффекте.
   useEffect(() => {
     if (initial) return
     try {
       const saved = localStorage.getItem(DRAFT_KEY)
       if (!saved) return
       const d = JSON.parse(saved)
+      /* eslint-disable react-hooks/set-state-in-effect -- mount-only draft restore from localStorage (SSR-safe) */
       if (d.title) setTitle(d.title)
       if (d.body) setBody(d.body)
+      /* eslint-enable react-hooks/set-state-in-effect */
     } catch { /* corrupted draft */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- restore once on mount
 

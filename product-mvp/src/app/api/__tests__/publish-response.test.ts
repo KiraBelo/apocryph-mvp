@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import type { PoolClient } from 'pg'
 
 // ── Mocks (must be declared before imports) ───────────────────────────────
 
@@ -74,7 +75,8 @@ describe('POST /api/games/[id]/publish-response', () => {
 
   it('returns 400 for invalid choice', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // We need the route to parse the body first, but invalid choice is checked before transaction
     const req = makeReq(`http://localhost/api/games/${GAME_ID}/publish-response`, { choice: 'invalid_choice' })
@@ -87,7 +89,8 @@ describe('POST /api/games/[id]/publish-response', () => {
 
   it('returns 403 when user is not a participant', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - not found
     mockClient.query.mockResolvedValueOnce({ rows: [] })
@@ -102,7 +105,8 @@ describe('POST /api/games/[id]/publish-response', () => {
 
   it('returns 400 when game is not active', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
@@ -119,7 +123,8 @@ describe('POST /api/games/[id]/publish-response', () => {
 
   it('returns 403 when partner has no consent', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
@@ -138,7 +143,8 @@ describe('POST /api/games/[id]/publish-response', () => {
 
   it('returns 200 with status active when choice is decline', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
@@ -159,7 +165,8 @@ describe('POST /api/games/[id]/publish-response', () => {
 
   it('returns 200 with status preparing when choice is edit_first', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
@@ -183,7 +190,8 @@ describe('POST /api/games/[id]/publish-response', () => {
 
   it('returns 200 with status moderation when choice is publish_as_is', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
@@ -222,7 +230,8 @@ describe('POST /api/games/[id]/submit-to-moderation', () => {
 
   it('returns 403 when user is not a participant', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - not found
     mockClient.query.mockResolvedValueOnce({ rows: [] })
@@ -237,7 +246,8 @@ describe('POST /api/games/[id]/submit-to-moderation', () => {
 
   it('returns 400 when game is not in preparing status', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
@@ -254,7 +264,8 @@ describe('POST /api/games/[id]/submit-to-moderation', () => {
 
   it('returns 403 when not all participants have consented', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })
@@ -273,7 +284,8 @@ describe('POST /api/games/[id]/submit-to-moderation', () => {
 
   it('returns 200 when all checks pass', async () => {
     const mockClient = { query: vi.fn() }
-    mockWithTransaction.mockImplementation(async (fn: (client: typeof mockClient) => unknown) => fn(mockClient))
+    // Test mock — PoolClient shape not fully needed for these unit tests
+    mockWithTransaction.mockImplementation(async (fn) => fn(mockClient as unknown as PoolClient))
 
     // 1. participant check - found
     mockClient.query.mockResolvedValueOnce({ rows: [{ id: 'p-id' }] })

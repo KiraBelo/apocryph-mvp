@@ -146,7 +146,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Проверка участия ДО стоп-листа: иначе неучастник мог бы записывать
     // stop_violations на чужую игру и спровоцировать её автоскрытие.
-    const participant = await requireParticipant(gameId, user.id)
+    const participant = await requireParticipant(gameId, user!.id)
     if (!participant) {
       return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
     }
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await query(
           `INSERT INTO stop_violations (game_id, user_id, phrase_id, matched_text, message_type)
            VALUES ($1, $2, $3, $4, $5)`,
-          [gameId, user.id, match.phraseId, match.context, msgType]
+          [gameId, user!.id, match.phraseId, match.context, msgType]
         )
         const countRow = await queryOne<{ cnt: string }>(
           'SELECT COUNT(*) as cnt FROM stop_violations WHERE game_id = $1',

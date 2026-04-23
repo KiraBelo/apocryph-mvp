@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+cd product-mvp && npx lint-staged

@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
       // Anti-spam: rate limit (5 published requests/day, drafts unlimited)
       const recentCount = await queryOne<{ count: string }>(
         `SELECT COUNT(*) as count FROM requests WHERE author_id = $1 AND status = 'active' AND created_at > NOW() - INTERVAL '1 day'`,
-        [user.id]
+        [user!.id]
       )
       if (recentCount && parseInt(recentCount.count) >= 5) {
         return NextResponse.json({ error: 'requestLimitReached' }, { status: 429 })
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
       // Anti-spam: cooldown (3 minutes between published requests)
       const lastRequest = await queryOne<{ created_at: string }>(
         `SELECT created_at FROM requests WHERE author_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
-        [user.id]
+        [user!.id]
       )
       if (lastRequest) {
         const diff = Date.now() - new Date(lastRequest.created_at).getTime()
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
            similarity(LOWER(title), LOWER($2)) > 0.7
            OR ($3::text IS NOT NULL AND $3::text != '' AND similarity(body, $3::text) > 0.7)
          ) LIMIT 1`,
-        [user.id, title, description || null]
+        [user!.id, title, description || null]
       )
       if (duplicate) {
         return NextResponse.json({ error: 'duplicateRequest' }, { status: 409 })
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
       const res = await client.query(
         `INSERT INTO requests (author_id, title, body, type, content_level, fandom_type, pairing, language, tags, is_public, status)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-        [user.id, title, sanitizeBody(description), type, content_level,
+        [user!.id, title, sanitizeBody(description), type, content_level,
          fandom_type || 'original', pairing || 'any', language || 'ru',
          tagsArr, is_public ?? true, status || 'draft']
       )

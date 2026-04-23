@@ -43,3 +43,8 @@ next-env.d.ts
 
 # local screenshots (not committed)
 /screenshots/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

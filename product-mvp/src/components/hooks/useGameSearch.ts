@@ -15,10 +15,15 @@ export function useGameSearch({ gameId, icMessages, oocMessages, notes }: {
   const [searchLoading, setSearchLoading] = useState(false)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Server-side search with debounce + AbortController
+  // Server-side search with debounce + AbortController.
+  // Эффект управляет асинхронным процессом (fetch) — setState здесь
+  // сбрасывает устаревшие результаты при смене scope/закрытии поиска.
+  // Перенести setState в обработчик события нельзя: тут реагируем на
+  // изменение searchQuery/searchScope, не на клик.
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
     if (!searchOpen || searchScope === 'notes') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset stale fetch state when search closed or scope=notes
       setServerSearchResults([])
       setSearchLoading(false)
       return
