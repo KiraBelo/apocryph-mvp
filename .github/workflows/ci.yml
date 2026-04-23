@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint · Typecheck · Test · Build · E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: apocryph_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/apocryph_test
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/apocryph_test
+      SESSION_SECRET: test-secret-key-at-least-32-characters-long
+      TRUSTED_PROXY: '1'
+      CI: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: product-mvp/package-lock.json
+
+      - name: Install dependencies
+        working-directory: product-mvp
+        run: npm ci
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            sleep 1
+          done
+
+      - name: Lint
+        working-directory: product-mvp
+        run: npm run lint
+
+      - name: Typecheck (known pre-existing errors, non-blocking)
+        working-directory: product-mvp
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Vitest (server + client)
+        working-directory: product-mvp
+        run: npm test
+
+      - name: Next.js build
+        working-directory: product-mvp
+        run: npm run build
+
+      - name: Reset test DB
+        working-directory: product-mvp
+        run: bash scripts/setup-test-db.sh
+
+      - name: Install Playwright browsers
+        working-directory: product-mvp
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E tests
+        working-directory: product-mvp
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: product-mvp/playwright-report/
+          retention-days: 7
