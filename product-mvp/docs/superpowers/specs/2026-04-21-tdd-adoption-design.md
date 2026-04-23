@@ -2,7 +2,7 @@
 
 **Дата:** 2026-04-21
 **Автор:** bkira2225 + Claude
-**Статус:** approved (готов к написанию implementation plan)
+**Статус:** Phase 1 завершена 2026-04-23 (PR #2, squash `9f6446f`). Phase 2-4 впереди.
 
 ## Цель
 
@@ -295,7 +295,9 @@ vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid')
 | 2.6 | `respond-to-request.spec.ts` | Отклик на заявку → превращение в игру → редирект в `/games/[id]`. |
 | 2.7 | `play-game.spec.ts` | Два контекста (luna, wolf), отправка IC-сообщения одним → получение другим через SSE без reload. |
 | 2.8 | `publish-to-library.spec.ts` | Флоу publish-consent → publish-response → moderation → published. |
-| 2.9 | `moderation.spec.ts` | Админ одобряет/отклоняет отправленную на модерацию игру. |
+| 2.9 | `moderation.spec.ts` | Админ 
+
+одобряет/отклоняет отправленную на модерацию игру. |
 
 **Выход:** все 9 E2E проходят в CI. Критичные флоу защищены от регрессий.
 
@@ -346,3 +348,37 @@ vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid')
 ## Открытые вопросы
 
 Нет. Все ключевые решения приняты через вопросы на фазе брейнштрома.
+
+---
+
+## Phase 1 — Статус
+
+**Завершено:** 2026-04-23
+**PR:** #2 https://github.com/KiraBelo/apocryph-mvp/pull/2
+**Squash-коммит в main:** `9f6446f`
+**CI:** зелёный с первого прогона, 1 мин 49 сек
+
+### Что сделано
+- Vitest 4.1 workspace (server + client projects)
+- React Testing Library + jsdom + MSW + MockEventSource для SSE
+- Playwright + fixtures (resetTestDb, loginAs)
+- Husky pre-commit + lint-staged (eslint --fix + vitest related --run)
+- GitHub Actions CI: lint → typecheck → test → build → e2e, Postgres 16 service
+- 3 gold standards: component (Breadcrumbs), integration (TagList + MSW), E2E (Feed)
+- Bonus cleanup: 20 pre-existing TS errors + 3 ESLint errors фиксед (иначе CI был красным)
+
+### Метрики до/после
+- Tests: 238 → 245 (+7 из gold standards)
+- TS errors: 20 → 0
+- ESLint errors: 3 → 0 (57 warnings остались, не критично)
+- `npm run build`: падал → проходит
+
+### Известный долг (не блокирующий)
+- `requireUser()` → `requireMod()` возвращают обычный union type, не discriminated — требуется `user!.` в каждом call site (15 мест). Следует отрефакторить в discriminated union.
+- Husky в монорепо: `core.hooksPath=product-mvp/.husky` в локальном git config + `cd product-mvp` в hook. Fragile при fresh clone — prepare script не найдёт `.git` рядом с `package.json`.
+- Старый `.conventions/gold-standards/test-file.test.ts` с закомментированными assertion'ами — 2 "теста" без проверок. Либо переписать в реальный, либо убрать из vitest include.
+
+### Следующие фазы
+- **Phase 2:** 9 критичных E2E флоу (отдельный plan)
+- **Phase 3:** активация правила TDD в CLAUDE.md + конвенции
+- **Phase 4:** органический рост coverage через Boy Scout (бессрочно)
