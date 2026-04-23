@@ -104,8 +104,15 @@ export async function requireMod(): Promise<ModResult> {
 
 /**
  * Converts requireUser/requireMod error string to NextResponse.
- * Returns null if no error (caller proceeds normally).
+ * Overloads let TypeScript narrow the return type based on the argument:
+ *   - handleAuthError(null) → null (no error)
+ *   - handleAuthError(someString) → NextResponse (guaranteed non-null)
+ * This means call sites can do: `if (auth.error) return handleAuthError(auth.error)`
+ * without needing a non-null assertion.
  */
+export function handleAuthError(error: null): null
+export function handleAuthError(error: string): NextResponse
+export function handleAuthError(error: string | null): NextResponse | null
 export function handleAuthError(error: string | null): NextResponse | null {
   if (!error) return null
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })
