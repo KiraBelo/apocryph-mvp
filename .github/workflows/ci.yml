@@ -62,10 +62,9 @@ jobs:
         working-directory: product-mvp
         run: npm run lint
 
-      - name: Typecheck (known pre-existing errors, non-blocking)
+      - name: Typecheck
         working-directory: product-mvp
         run: npm run typecheck
-        continue-on-error: true
 
       - name: Vitest (server + client)
         working-directory: product-mvp
