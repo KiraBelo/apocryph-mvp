@@ -9,18 +9,18 @@ import { rateLimit } from '@/lib/rate-limit'
 // Включаем left-участников: личные заметки автора должны быть доступны
 // и после выхода из игры.
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
   const { id: gameId } = await params
 
   try {
-    const member = await requireParticipant(gameId, user!.id, { includeLeft: true })
+    const member = await requireParticipant(gameId, user.id, { includeLeft: true })
     if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const notes = await query<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
       'SELECT id, title, content, created_at, updated_at FROM game_notes WHERE game_id=$1 AND user_id=$2 ORDER BY created_at DESC',
-      [gameId, user!.id]
+      [gameId, user.id]
     )
     // Defence in depth: повторно санитизируем контент при чтении на случай если
     // в БД попали данные до внедрения sanitizeBody (исторические записи или баг в санитайзере).
@@ -33,11 +33,11 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
 // POST — создать новую заметку
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
-  const { allowed } = rateLimit(`notes:${user!.id}`, 20, 60_000)
+  const { allowed } = rateLimit(`notes:${user.id}`, 20, 60_000)
   if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
 
   const { id: gameId } = await params
@@ -56,12 +56,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   try {
-    const member = await requireParticipant(gameId, user!.id)
+    const member = await requireParticipant(gameId, user.id)
     if (!member) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
     const note = await queryOne<{ id: number; title: string; content: string; created_at: string; updated_at: string | null }>(
       'INSERT INTO game_notes (game_id, user_id, title, content) VALUES ($1, $2, $3, $4) RETURNING id, title, content, created_at, updated_at',
-      [gameId, user!.id, title ?? '', sanitizeBody(content ?? '')]
+      [gameId, user.id, title ?? '', sanitizeBody(content ?? '')]
     )
     return NextResponse.json({ note })
   } catch (error) {

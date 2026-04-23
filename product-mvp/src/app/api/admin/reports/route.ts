@@ -4,9 +4,9 @@ import { requireMod, handleAuthError } from '@/lib/session'
 
 // GET /api/admin/reports?status=pending&page=1
 export async function GET(req: NextRequest) {
-  const { error, user } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const sp = req.nextUrl.searchParams
   const status = sp.get('status') || 'pending'
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     )
     const total = parseInt(countRow[0]?.cnt || '0')
 
-    return NextResponse.json({ reports, total, page, user: { id: user!.id, role: user!.role } })
+    return NextResponse.json({ reports, total, page, user: { id: user.id, role: user.role } })
   } catch (error) {
     console.error('[API /api/admin/reports] GET:', error)
     return NextResponse.json({ error: 'serverError' }, { status: 500 })

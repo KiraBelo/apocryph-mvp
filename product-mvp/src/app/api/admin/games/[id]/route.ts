@@ -4,9 +4,8 @@ import { requireMod, handleAuthError } from '@/lib/session'
 
 // PATCH /api/admin/games/[id] — change moderation_status
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const { id: gameId } = await params
 

@@ -5,11 +5,11 @@ import { requireParticipant } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
-  const { allowed } = rateLimit(`report:${user!.id}`, 3, 60 * 60_000)
+  const { allowed } = rateLimit(`report:${user.id}`, 3, 60 * 60_000)
   if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })
 
   const { id: gameId } = await params
@@ -24,19 +24,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     // Verify reporter is a participant of this game
-    const participant = await requireParticipant(gameId, user!.id)
+    const participant = await requireParticipant(gameId, user.id)
     if (!participant) return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
 
     // Prevent duplicate pending reports from the same user
     const existing = await queryOne(
       "SELECT id FROM reports WHERE game_id=$1 AND reporter_id=$2 AND status='pending'",
-      [gameId, user!.id]
+      [gameId, user.id]
     )
     if (existing) return NextResponse.json({ error: 'alreadyReported' }, { status: 409 })
 
     await query(
       'INSERT INTO reports (game_id, reporter_id, reason) VALUES ($1,$2,$3)',
-      [gameId, user!.id, reason || 'Не указано']
+      [gameId, user.id, reason || 'Не указано']
     )
 
     // Auto-hide: 2+ distinct reporters → hide game for moderation review

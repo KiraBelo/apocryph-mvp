@@ -5,9 +5,9 @@ import { PAGE_SIZE } from '@/lib/constants'
 
 // GET /api/games?page=N — мои игры (новые сверху), с пагинацией
 export async function GET(req: NextRequest) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') || '1', 10))
   const offset = (page - 1) * PAGE_SIZE
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
        ) ap ON ap.game_id = g.id
        ORDER BY g.created_at DESC
        LIMIT $2 OFFSET $3`,
-      [user!.id, PAGE_SIZE, offset]
+      [user.id, PAGE_SIZE, offset]
     )
     const total = rows.length > 0 ? parseInt(rows[0]._total) : 0
     const items = rows.map(({ _total, ...rest }) => rest)

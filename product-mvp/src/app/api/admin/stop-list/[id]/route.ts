@@ -5,9 +5,8 @@ import { invalidateStopPhraseCache } from '@/lib/stoplist'
 
 // PATCH /api/admin/stop-list/[id]
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const { id } = await params
 
@@ -59,9 +58,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 // DELETE /api/admin/stop-list/[id]
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const { id } = await params
   try {

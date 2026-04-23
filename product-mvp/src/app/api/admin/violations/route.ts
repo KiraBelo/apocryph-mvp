@@ -4,9 +4,8 @@ import { requireMod, handleAuthError } from '@/lib/session'
 
 // GET /api/admin/violations?page=1&game_id=...
 export async function GET(req: NextRequest) {
-  const { error } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const sp = req.nextUrl.searchParams
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10))

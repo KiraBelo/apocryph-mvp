@@ -24,9 +24,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ token:
 
 // POST — принять инвайт
 export async function POST(_: NextRequest, { params }: { params: Promise<{ token: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { token } = await params
 
@@ -51,7 +51,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ token
       if (!request) return { error: 'requestNotActive', status: 404 }
 
       // Author cannot accept their own invite
-      if (request.author_id === user!.id) return { error: 'forbidden', status: 403 }
+      if (request.author_id === user.id) return { error: 'forbidden', status: 403 }
 
       // Создаём или находим игру
       const gameRes = await client.query(
@@ -96,7 +96,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ token
 
       await client.query(
         "INSERT INTO game_participants (game_id, user_id, nickname) VALUES ($1,$2,'Игрок') ON CONFLICT DO NOTHING",
-        [gameId, user!.id]
+        [gameId, user.id]
       )
 
       // Помечаем инвайт использованным

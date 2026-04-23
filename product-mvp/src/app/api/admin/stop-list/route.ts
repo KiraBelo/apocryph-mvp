@@ -49,9 +49,9 @@ export async function GET(req: NextRequest) {
 
 // POST /api/admin/stop-list — create phrase
 export async function POST(req: NextRequest) {
-  const { error, user } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   let body
   try {
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const row = await query(
       `INSERT INTO stop_phrases (phrase, note, created_by)
        VALUES ($1, $2, $3) RETURNING *`,
-      [cleaned, note?.trim() || null, user!.id]
+      [cleaned, note?.trim() || null, user.id]
     )
 
     invalidateStopPhraseCache()

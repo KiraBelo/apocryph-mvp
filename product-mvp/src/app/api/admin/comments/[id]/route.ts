@@ -4,9 +4,8 @@ import { requireMod, handleAuthError } from '@/lib/session'
 
 // POST — approve comment
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const { id: commentId } = await params
 
@@ -25,9 +24,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
 // DELETE — remove comment
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
 
   const { id: commentId } = await params
 

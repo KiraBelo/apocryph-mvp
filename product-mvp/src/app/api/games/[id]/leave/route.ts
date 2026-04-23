@@ -5,9 +5,9 @@ import { requireParticipant } from '@/lib/auth'
 import { notifyGame } from '@/lib/sse'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireUser()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id: gameId } = await params
   let reason: string
@@ -22,18 +22,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     // Check participant exists and hasn't already left
-    const participant = await requireParticipant(gameId, user!.id, { includeLeft: true })
+    const participant = await requireParticipant(gameId, user.id, { includeLeft: true })
     if (!participant) return NextResponse.json({ error: 'notParticipant' }, { status: 403 })
     if (participant.left_at) return NextResponse.json({ error: 'alreadyLeft' }, { status: 400 })
 
     await query(
       `UPDATE game_participants SET left_at=NOW(), leave_reason=$3
        WHERE game_id=$1 AND user_id=$2 AND left_at IS NULL`,
-      [gameId, user!.id, reason]
+      [gameId, user.id, reason]
     )
 
     // Notify SSE subscribers about participant leaving
-    notifyGame(gameId, { _type: 'participantLeft', userId: user!.id })
+    notifyGame(gameId, { _type: 'participantLeft', userId: user.id })
 
     // Проверяем, не осталось ли активных участников
     await query(

@@ -48,8 +48,22 @@ export async function getUser() {
   return { id: session.userId, email: session.email!, role: (session.role || 'user') as Role }
 }
 
+export type AuthUser = { id: string; email: string; role: Role }
+
+/**
+ * Discriminated union: when `error` is null, `user` is guaranteed non-null.
+ * TypeScript narrows correctly after `if (result.error) return …`.
+ */
+export type AuthResult =
+  | { error: null; user: AuthUser; banReason: null }
+  | { error: 'unauthorized' | 'banned'; user: null; banReason: string | null }
+
+export type ModResult =
+  | { error: null; user: AuthUser }
+  | { error: 'unauthorized' | 'banned' | 'forbidden'; user: null }
+
 /** For write endpoints: checks auth + ban status + session version from DB */
-export async function requireUser() {
+export async function requireUser(): Promise<AuthResult> {
   const session = await getSession()
   if (!session.userId) return { error: 'unauthorized' as const, user: null, banReason: null }
 
@@ -76,7 +90,7 @@ export async function requireUser() {
 }
 
 /** For admin/mod endpoints: checks auth + role + ban from DB */
-export async function requireMod() {
+export async function requireMod(): Promise<ModResult> {
   const session = await getSession()
   if (!session.userId) return { error: 'unauthorized' as const, user: null }
   const row = await queryOne<{ role: string; banned_at: string | null }>(
@@ -90,8 +104,15 @@ export async function requireMod() {
 
 /**
  * Converts requireUser/requireMod error string to NextResponse.
- * Returns null if no error (caller proceeds normally).
+ * Overloads let TypeScript narrow the return type based on the argument:
+ *   - handleAuthError(null) → null (no error)
+ *   - handleAuthError(someString) → NextResponse (guaranteed non-null)
+ * This means call sites can do: `if (auth.error) return handleAuthError(auth.error)`
+ * without needing a non-null assertion.
  */
+export function handleAuthError(error: null): null
+export function handleAuthError(error: string): NextResponse
+export function handleAuthError(error: string | null): NextResponse | null
 export function handleAuthError(error: string | null): NextResponse | null {
   if (!error) return null
   if (error === 'unauthorized') return NextResponse.json({ error }, { status: 401 })

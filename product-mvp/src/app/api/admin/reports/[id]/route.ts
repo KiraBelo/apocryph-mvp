@@ -4,9 +4,9 @@ import { requireMod, handleAuthError } from '@/lib/session'
 
 // PATCH /api/admin/reports/[id] — resolve or dismiss a report
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error, user } = await requireMod()
-  const authErr = handleAuthError(error)
-  if (authErr) return authErr
+  const auth = await requireMod()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id: reportId } = await params
 
@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `UPDATE reports SET status = $1, resolved_by = $2, resolved_at = NOW()
        WHERE id = $3 AND status = 'pending'
        RETURNING game_id`,
-      [status, user!.id, reportId]
+      [status, user.id, reportId]
     )
     if (!report) return NextResponse.json({ error: 'notFound' }, { status: 404 })
 
