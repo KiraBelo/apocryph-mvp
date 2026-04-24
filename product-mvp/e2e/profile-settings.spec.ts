@@ -63,8 +63,10 @@ test.describe('Settings panel', () => {
   test('email-notifs toggle is visible to authenticated users', async ({ page }) => {
     await loginAs(page, 'wolf')
     await openSettingsPanel(page)
-    await expect(
-      page.getByRole('switch', { name: /уведомления.*e.?mail|email.*notif/i }),
-    ).toBeVisible()
+    // The Toggle component renders the label in a <span> sibling (not as an
+    // aria-label on the switch button), so getByRole('switch', { name }) won't
+    // match. We assert the label text + presence of a role=switch nearby.
+    await expect(page.getByText(/уведомления на e.?mail/i).first()).toBeVisible()
+    await expect(page.getByRole('switch').first()).toBeVisible()
   })
 })

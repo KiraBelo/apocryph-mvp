@@ -74,8 +74,12 @@ export async function seedIcMessages(
  */
 export async function listGameParticipants(gameId: string) {
   const db = testDbPool()
+  // Note: game_participants has no joined_at / created_at column, so we order
+  // by id (UUID) purely for determinism. The order is not chronological —
+  // callers that need the author vs. responder distinction should match by
+  // user_id, not by position.
   const { rows } = await db.query<{ id: string; user_id: string; nickname: string }>(
-    'SELECT id, user_id, nickname FROM game_participants WHERE game_id = $1 ORDER BY joined_at',
+    'SELECT id, user_id, nickname FROM game_participants WHERE game_id = $1 ORDER BY id',
     [gameId],
   )
   return rows
