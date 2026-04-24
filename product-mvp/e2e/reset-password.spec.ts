@@ -21,7 +21,7 @@ function freshEmail() {
 test.describe('Reset password', () => {
   test('forgot-password form surfaces notImplemented when email sending is stubbed', async ({ page }) => {
     await page.goto('/auth/forgot-password')
-    await page.getByLabel('Email').fill('luna@apocryph.test')
+    await page.locator('input[type="email"]').fill('luna@apocryph.test')
     await page.getByRole('button', { name: /отправить ссылку/i }).click()
 
     // UI остаётся на той же странице и показывает сообщение об ошибке.
@@ -51,8 +51,10 @@ test.describe('Reset password', () => {
 
     // 3. Идём на /auth/reset-password?token=... и вводим новый пароль.
     await page.goto(`/auth/reset-password?token=${encodeURIComponent(token)}`)
-    await page.getByLabel('Новый пароль', { exact: true }).fill(newPassword)
-    await page.getByLabel(/повторите пароль/i).fill(newPassword)
+    // Two `input[type="password"]` fields on this page: «Новый пароль» and «Повторите пароль».
+    const passwordInputs = page.locator('input[type="password"]')
+    await passwordInputs.nth(0).fill(newPassword)
+    await passwordInputs.nth(1).fill(newPassword)
     await page.getByRole('button', { name: /сменить пароль/i }).click()
 
     // 4. Success-сообщение видно, через 3 сек компонент редиректит на login.
@@ -60,8 +62,8 @@ test.describe('Reset password', () => {
 
     // 5. Логинимся новым паролем.
     await page.goto('/auth/login')
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Пароль').fill(newPassword)
+    await page.locator('input[type="email"]').fill(email)
+    await page.locator('input[type="password"]').fill(newPassword)
     await page.getByRole('button', { name: /^войти/i }).click()
     await page.waitForURL(/\/feed/, { timeout: 10_000 })
   })
@@ -69,8 +71,9 @@ test.describe('Reset password', () => {
   test('reset-password rejects expired/invalid token', async ({ page }) => {
     // Токен в URL, но в БД его нет — форма отправит запрос и получит resetExpired.
     await page.goto(`/auth/reset-password?token=not-a-real-token-${Date.now()}`)
-    await page.getByLabel('Новый пароль', { exact: true }).fill('some-new-password')
-    await page.getByLabel(/повторите пароль/i).fill('some-new-password')
+    const passwordInputs = page.locator('input[type="password"]')
+    await passwordInputs.nth(0).fill('some-new-password')
+    await passwordInputs.nth(1).fill('some-new-password')
     await page.getByRole('button', { name: /сменить пароль/i }).click()
 
     await expect(

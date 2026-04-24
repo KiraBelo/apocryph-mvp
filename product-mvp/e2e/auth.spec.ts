@@ -1,6 +1,7 @@
 /**
  * E2E 2.1 — auth: register → logout → login.
- * Простейший сквозной флоу, отлаживает всю E2E-инфраструктуру.
+ * Targets inputs by type attribute — the form's password row contains a
+ * "Показать пароль" toggle button whose aria-label collides with getByLabel.
  */
 import { test, expect } from '@playwright/test'
 
@@ -14,37 +15,30 @@ test.describe('Auth', () => {
     const password = 'e2e-password-123'
 
     await page.goto('/auth/register')
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Пароль').fill(password)
-    // Чекбокс возраста — без него кнопка disabled.
+    await page.locator('input[type="email"]').fill(email)
+    await page.locator('input[type="password"]').fill(password)
     await page.getByRole('checkbox', { name: /исполнилось 18/i }).check()
     await page.getByRole('button', { name: /создать аккаунт/i }).click()
 
-    // После регистрации редирект на /feed.
     await page.waitForURL(/\/feed/, { timeout: 10_000 })
 
-    // Кнопка выхода в Nav — только aria-label="Выйти".
     const logout = page.getByRole('button', { name: 'Выйти' })
-    await logout.click()
+    await logout.first().click()
+    await expect(logout.first()).toBeHidden()
 
-    // После logout — редирект на главную (лендинг для анонимов).
-    await expect(logout).toBeHidden()
-
-    // Логин тем же юзером.
     await page.goto('/auth/login')
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Пароль').fill(password)
+    await page.locator('input[type="email"]').fill(email)
+    await page.locator('input[type="password"]').fill(password)
     await page.getByRole('button', { name: /^войти/i }).click()
     await page.waitForURL(/\/feed/, { timeout: 10_000 })
 
-    // Юзер залогинен: снова виден «Выйти».
-    await expect(page.getByRole('button', { name: 'Выйти' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Выйти' }).first()).toBeVisible()
   })
 
   test('login rejects wrong password', async ({ page }) => {
     await page.goto('/auth/login')
-    await page.getByLabel('Email').fill('luna@apocryph.test')
-    await page.getByLabel('Пароль').fill('definitely-not-the-password')
+    await page.locator('input[type="email"]').fill('luna@apocryph.test')
+    await page.locator('input[type="password"]').fill('definitely-not-the-password')
     await page.getByRole('button', { name: /^войти/i }).click()
 
     await expect(page).toHaveURL(/\/auth\/login/)
@@ -55,8 +49,8 @@ test.describe('Auth', () => {
 
   test('register rejects short password', async ({ page }) => {
     await page.goto('/auth/register')
-    await page.getByLabel('Email').fill(freshEmail())
-    await page.getByLabel('Пароль').fill('short')
+    await page.locator('input[type="email"]').fill(freshEmail())
+    await page.locator('input[type="password"]').fill('short')
     await page.getByRole('checkbox', { name: /исполнилось 18/i }).check()
     await page.getByRole('button', { name: /создать аккаунт/i }).click()
 
