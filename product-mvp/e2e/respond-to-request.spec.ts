@@ -105,10 +105,13 @@ test.describe('Respond to request', () => {
 
       // The «Ответить» button is rendered only when `!isAuthor` — author sees edit/deactivate instead.
       await expect(authorPage.getByRole('button', { name: /^ответить$/i })).toHaveCount(0)
+      // RequestForm renders both controls in the author block; either one is
+      // enough to prove we're on the author view. `.first()` keeps strict-mode
+      // locator matching happy when more than one action is present.
       await expect(
         authorPage.getByRole('link', { name: /редактировать/i }).or(
           authorPage.getByRole('button', { name: /убрать из ленты/i }),
-        ),
+        ).first(),
       ).toBeVisible()
     } finally {
       await authorCtx.close()
