@@ -233,6 +233,24 @@ CSS-переменные маппятся на Tailwind через `@theme`:
 
 Полный план: `../../BETA-PLAN.md` | UX-план: `../../ux-beta.md`
 
+### Тестирование (TDD)
+
+**Правило:** Поведение без теста — не PR. Полный rulebook: [`product-mvp/.conventions/tdd-rules.md`](product-mvp/.conventions/tdd-rules.md).
+
+- **Обязателен тест:** новая фича, баг-фикс (regression test), любое изменение поведения существующего кода. Код-ревью блокирует PR без теста на изменённое поведение.
+- **НЕ обязателен тест:** косметика — CSS, копирайтинг через `src/i18n`, иконки, вёрсточный рефактор, чистое переименование без смены API. Критерий: существующие тесты проходят без правок.
+- **Пирамида уровней:** unit (vitest `server`, node env) → integration с моками `@/lib/db` → component (vitest `client`, jsdom + RTL) → client integration с MSW → E2E (Playwright). Начинай с самого низкого уровня, на котором выражается поведение.
+- **Test-runner:** `vitest` (Jest запрещён). E2E — `@playwright/test`.
+- **Режим работы:** `npm run test:watch` открыт в отдельном терминале. Красный → зелёный → рефактор → коммит.
+- **Gold standards:** в [`product-mvp/.conventions/gold-standards/`](product-mvp/.conventions/gold-standards/) — шаблоны для backend unit, client component, integration с MSW, E2E. Копируй их как стартовую точку.
+- **Тесты на поведение, не реализацию:** `expect(result).toBe(expected)` / `expect(user.sees(X))`, не `expect(internalState)`. Рефакторинг без смены поведения не должен ломать тесты.
+- **Моки централизованы:** `product-mvp/src/test/mocks/` (`db`, `session`, `next`). `vi.clearAllMocks()` в `beforeEach`. Клиентские `fetch` — через MSW `server` из `@/test/mocks/server`.
+- **E2E-правила:** никаких `page.waitForTimeout()` — только auto-waiting (`expect(locator).toBeVisible()`). Семантические локаторы (`getByRole`, `getByLabel`). Для password — `locator('input[type="password"]')` (`getByLabel` матчит aria-label toggle-кнопки).
+- **E2E seed-юзеры:** `loginAs(page, 'luna' | 'wolf' | 'ember' | 'starfall')` из `e2e/fixtures/auth.ts` — Luna это admin. Для multi-user флоу — `registerFreshUser(ctx)` из `e2e/fixtures/register.ts` (минует rate-limit благодаря `APOCRIPH_DISABLE_RATE_LIMIT=1` в Playwright env).
+- **Эскейп-хатч `// SKIP-TEST:`** — только когда ни один уровень пирамиды не работает (внешний API без sandbox, 30-минутный real timer, нативный OS API). Формат: `// SKIP-TEST: <одна-две строки почему>`. Без обоснования ревью не примет.
+- **`--no-verify`** — только в авариях на проде, с regression-тестом на баг в том же или следующем коммите.
+- **Две линии защиты в CI:** pre-commit (husky + lint-staged → eslint + `vitest related --run`, ≤10с) + GitHub Actions (lint → typecheck → test → build → e2e против Postgres 16 service, ≤15 мин).
+
 ### Безопасность API
 - **Self-action:** всегда проверять `author_id !== user.id` — автор не может откликаться на свою заявку, принимать свой инвайт, одобрять свою публикацию
 - **IDOR:** каждый эндпоинт игры — проверка `game_participants` на участие текущего пользователя. Нет участия → 403
