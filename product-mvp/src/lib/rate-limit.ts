@@ -3,7 +3,14 @@ const g = globalThis as unknown as { __rateLimitStore?: Map<string, { count: num
 if (!g.__rateLimitStore) g.__rateLimitStore = new Map<string, { count: number; resetAt: number }>()
 const store: Map<string, { count: number; resetAt: number }> = g.__rateLimitStore
 
+// Test-only escape hatch. Never set this in production — it is ONLY consumed
+// by Playwright's webServer.env in playwright.config.ts to let the E2E suite
+// burst many registrations/logins from a single IP without tripping limits.
+// When the flag is absent (i.e. always, in prod/dev), rateLimit behaves normally.
+const DISABLED = process.env.APOCRIPH_DISABLE_RATE_LIMIT === '1'
+
 export function rateLimit(key: string, maxAttempts: number, windowMs: number): { allowed: boolean; remaining: number } {
+  if (DISABLED) return { allowed: true, remaining: maxAttempts }
   const now = Date.now()
   const entry = store.get(key)
 

@@ -382,3 +382,44 @@ vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid')
 - **Phase 2:** 9 критичных E2E флоу (отдельный plan)
 - **Phase 3:** активация правила TDD в CLAUDE.md + конвенции
 - **Phase 4:** органический рост coverage через Boy Scout (бессрочно)
+
+---
+
+## Phase 2 — Статус
+
+**Завершено:** 2026-04-24 (PR в работе)
+**Plan:** [`docs/superpowers/plans/2026-04-24-tdd-adoption-phase-2.md`](../plans/2026-04-24-tdd-adoption-phase-2.md)
+
+### Что сделано (9 E2E файлов + инфра)
+
+| Файл | Сценарии |
+|---|---|
+| `e2e/auth.spec.ts` | Регистрация → logout → логин; неверный пароль; короткий пароль (<6) |
+| `e2e/reset-password.spec.ts` | forgot-password 501-stub UI; полный reset через прямой токен в БД; невалидный токен |
+| `e2e/create-request.spec.ts` | Аноним → /auth/login; пустая форма → role=alert; «Сохранить черновик» → /my/requests?tab=draft; POST API → /my/requests?tab=active |
+| `e2e/feed-filters.spec.ts` | Текстовый поиск; type=multiplayer фильтр; очистка поиска |
+| `e2e/profile-settings.spec.ts` | SettingsPanel (адаптация: нет страницы /settings, только панель); тема `data-theme`; язык ru→en; email-toggle для авторизованных |
+| `e2e/respond-to-request.spec.ts` | Отклик → /games/[id], игра в /my/games автора; самооотклик скрыт |
+| `e2e/play-game.spec.ts` | SSE round trip: author POST → responder видит без reload; outsider GET messages → 403 |
+| `e2e/publish-to-library.spec.ts` | tooFewMessages если <20; publish_as_is → moderation; self-approve → 403; edit_first → preparing |
+| `e2e/moderation.spec.ts` | admin approve → published + видна в /api/public-games; reject → active; non-admin → 401/403 |
+
+### Инфра (общая для Phase 2+)
+
+- `e2e/global-setup.ts` — сбрасывает `apocryph_test` через `scripts/setup-test-db.sh` перед всем suite (с safety-guard на имя БД)
+- `e2e/fixtures/users.ts` — реестр seed-юзеров (email/password/role) — luna=admin, остальные=user
+- `e2e/fixtures/auth.ts` — `loginAs(page, key)` через UI на /auth/login (refactored from inline)
+- `e2e/fixtures/register.ts` — `registerFreshUser(ctx)` через POST /api/auth/register, кладёт session cookie в context
+- `e2e/fixtures/db.ts` — `pg` Pool + helpers: `seedIcMessages`, `listGameParticipants`, `getGameStatus`, `insertResetToken`, `findUserIdByEmail`
+
+### Принятые отклонения от исходного плана
+
+- **2.5 (profile-settings):** в проекте нет страницы /settings со сменой пароля/аватара/ника. Покрываем существующий `SettingsPanel` (тема/язык/email-уведомления) — это максимум profile-функционала, который реально есть.
+- **2.2 (reset-password):** `/api/auth/forgot-password` — 501 stub. Тестируем (а) UI обработку ошибки + (б) полный reset через прямой INSERT токена в `password_reset_tokens` от свежего юзера, чтобы не ломать seed-пароли.
+- **2.3 (create-request):** UI создания через TipTap + FilterSelect + TagAutocomplete слишком хрупко. Happy-path делаем через POST /api/requests; UI покрываем драфт-кнопкой + валидацией пустой формы.
+- **2.7 (play-game):** автор шлёт IC-пост через API, а не печатает в TipTap — регрессионная цель здесь это SSE round-trip, не редактор.
+
+### Известный долг
+
+- E2E запускаются только в CI (Postgres + Playwright + браузеры). Локально на Windows без Postgres большинство тестов не пройдут — это нормально.
+- Подавляющее большинство сценариев — happy-path. Sad-path и edge cases добавляются органически по мере фиксов (Phase 4).
