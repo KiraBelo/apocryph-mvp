@@ -387,7 +387,7 @@ vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid')
 
 ## Phase 2 — Статус
 
-**Завершено:** 2026-04-24 (PR в работе)
+**Завершено:** 2026-04-24 (PR #5, squash `6e6cc76`)
 **Plan:** [`docs/superpowers/plans/2026-04-24-tdd-adoption-phase-2.md`](../plans/2026-04-24-tdd-adoption-phase-2.md)
 
 ### Что сделано (9 E2E файлов + инфра)
@@ -423,3 +423,28 @@ vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid')
 
 - E2E запускаются только в CI (Postgres + Playwright + браузеры). Локально на Windows без Postgres большинство тестов не пройдут — это нормально.
 - Подавляющее большинство сценариев — happy-path. Sad-path и edge cases добавляются органически по мере фиксов (Phase 4).
+
+---
+
+## Phase 3 — Статус
+
+**Завершено:** 2026-04-24 (PR в работе)
+
+### Что сделано
+
+- **Новый формальный rulebook:** [`product-mvp/.conventions/tdd-rules.md`](../../.conventions/tdd-rules.md) — полный набор правил: когда тест обязателен / когда нет, пирамида уровней, эскейп-хатч `// SKIP-TEST:`, правила code review, разрешённые паттерны моков, правила E2E (без `waitForTimeout`, семантические локаторы, password-input через `type="password"`).
+- **Секция «Тестирование (TDD)» добавлена в оба `CLAUDE.md`:**
+  - [`product-mvp/CLAUDE.md`](../../CLAUDE.md) — подсекция внутри «Правила качества кода», первой до «Безопасность API».
+  - [`2-3-MVP/CLAUDE.md`](../../../CLAUDE.md) — та же подсекция с абсолютными путями, т.к. корневой CLAUDE.md на уровень выше.
+- **Ссылки на gold standards** из `.conventions/gold-standards/` (test-file.test.ts, component-test.test.tsx, integration-test.test.tsx, e2e-test.spec.ts).
+- **Правило объявлено:** все последующие PR обязаны иметь тест на изменённое поведение или явный `// SKIP-TEST:` с обоснованием.
+
+### Что НЕ сделано (осознанно)
+
+- Не трогали существующие 245 тестов и E2E — они и так соответствуют правилам (Phase 1 и 2 задавали стандарт).
+- Не делали CI-guard типа «PR без теста блокируется автоматически» — это полагается на code review. Автоматизация — возможное улучшение для Phase 4.
+- Не писали «Плохие примеры тестов» в `.conventions/anti-patterns/` — пока что anti-patterns касаются только UI (alert / string types). Добавятся органически.
+
+### Следующее
+
+- **Phase 4:** органический Boy Scout рост coverage. Без плана и без дедлайна — каждое касание кода = тест.
