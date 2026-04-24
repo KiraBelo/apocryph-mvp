@@ -33,14 +33,17 @@ beforeEach(() => {
 
 // 3. Use valid GameStatus values — 'finished' does NOT exist
 // Valid: 'active' | 'preparing' | 'moderation' | 'published'
-describe('POST /api/example', () => {
-  it('returns 401 when not authenticated', async () => {
+//
+// it.todo() marks these as template placeholders — vitest reports them as "todo",
+// not "passed". Real tests import the real route handler and assert actual responses.
+describe('POST /api/example (template)', () => {
+  it.todo('returns 401 when not authenticated', async () => {
     mockRequireUser.mockResolvedValueOnce({ error: 'unauthorized', user: null, banReason: null })
     // const res = await POST(req, params)
     // expect(res.status).toBe(401)
   })
 
-  it('returns 400 for invalid status', async () => {
+  it.todo('returns 400 for invalid status', async () => {
     mockClient.query
       .mockResolvedValueOnce({ rows: [{ id: 'pid' }] })       // participant check
       .mockResolvedValueOnce({ rows: [{ status: 'published' }] }) // game status (use valid status!)
