@@ -48,6 +48,52 @@ export async function insertResetToken(userId: string, token: string) {
 }
 
 /**
+ * Inserts N IC messages from a participant into a game directly via SQL.
+ * Bypasses the messages POST rate limit (30/min) so seed counts up to
+ * MIN_IC_POSTS in a single go for publish/moderation E2E tests.
+ */
+export async function seedIcMessages(
+  gameId: string,
+  participantId: string,
+  count: number,
+  prefix = 'seed',
+): Promise<void> {
+  const db = testDbPool()
+  for (let i = 0; i < count; i++) {
+    await db.query(
+      `INSERT INTO messages (game_id, participant_id, content, type)
+       VALUES ($1, $2, $3, 'ic')`,
+      [gameId, participantId, `<p>${prefix} ic ${i + 1}</p>`],
+    )
+  }
+}
+
+/**
+ * Returns participant_id rows for a game, in join order.
+ * Useful when seeding messages or asserting participant state.
+ */
+export async function listGameParticipants(gameId: string) {
+  const db = testDbPool()
+  const { rows } = await db.query<{ id: string; user_id: string; nickname: string }>(
+    'SELECT id, user_id, nickname FROM game_participants WHERE game_id = $1 ORDER BY joined_at',
+    [gameId],
+  )
+  return rows
+}
+
+/**
+ * Reads the current games row (status / moderation_status).
+ */
+export async function getGameStatus(gameId: string) {
+  const db = testDbPool()
+  const { rows } = await db.query<{ status: string; moderation_status: string }>(
+    'SELECT status, moderation_status FROM games WHERE id = $1',
+    [gameId],
+  )
+  return rows[0] ?? null
+}
+
+/**
  * Looks up a user's id by email. Returns null if absent.
  */
 export async function findUserIdByEmail(email: string): Promise<string | null> {
