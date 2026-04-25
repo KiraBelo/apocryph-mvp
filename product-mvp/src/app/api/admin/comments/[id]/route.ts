@@ -30,7 +30,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id: commentId } = await params
 
   try {
-    await queryOne('DELETE FROM game_comments WHERE id=$1', [commentId])
+    // CORRECTNESS (CRIT-3, audit-v4): DELETE of a non-existent row must
+    // return 404, not 200 — silent success hides typos and stale UIs.
+    const deleted = await queryOne<{ id: string }>(
+      'DELETE FROM game_comments WHERE id=$1 RETURNING id',
+      [commentId]
+    )
+    if (!deleted) return NextResponse.json({ error: 'notFound' }, { status: 404 })
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[API /api/admin/comments/[id]] DELETE:', error)

@@ -75,6 +75,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'requestCooldown' }, { status: 429 })
         }
       }
+
+      // CORRECTNESS (CRIT-8, audit-v4): fuzzy duplicate detection. POST had
+      // it but PATCH status='active' did not — so a user could create five
+      // similar drafts and then PATCH them live one by one to bypass it.
+      // Self-exclusion via id <> $4 keeps the row being activated out of the
+      // similarity comparison.
+      const current = await queryOne<{ title: string; body: string | null }>(
+        `SELECT title, body FROM requests WHERE id = $1`,
+        [id]
+      )
+      if (current) {
+        const duplicate = await queryOne<{ id: string }>(
+          `SELECT id FROM requests
+           WHERE author_id = $1 AND created_at > NOW() - INTERVAL '1 day' AND id <> $4
+           AND (
+             similarity(LOWER(title), LOWER($2)) > 0.7
+             OR ($3::text IS NOT NULL AND $3::text != '' AND similarity(body, $3::text) > 0.7)
+           ) LIMIT 1`,
+          [user.id, current.title, current.body || null, id]
+        )
+        if (duplicate) {
+          return NextResponse.json({ error: 'duplicateRequest' }, { status: 409 })
+        }
+      }
     }
 
     try {
