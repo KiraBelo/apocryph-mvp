@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, withTransaction } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { rateLimit } from '@/lib/rate-limit'
 
 // GET — like count + whether current user liked
@@ -39,8 +39,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
 // POST — toggle like (authorized users only)
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // SECURITY (CRIT-2, audit-v4): write endpoints MUST use requireUser, which
+  // hits the DB to check ban + session_version. getUser only reads the cookie
+  // and would let banned users keep liking after revocation.
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { allowed } = rateLimit(`likes:${user.id}`, 30, 60_000)
   if (!allowed) return NextResponse.json({ error: 'errors.tooManyRequests' }, { status: 429 })

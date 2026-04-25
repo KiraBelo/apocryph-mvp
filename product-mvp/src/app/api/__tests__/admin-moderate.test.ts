@@ -233,7 +233,8 @@ describe('GET /api/public-games/[id]/likes', () => {
 
 describe('POST /api/public-games/[id]/likes', () => {
   it('returns 401 when user is not authenticated', async () => {
-    mockGetUser.mockResolvedValueOnce(null)
+    // After CRIT-2 fix, this endpoint uses requireUser (DB-backed).
+    mockRequireUser.mockResolvedValueOnce({ error: 'unauthorized', user: null, banReason: null })
 
     const res = await toggleLike(makeLikesPostReq(), { params: Promise.resolve({ id: GAME_ID }) })
 

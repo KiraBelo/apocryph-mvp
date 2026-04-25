@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 
 // PATCH — обновить заметку
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; noteId: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // SECURITY (CRIT-2, audit-v4): write endpoint — requireUser checks ban +
+  // session_version. getUser would let banned users keep editing notes.
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
   const { id: gameId, noteId } = await params
 
   let body
@@ -39,8 +42,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 // DELETE — удалить заметку
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string; noteId: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // SECURITY (CRIT-2, audit-v4): see PATCH comment above.
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
   const { id: gameId, noteId } = await params
 
   try {
