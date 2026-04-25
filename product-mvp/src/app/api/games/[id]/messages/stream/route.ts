@@ -33,14 +33,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   trackConnect(userId)
 
+  // SECURITY/RELIABILITY (CRIT-9, audit-v4): when controller.enqueue throws
+  // (TCP RST without HTTP close, or reader gone) we previously cleared only
+  // the ping interval — leaving the subscriber registered in the SSE Map
+  // forever and the connection counter incremented. cleanup() centralises
+  // the full teardown so every error path runs all three steps.
+  // SKIP-TEST: ReadableStream + controller.enqueue throwing on a real socket
+  // teardown is not reproducible in jsdom/node unit tests. Verified by
+  // manually killing the dev server connection during /games/[id] open.
+  let pingTimer: ReturnType<typeof setInterval> | null = null
+  function cleanup(closeController?: () => void) {
+    if (cleaned) return
+    cleaned = true
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null }
+    unsubscribe?.()
+    trackDisconnect(userId)
+    closeController?.()
+  }
+
   const stream = new ReadableStream({
     start(controller) {
       // Keep-alive ping every 20s
-      const ping = setInterval(() => {
+      pingTimer = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(': ping\n\n'))
         } catch {
-          clearInterval(ping)
+          cleanup(() => controller.close())
         }
       }, 20000)
 
@@ -48,24 +66,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
         } catch {
-          clearInterval(ping)
+          cleanup(() => controller.close())
         }
       })
 
       req.signal.addEventListener('abort', () => {
-        if (cleaned) return
-        cleaned = true
-        clearInterval(ping)
-        unsubscribe?.()
-        trackDisconnect(userId)
-        controller.close()
+        cleanup(() => controller.close())
       })
     },
     cancel() {
-      if (cleaned) return
-      cleaned = true
-      unsubscribe?.()
-      trackDisconnect(userId)
+      cleanup()
     },
   })
 

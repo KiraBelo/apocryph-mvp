@@ -49,8 +49,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       let game: { id: string } | null = null
 
       if (request.type === 'multiplayer') {
+        // SECURITY (CRIT-5, audit-v4): defence-in-depth FOR UPDATE on the
+        // games lookup. The outer requests-row lock (line 41) does serialise
+        // concurrent responds in Read Committed, but adding FOR UPDATE here
+        // protects future code that might reorder the locks.
+        // SKIP-TEST: race-condition behaviour requires a real Postgres + two
+        // concurrent transactions; not expressible at unit/integration level
+        // with mocked db. Covered by manual concurrency check after deploy.
         const existing = await client.query(
-          'SELECT id FROM games WHERE request_id=$1 ORDER BY created_at LIMIT 1',
+          'SELECT id FROM games WHERE request_id=$1 ORDER BY created_at LIMIT 1 FOR UPDATE',
           [requestId]
         )
         game = existing.rows[0] || null

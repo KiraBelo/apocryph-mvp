@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -87,8 +87,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // POST — submit comment (authorized users)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // SECURITY (CRIT-2, audit-v4): see likes/route.ts comment.
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { allowed } = rateLimit(`comment:${user.id}`, 10, 60 * 1000)
   if (!allowed) {
