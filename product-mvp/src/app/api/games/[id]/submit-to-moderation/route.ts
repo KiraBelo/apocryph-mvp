@@ -26,13 +26,20 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         return { error: 'invalidStatus', status: 400 }
       }
 
-      // Both participants must have consented
+      // SECURITY/PRIVACY (CRIT-6, audit-v4 — variant A): all participants
+      // who were ever in the game must have consented, including those who
+      // already left. Otherwise the player remaining after a partner walks
+      // away could publish the joint story without that partner's
+      // permission, exposing them in /library against their will.
+      // If the leaver consented before leaving, their consent stands. If
+      // they never consented, the game cannot be published — that is the
+      // intended trade-off for protecting anonymity.
       const consentRes = await client.query(
         `SELECT COUNT(*) as total,
                 COUNT(c.participant_id) FILTER (WHERE c.consented = true) as agreed
          FROM game_participants gp
          LEFT JOIN game_publish_consent c ON c.participant_id = gp.id AND c.game_id = gp.game_id
-         WHERE gp.game_id = $1 AND gp.left_at IS NULL`,
+         WHERE gp.game_id = $1`,
         [gameId]
       )
       const { total, agreed } = consentRes.rows[0]
