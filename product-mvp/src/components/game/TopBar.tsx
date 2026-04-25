@@ -21,7 +21,8 @@ interface TopBarProps {
   isPreparing: boolean
   partnerWantsPublish: boolean
   participants: Participant[]
-  userId: string
+  /** Current viewer's participant id — see CRIT-1 in audit-v4. */
+  participantId: string
   notesCount: number
   icPostCount: number
   publishLoading: boolean
@@ -40,7 +41,7 @@ interface TopBarProps {
 export default function TopBar({
   requestTitle, effectiveBanner, activeTab, setActiveTab,
   oocEnabled, fullscreen, isLeft, gameStatus, isFrozen, isPreparing, partnerWantsPublish,
-  participants, userId, notesCount,
+  participants, participantId, notesCount,
   publishLoading,
   onSearchToggle, onExport, onSettings, onFullscreenToggle,
   onProposePublish, onPublishResponse, onRevoke, onSubmitToModeration,
@@ -142,7 +143,7 @@ export default function TopBar({
                 <div
                   key={p.id}
                   title={p.nickname}
-                  className={`game-avatar ${p.user_id === userId ? 'game-avatar-mine' : ''}`}
+                  className={`game-avatar ${p.id === participantId ? 'game-avatar-mine' : ''}`}
                 >
                   {p.avatar_url
                     ? <img

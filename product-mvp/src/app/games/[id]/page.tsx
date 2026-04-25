@@ -24,20 +24,22 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     [gameId]
   )
 
-  const me = rawParticipants.find(p => p.user_id === user.id)
-  if (!me && !isMod) notFound()
+  const myRaw = rawParticipants.find(p => p.user_id === user.id)
+  if (!myRaw && !isMod) notFound()
 
-  // For moderators who aren't participants, create a read-only observer entry
-  const effectiveMe = me || {
-    id: 'mod-observer', user_id: user.id, nickname: 'Модератор', avatar_url: null,
-    banner_url: null, banner_pref: 'none', left_at: new Date().toISOString(), leave_reason: null,
-  }
+  // SECURITY (CRIT-1, audit-v4): strip user_id from participants — clients
+  // must compare via participant.id (per-game opaque), not the real user_id.
+  const participants = rawParticipants.map(({ user_id: _u, ...rest }) => { void _u; return rest })
 
-  // Strip user_id from other participants before sending to client
-  const participants = rawParticipants.map(p => ({
-    ...p,
-    user_id: p.user_id === user.id ? p.user_id : p.id, // replace other users' real user_id with participant id
-  }))
+  // myParticipant for the client (no user_id). For moderators who aren't
+  // participants, create a synthetic read-only observer entry.
+  const me = myRaw
+    ? participants.find(p => p.id === myRaw.id)!
+    : {
+        id: 'mod-observer', nickname: 'Модератор', avatar_url: null,
+        banner_url: null, banner_pref: 'none' as const,
+        left_at: new Date().toISOString(), leave_reason: null,
+      }
 
   // Count IC messages (excluding ooc and dice)
   const countRes = await queryOne<{ count: string }>(
@@ -48,11 +50,13 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const offset = Math.max(0, (totalPages - 1) * PAGE_SIZE)
 
+  // SECURITY (CRIT-1): do NOT select gp.user_id. Use participant_id for
+  // ownership comparison on the client (matches /api/games/[id]/messages GET).
   const messages = await query<{
     id: string; game_id: string; participant_id: string; content: string; created_at: string;
-    edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string; type: 'ic' | 'ooc' | 'dice'
+    edited_at: string | null; nickname: string; avatar_url: string | null; type: 'ic' | 'ooc' | 'dice'
   }>(
-    `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
+    `SELECT m.*, gp.nickname, gp.avatar_url
      FROM messages m
      JOIN game_participants gp ON gp.id = m.participant_id
      WHERE m.game_id = $1 AND m.type NOT IN ('ooc', 'dice')
@@ -73,8 +77,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       initialPage={totalPages}
       totalPages={totalPages}
       participants={participants}
-      me={effectiveMe}
-      userId={user.id}
+      me={me}
       requestTitle={requestTitle ?? null}
     />
   )

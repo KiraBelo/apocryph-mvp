@@ -16,7 +16,7 @@ interface GameRow {
   my_nickname: string
   message_count: string
   active_participants: string
-  last_message_user_id: string | null
+  last_message_is_mine: boolean
   ic_unread: string
   ooc_unread: string
   starred_at: string | null
@@ -36,12 +36,11 @@ interface GameRow {
 
 interface Props {
   games: GameRow[]
-  userId: string
 }
 
 type MainTab = 'active' | 'inactive' | 'starred' | 'published'
 
-export default function MyGamesClient({ games: initialGames, userId }: Props) {
+export default function MyGamesClient({ games: initialGames }: Props) {
   const t = useT()
   const tPlural = usePlural()
   const { addToast } = useToast()
@@ -67,8 +66,10 @@ export default function MyGamesClient({ games: initialGames, userId }: Props) {
   })
   const published = visible.filter(g => g.status === 'published')
 
-  const waitingMe = active.filter(g => g.last_message_user_id !== userId)
-  const waitingThem = active.filter(g => g.last_message_user_id === userId)
+  // SECURITY (CRIT-1, audit-v4): server computes last_message_is_mine — we
+  // never receive partner's user_id on the wire.
+  const waitingMe = active.filter(g => !g.last_message_is_mine)
+  const waitingThem = active.filter(g => g.last_message_is_mine)
 
   async function toggleStar(gameId: string) {
     const g = games.find(x => x.id === gameId)

@@ -21,13 +21,15 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     )
     if (!game) return NextResponse.json({ error: 'notFound' }, { status: 404 })
 
-    // For moderators: include email for deanonymization
+    // SECURITY (CRIT-1): keep user_id server-side for filtering, but NEVER
+    // send it to non-moderator clients — anonymity is the platform invariant.
+    // Moderators legitimately need user_id + email for moderation actions.
     const participantFields = isMod
       ? 'gp.id, gp.game_id, gp.user_id, gp.nickname, gp.avatar_url, gp.banner_url, gp.banner_pref, gp.left_at, gp.leave_reason, u.email as user_email'
       : 'gp.id, gp.game_id, gp.user_id, gp.nickname, gp.avatar_url, gp.banner_url, gp.banner_pref, gp.left_at, gp.leave_reason'
     const participantJoin = isMod ? 'JOIN users u ON u.id = gp.user_id' : ''
 
-    const participants = await query(
+    const rawParticipants = await query<{ user_id: string; left_at: string | null } & Record<string, unknown>>(
       `SELECT ${participantFields}
        FROM game_participants gp ${participantJoin}
        WHERE gp.game_id = $1
@@ -35,10 +37,16 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       [gameId]
     )
 
-    const myParticipant = (participants as Array<{ user_id: string; left_at: string | null }>)
-      .find(p => p.user_id === user.id)
+    const myParticipant = rawParticipants.find(p => p.user_id === user.id)
     // Allow moderators to view any game
     if (!myParticipant && !isMod) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+
+    // For non-mods, strip user_id from all participants in the response.
+    // myParticipant is also stripped — client uses participant.id from the
+    // returned object (passed alongside) for ownership checks.
+    const participants = isMod
+      ? rawParticipants
+      : rawParticipants.map(({ user_id: _u, ...rest }) => { void _u; return rest })
 
     return NextResponse.json({ game, participants, myParticipant: myParticipant || null, isMod })
   } catch (error) {

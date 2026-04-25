@@ -11,7 +11,7 @@ interface GameRow {
   my_nickname: string
   message_count: string
   active_participants: string
-  last_message_user_id: string | null
+  last_message_is_mine: boolean
   ic_unread: string
   ooc_unread: string
   starred_at: string | null
@@ -49,13 +49,14 @@ export default async function MyGamesPage() {
          JOIN my_games mg ON mg.game_id = m.game_id
         GROUP BY m.game_id
      ),
+     -- SECURITY (CRIT-1, audit-v4): never leak partner's user_id to the
+     -- client. Compute last_message_is_mine server-side instead.
      last_msg AS (
        SELECT DISTINCT ON (m.game_id)
               m.game_id,
-              gp_last.user_id as last_message_user_id
+              (m.participant_id = mg.participant_id) as last_message_is_mine
          FROM messages m
          JOIN my_games mg ON mg.game_id = m.game_id
-         JOIN game_participants gp_last ON gp_last.id = m.participant_id
         ORDER BY m.game_id, m.created_at DESC
      ),
      active_parts AS (
@@ -92,7 +93,7 @@ export default async function MyGamesPage() {
             r.content_level as request_content_level,
             COALESCE(gs.message_count, '0') as message_count,
             COALESCE(ap.active_participants, '0') as active_participants,
-            lm.last_message_user_id,
+            COALESCE(lm.last_message_is_mine, false) as last_message_is_mine,
             COALESCE(us.ic_unread, '0') as ic_unread,
             COALESCE(us.ooc_unread, '0') as ooc_unread,
             gs.last_message_at,
@@ -109,5 +110,5 @@ export default async function MyGamesPage() {
     [user.id]
   )
 
-  return <MyGamesClient games={games} userId={user.id} />
+  return <MyGamesClient games={games} />
 }

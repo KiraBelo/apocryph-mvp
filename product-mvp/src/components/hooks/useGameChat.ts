@@ -204,9 +204,11 @@ export function useGameChat({ gameId, participantId, activeTab, t, onMyConsentRe
     setOocMessages(updater)
   }
 
-  function updateLocalNickname(userId: string, nickname: string, avatarUrl: string | null) {
+  // Updates messages authored by the given participant. We use participant_id
+  // (per-game opaque) rather than user_id — see CRIT-1 in audit-v4.
+  function updateLocalNickname(targetParticipantId: string, nickname: string, avatarUrl: string | null) {
     const updater = (prev: Message[]) => prev.map(m =>
-      m.user_id === userId
+      m.participant_id === targetParticipantId
         ? { ...m, avatar_url: avatarUrl, nickname }
         : m
     )

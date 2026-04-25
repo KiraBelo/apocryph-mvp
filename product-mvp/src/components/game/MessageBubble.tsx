@@ -8,7 +8,11 @@ import { Pencil } from 'lucide-react'
 
 interface MessageBubbleProps {
   msg: Message
-  userId: string
+  /**
+   * Current viewer's participant id (per-game opaque). Used instead of user_id
+   * to determine `isMine` — see CRIT-1 in audit-v4 (anonymity invariant).
+   */
+  participantId: string
   isOoc: boolean
   isLeft: boolean
   editingId: string | null
@@ -19,12 +23,12 @@ interface MessageBubbleProps {
 }
 
 function MessageBubble({
-  msg, userId, isOoc, isLeft, editingId,
+  msg, participantId, isOoc, isLeft, editingId,
   notesEnabled, onStartEdit, onCancelEdit, onQuotePost,
 }: MessageBubbleProps) {
   const t = useT()
   const { gameLayout } = useSettings()
-  const isMine = msg.user_id === userId
+  const isMine = msg.participant_id === participantId
   const isEditing = editingId === msg.id
   const smsOnly = isSMSOnly(msg.content)
   const dateStr = new Date(msg.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -145,11 +149,11 @@ function MessageBubble({
                   background: 'transparent', borderTop: 'none', borderBottom: 'none',
                   ...(isMine ? {
                     padding: `0 var(--game-body-px) 0 0`,
-                    borderRight: `3px solid ${feedPostBg(msg.user_id).replace('0.10', '0.35')}`,
+                    borderRight: `3px solid ${feedPostBg(msg.participant_id).replace('0.10', '0.35')}`,
                     borderLeft: 'none',
                   } : {
                     padding: `0 0 0 var(--game-body-px)`,
-                    borderLeft: `3px solid ${feedPostBg(msg.user_id).replace('0.10', '0.35')}`,
+                    borderLeft: `3px solid ${feedPostBg(msg.participant_id).replace('0.10', '0.35')}`,
                     borderRight: 'none',
                   }),
                 } : {

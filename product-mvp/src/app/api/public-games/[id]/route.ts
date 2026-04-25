@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { sanitizeBody } from '@/lib/sanitize'
+import { sanitizeBody, sanitizeNickname } from '@/lib/sanitize'
 import { PAGE_SIZE } from '@/lib/constants'
 import { getUser } from '@/lib/session'
 
@@ -71,10 +71,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       [gameId, PAGE_SIZE, offset]
     )
 
-    // Sanitize content
+    // SECURITY (CRIT-7, audit-v4): nicknames are user input — must be
+    // sanitized before exposing through the public API.
+    const safeParticipants = participants.map(p => ({
+      ...p,
+      nickname: sanitizeNickname(p.nickname ?? ''),
+    }))
     const safeMessages = messages.map(m => ({
       ...m,
       content: sanitizeBody(m.content) || '',
+      nickname: sanitizeNickname(m.nickname ?? ''),
     }))
 
     return NextResponse.json({
@@ -93,7 +99,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         tags: request.tags,
         body: sanitizeBody(request.body),
       } : null,
-      participants,
+      participants: safeParticipants,
       messages: safeMessages,
       page,
       totalPages,

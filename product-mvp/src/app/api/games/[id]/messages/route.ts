@@ -8,6 +8,14 @@ import { requireParticipant } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { PAGE_SIZE } from '@/lib/constants'
 
+// SECURITY (CRIT-1, audit-v4): defence-in-depth helper. user_id MUST NEVER
+// reach the wire — clients should compare via participant_id (per-game opaque).
+function stripUserId<T extends Record<string, unknown>>(row: T): Omit<T, 'user_id'> {
+  const { user_id: _userId, ...safe } = row
+  void _userId
+  return safe
+}
+
 // GET — paginated messages + search
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: gameId } = await params
@@ -81,8 +89,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const page = pageParam ? Math.max(1, Math.min(parseInt(pageParam, 10) || totalPages, totalPages)) : totalPages
     const offset = (page - 1) * limit
 
-    const rows = await query(
-      `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
+    // SECURITY (CRIT-1): do NOT select gp.user_id — leaking real user IDs
+    // breaks the platform's anonymity guarantee. Use participant_id (per-game
+    // opaque) for client-side ownership comparison. stripUserId is defence in
+    // depth in case a future SELECT regresses.
+    const rows = await query<Record<string, unknown>>(
+      `SELECT m.*, gp.nickname, gp.avatar_url
        FROM messages m
        JOIN game_participants gp ON gp.id = m.participant_id
        WHERE m.game_id = $1 AND ${typeFilter}
@@ -91,7 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       [gameId, limit, offset]
     )
 
-    return NextResponse.json({ messages: rows, total, page, totalPages })
+    return NextResponse.json({ messages: rows.map(stripUserId), total, page, totalPages })
   } catch (error) {
     console.error('[API /api/games/[id]/messages] GET:', error)
     return NextResponse.json({ error: 'serverError' }, { status: 500 })
@@ -183,19 +195,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     )
     if (!message) return NextResponse.json({ error: 'serverError' }, { status: 500 })
 
-    // Получаем полные данные с никнеймом
+    // SECURITY (CRIT-1): do NOT select gp.user_id — see GET handler comment.
     const full = await queryOne<Record<string, unknown>>(
-      `SELECT m.*, gp.nickname, gp.avatar_url, gp.user_id
+      `SELECT m.*, gp.nickname, gp.avatar_url
        FROM messages m
        JOIN game_participants gp ON gp.id = m.participant_id
        WHERE m.id = $1`,
       [message.id]
     )
 
-    // Нотифицируем SSE-слушателей
-    if (full) notifyGame(gameId, { _type: 'new', ...full })
+    const safe = full ? stripUserId(full) : null
 
-    return NextResponse.json(full, { status: 201 })
+    // Нотифицируем SSE-слушателей
+    if (safe) notifyGame(gameId, { _type: 'new', ...safe })
+
+    return NextResponse.json(safe, { status: 201 })
   } catch (error) {
     console.error('[API /api/games/[id]/messages] POST:', error)
     return NextResponse.json({ error: 'serverError' }, { status: 500 })

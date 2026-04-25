@@ -7,7 +7,8 @@ import type { Message } from './types'
 
 interface MessageFeedProps {
   messages: Message[]
-  userId: string
+  /** Current viewer's participant id — see CRIT-1 in audit-v4. */
+  participantId: string
   isOoc: boolean
   isLeft: boolean
   isFinished: boolean
@@ -29,7 +30,7 @@ interface MessageFeedProps {
 }
 
 export default function MessageFeed({
-  messages, userId, isOoc, isLeft, isFinished, isFrozen, fullscreen,
+  messages, participantId, isOoc, isLeft, isFinished, isFrozen, fullscreen,
   editingId, notesEnabled, pageLoading,
   currentPage, totalPages,
   scrollRef, onScroll, onSpoilerClick,
@@ -72,12 +73,12 @@ export default function MessageFeed({
         )}
         <div className={!isOoc && gameLayout === 'feed' ? 'max-w-[1050px] mx-auto w-full flex flex-col' : 'contents'} style={!isOoc && gameLayout === 'feed' ? { gap: 'var(--game-gap, 1.5rem)' } : undefined}>
           {messages.map(msg => {
-            const isDimmed = isPrePublish && msg.user_id !== userId && !isOoc
+            const isDimmed = isPrePublish && msg.participant_id !== participantId && !isOoc
             return (
               <div key={msg.id} style={isDimmed ? { opacity: 0.38, transition: 'opacity 0.2s' } : undefined}>
                 <MessageBubble
                   msg={msg}
-                  userId={userId}
+                  participantId={participantId}
                   isOoc={isOoc}
                   isLeft={isLeft}
                   editingId={editingId}
