@@ -1,13 +1,16 @@
 import type { GameStatus, ModerationStatus } from '@/types/api'
 
+// SECURITY (CRIT-1, audit-v4): user_id is intentionally NOT exposed on
+// Message or Participant for non-moderators — clients compare ownership via
+// participant_id / participant.id (per-game opaque) to preserve anonymity.
 export interface Message {
   id: string; participant_id: string; content: string; created_at: string;
-  edited_at: string | null; nickname: string; avatar_url: string | null; user_id: string;
+  edited_at: string | null; nickname: string; avatar_url: string | null;
   type: 'ic' | 'ooc' | 'dice'
 }
 
 export interface Participant {
-  id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: 'own' | 'partner' | 'none'; left_at: string | null
+  id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: 'own' | 'partner' | 'none'; left_at: string | null
 }
 
 export interface NoteEntry {
@@ -26,7 +29,6 @@ export interface GameDialogProps {
   totalPages: number
   participants: Participant[]
   me: Participant
-  userId: string
   requestTitle: string | null
 }
 

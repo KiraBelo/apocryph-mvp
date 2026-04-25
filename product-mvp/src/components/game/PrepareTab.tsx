@@ -10,7 +10,8 @@ import type { Message } from './types'
 
 interface PrepareTabProps {
   messages: Message[]
-  userId: string
+  /** Current viewer's participant id — see CRIT-1 in audit-v4. */
+  participantId: string
   gameId: string
   currentPage: number
   totalPages: number
@@ -25,7 +26,7 @@ interface PrepareTabProps {
 
 export default function PrepareTab({
   messages,
-  userId,
+  participantId,
   gameId,
   currentPage,
   totalPages,
@@ -92,7 +93,7 @@ export default function PrepareTab({
             ))}
           </div>
         ) : messages.map(msg => {
-          const isMine = msg.user_id === userId
+          const isMine = msg.participant_id === participantId
           const canEdit = isMine && msg.type !== 'dice'
 
           return (

@@ -16,6 +16,7 @@ vi.mock('@/lib/session', async () => {
       user: { id: 'user-id', email: 'a@b.com', role: 'user' },
       banReason: null,
     }),
+    getUser: vi.fn().mockResolvedValue({ id: 'user-id', email: 'a@b.com', role: 'user' }),
     handleAuthError: handleAuthErrorMock,
   }
 })
@@ -36,8 +37,9 @@ vi.mock('@/lib/sse', () => ({
 
 import { query, queryOne } from '@/lib/db'
 import { requireUser } from '@/lib/session'
+import { notifyGame } from '@/lib/sse'
 import { getActiveStopPhrases, checkStopList } from '@/lib/stoplist'
-import { POST } from '@/app/api/games/[id]/messages/route'
+import { POST, GET } from '@/app/api/games/[id]/messages/route'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
@@ -195,7 +197,7 @@ describe('POST /api/games/[id]/messages', () => {
       mockQueryOne.mockResolvedValueOnce({ moderation_status: 'visible', status: 'active' }) // game
       mockQueryOne.mockResolvedValueOnce({ id: 'p-id', left_at: null }) // participant
       mockQueryOne.mockResolvedValueOnce({ id: 'msg-id', game_id: GAME_ID, participant_id: 'p-id', content: 'Hello world', type: 'ic' }) // INSERT
-      mockQueryOne.mockResolvedValueOnce({ id: 'msg-id', content: 'Hello world', nickname: 'Player', avatar_url: null, user_id: 'user-id', type: 'ic' }) // full
+      mockQueryOne.mockResolvedValueOnce({ id: 'msg-id', content: 'Hello world', nickname: 'Player', avatar_url: null, participant_id: 'p-id', type: 'ic' }) // full
 
       const req = makeRequest({ content: 'Hello world', type: 'ic' })
       const res = await POST(req, { params: Promise.resolve({ id: GAME_ID }) })
@@ -205,5 +207,82 @@ describe('POST /api/games/[id]/messages', () => {
       expect(data.id).toBe('msg-id')
       expect(data.content).toBe('Hello world')
     })
+  })
+
+  // ── Anonymity invariant (audit-v4 CRIT-1) ───────────────────────────────
+  // Real user_id MUST NOT leak to other participants — this is the platform's
+  // core anonymity guarantee. Use participant_id (per-game opaque) instead.
+  // The DB rows MAY contain user_id (used server-side for filtering), but the
+  // HTTP response and SSE payload must strip it.
+  describe('anonymity (CRIT-1 regression)', () => {
+    it('POST response does NOT contain user_id (even when DB row has it)', async () => {
+      mockQueryOne.mockResolvedValueOnce({ moderation_status: 'visible', status: 'active' }) // game
+      mockQueryOne.mockResolvedValueOnce({ id: 'p-id', left_at: null }) // participant
+      mockQueryOne.mockResolvedValueOnce({ id: 'msg-id', game_id: GAME_ID, participant_id: 'p-id', content: 'x', type: 'ic' }) // INSERT
+      // Simulate real DB returning user_id (legacy SELECT m.*, gp.user_id)
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'msg-id', content: 'x', nickname: 'P', avatar_url: null,
+        participant_id: 'p-id', type: 'ic',
+        user_id: 'real-secret-uid-AAAAA',
+      }) // full
+
+      const req = makeRequest({ content: 'x', type: 'ic' })
+      const res = await POST(req, { params: Promise.resolve({ id: GAME_ID }) })
+      const data = await res.json()
+
+      expect(res.status).toBe(201)
+      expect(data).not.toHaveProperty('user_id')
+      expect(data.participant_id).toBe('p-id')
+    })
+
+    it('SSE notification payload does NOT contain user_id (even when DB row has it)', async () => {
+      mockQueryOne.mockResolvedValueOnce({ moderation_status: 'visible', status: 'active' }) // game
+      mockQueryOne.mockResolvedValueOnce({ id: 'p-id', left_at: null }) // participant
+      mockQueryOne.mockResolvedValueOnce({ id: 'msg-id', game_id: GAME_ID, participant_id: 'p-id', content: 'x', type: 'ic' }) // INSERT
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'msg-id', content: 'x', nickname: 'P', avatar_url: null,
+        participant_id: 'p-id', type: 'ic',
+        user_id: 'real-secret-uid-BBBBB',
+      })
+
+      const req = makeRequest({ content: 'x', type: 'ic' })
+      await POST(req, { params: Promise.resolve({ id: GAME_ID }) })
+
+      const mockNotify = vi.mocked(notifyGame)
+      expect(mockNotify).toHaveBeenCalledOnce()
+      const sseData = mockNotify.mock.calls[0][1] as Record<string, unknown>
+      expect(sseData).not.toHaveProperty('user_id')
+      expect(sseData.participant_id).toBe('p-id')
+    })
+  })
+})
+
+// ── GET tests for anonymity (CRIT-1 regression) ─────────────────────────────
+describe('GET /api/games/[id]/messages', () => {
+  function makeGetRequest(): NextRequest {
+    return new NextRequest(`http://localhost/api/games/${GAME_ID}/messages?type=ic`)
+  }
+
+  it('messages in pagination response do NOT contain user_id (even when DB row has it)', async () => {
+    // requireParticipant uses queryOne to check participant — first queryOne call
+    mockQueryOne.mockResolvedValueOnce({ id: 'p-id', left_at: null }) // requireParticipant
+    mockQueryOne.mockResolvedValueOnce({ count: '1' }) // count
+    // Simulate real DB returning user_id (legacy SELECT m.*, gp.user_id)
+    mockQuery.mockResolvedValueOnce([
+      {
+        id: 'msg-1', participant_id: 'other-p-id', content: 'hi',
+        nickname: 'Other', avatar_url: null, type: 'ic',
+        created_at: '2026-04-01T00:00:00Z', edited_at: null,
+        user_id: 'real-secret-uid-CCCCC',
+      },
+    ])
+
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: GAME_ID }) })
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.messages).toHaveLength(1)
+    expect(data.messages[0]).not.toHaveProperty('user_id')
+    expect(data.messages[0].participant_id).toBe('other-p-id')
   })
 })

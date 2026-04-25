@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getUser } from '@/lib/session'
 import { PAGE_SIZE } from '@/lib/constants'
+import { sanitizeNickname } from '@/lib/sanitize'
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
@@ -93,10 +94,19 @@ export async function GET(req: NextRequest) {
     const total = games.length > 0 ? parseInt(games[0]._total) : 0
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-    const safeGames = games.map(({ _total, ...g }) => ({
-      ...g,
-      participants: g.participants ? JSON.parse(g.participants) : [],
-    }))
+    // SECURITY (CRIT-7, audit-v4): nicknames are user input and must be
+    // sanitized before exposing through the public API. The DB column may
+    // contain HTML if a legacy entry slipped past write-time sanitation.
+    const safeGames = games.map(({ _total, ...g }) => {
+      const rawParticipants = g.participants
+        ? (JSON.parse(g.participants) as Array<{ nickname: string; avatar_url: string | null }>)
+        : []
+      const participants = rawParticipants.map(p => ({
+        ...p,
+        nickname: sanitizeNickname(p.nickname ?? ''),
+      }))
+      return { ...g, participants }
+    })
 
     return NextResponse.json({ games: safeGames, total, page, totalPages })
   } catch (error) {

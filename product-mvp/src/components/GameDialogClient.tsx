@@ -25,7 +25,7 @@ import { useDiceRoller } from './hooks/useDiceRoller'
 import usePublishFlow from './hooks/usePublishFlow'
 import { useToast } from './ToastProvider'
 
-export default function GameDialogClient({ gameId, game, initialMessages, initialPage, totalPages: initTotalPages, participants, me, userId, requestTitle }: GameDialogProps) {
+export default function GameDialogClient({ gameId, game, initialMessages, initialPage, totalPages: initTotalPages, participants, me, requestTitle }: GameDialogProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { notesEnabled } = useSettings()
@@ -64,7 +64,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const [gameStatus, setGameStatus] = useState<GameStatus>((game.status as GameStatus) || 'active')
   const isPreparing = gameStatus === 'preparing'
   const isIcFrozen = gameStatus !== 'active'
-  const partner = participants.find(p => p.user_id !== userId)
+  const partner = participants.find(p => p.id !== me.id)
 
   // ── Publish flow ──
   const publishFlow = usePublishFlow({
@@ -92,7 +92,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
 
   const isOoc = activeTab === 'ooc'
   const visibleMessages = isOoc ? chat.oocMessages : chat.icMessages
-  const activePartner = participants.find(p => p.user_id !== userId && !p.left_at)
+  const activePartner = participants.find(p => p.id !== me.id && !p.left_at)
   const effectiveBanner = bannerPref === 'none' ? null : bannerPref === 'partner' ? (activePartner?.banner_url ?? null) : (bannerUrl || null)
 
   // ── Effects ──
@@ -179,7 +179,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         oocEnabled={oocEnabled} fullscreen={fullscreen} isLeft={isLeft}
         gameStatus={gameStatus} isFrozen={isFrozen} isPreparing={isPreparing}
         partnerWantsPublish={partnerWantsPublish}
-        participants={participants} userId={userId} notesCount={notesHook.notes.length} icPostCount={icPostCount}
+        participants={participants} participantId={me.id} notesCount={notesHook.notes.length} icPostCount={icPostCount}
         publishLoading={publishLoading}
         onSearchToggle={() => { search.setSearchOpen(s => !s); search.setSearchQuery(''); search.setSearchScope(activeTab === 'notes' ? 'notes' : activeTab === 'ooc' ? 'ooc' : 'ic') }}
         onExport={() => setShowExport(true)} onSettings={() => setShowSettings(true)}
@@ -229,7 +229,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
         />
       ) : activeTab === 'prepare' ? (
         <PrepareTab
-          messages={chat.icMessages} userId={userId} gameId={gameId}
+          messages={chat.icMessages} participantId={me.id} gameId={gameId}
           currentPage={chat.icPage} totalPages={chat.icTotalPages} pageLoading={chat.pageLoading}
           fullscreen={fullscreen}
           submitLoading={submitLoading}
@@ -241,7 +241,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
       ) : (
         <>
           <MessageFeed
-            messages={visibleMessages} userId={userId} isOoc={isOoc} isLeft={isLeft} isFinished={isIcFrozen} isFrozen={isFrozen}
+            messages={visibleMessages} participantId={me.id} isOoc={isOoc} isLeft={isLeft} isFinished={isIcFrozen} isFrozen={isFrozen}
             fullscreen={fullscreen} editingId={chat.editingId} notesEnabled={notesEnabled} pageLoading={chat.pageLoading}
             currentPage={isOoc ? chat.oocPage : chat.icPage} totalPages={isOoc ? chat.oocTotalPages : chat.icTotalPages}
             scrollRef={chat.scrollRef} onScroll={handleMessagesScroll} onSpoilerClick={handleSpoilerClick}
@@ -269,7 +269,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
           nickname={nickname} setNickname={setNickname} avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
           bannerUrl={bannerUrl} setBannerUrl={setBannerUrl} bannerPref={bannerPref} setBannerPref={setBannerPref}
           oocEnabled={oocEnabled} setOocEnabled={setOocEnabled}
-          onSettingsSaved={(n, a) => { chat.updateLocalNickname(userId, n, a || null); router.refresh() }}
+          onSettingsSaved={(n, a) => { chat.updateLocalNickname(me.id, n, a || null); router.refresh() }}
           onReport={() => setShowReport(true)}
           onLeave={() => setShowLeave(true)}
           onClose={() => setShowSettings(false)}
