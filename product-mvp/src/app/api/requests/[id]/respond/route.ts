@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, withTransaction } from '@/lib/db'
 import { requireUser, handleAuthError } from '@/lib/session'
+import { rateLimit } from '@/lib/rate-limit'
 import { escapeHtml } from '@/lib/game-utils'
 
 // POST /api/requests/[id]/respond — откликнуться на заявку
@@ -8,6 +9,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const auth = await requireUser()
   if (auth.error) return handleAuthError(auth.error)
   const { user } = auth
+
+  // HIGH-S3 (audit-v4): rate limit per user. Joining games is a deliberate
+  // action — 10/min is plenty for humans, blocks bots that try to scrape
+  // every active request by responding.
+  const { allowed } = rateLimit(`respond:${user.id}`, 10, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'limitReached' }, { status: 429 })
 
   const { id: requestId } = await params
   let nickname: string | undefined

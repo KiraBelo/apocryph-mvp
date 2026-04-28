@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db'
 import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { requireParticipant } from '@/lib/auth'
 import { sanitizeNickname } from '@/lib/sanitize'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
@@ -60,6 +61,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const auth = await requireUser()
   if (auth.error) return handleAuthError(auth.error)
   const { user } = auth
+
+  // HIGH-S3 (audit-v4): rate limit per user. 30/min covers legitimate
+  // edits (toggling banners/star/hide while browsing) but blocks scripted
+  // bursts.
+  const { allowed } = rateLimit(`game-update:${user.id}`, 30, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'limitReached' }, { status: 429 })
 
   const { id: gameId } = await params
 
