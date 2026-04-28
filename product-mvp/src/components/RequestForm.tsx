@@ -185,6 +185,8 @@ export default function RequestForm({ initial }: Props) {
       <Field label={t('form.titleLabel') as string} error={errors.title}>
         <input
           type="text" value={title} onChange={e => setTitle(e.target.value)} required maxLength={200}
+          autoFocus={!initial}
+          aria-invalid={errors.title ? true : undefined}
           placeholder={t('form.titlePlaceholder') as string}
           className="input-base text-[1rem] p-[0.65rem_0.9rem] w-full"
         />

@@ -607,6 +607,7 @@ const en: Translations = {
     notFound: 'Not found',
     forbidden: 'Access denied',
     networkError: 'Network error',
+    sseLost: 'Real-time connection lost — please refresh',
     generic: 'Error',
     errorPageLabel: '§ error',
     errorPageTitle: 'Something went wrong',

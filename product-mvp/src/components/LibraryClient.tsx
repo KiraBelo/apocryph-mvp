@@ -271,7 +271,7 @@ export default function LibraryClient() {
           <button
             onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
             disabled={page === 1}
-            className="btn-ghost text-[0.65rem] tracking-[0.1em] p-[0.35rem_0.8rem] disabled:opacity-30"
+            className="btn-ghost pagination-btn text-[0.65rem] tracking-[0.1em] disabled:opacity-30"
           >
             {t('feed.prevPage') as string}
           </button>
@@ -282,7 +282,7 @@ export default function LibraryClient() {
               <button
                 key={item}
                 onClick={() => { setPage(item); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                className={`font-mono text-[0.7rem] tracking-[0.08em] border-none cursor-pointer p-[0.35rem_0.6rem]
+                className={`pagination-btn font-mono text-[0.7rem] tracking-[0.08em] border-none cursor-pointer
                   ${item === page ? 'bg-accent text-white' : 'bg-transparent text-ink-2 hover:text-ink'}`}
               >
                 {item}
@@ -292,7 +292,7 @@ export default function LibraryClient() {
           <button
             onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
             disabled={page === totalPages}
-            className="btn-ghost text-[0.65rem] tracking-[0.1em] p-[0.35rem_0.8rem] disabled:opacity-30"
+            className="btn-ghost pagination-btn text-[0.65rem] tracking-[0.1em] disabled:opacity-30"
           >
             {t('feed.nextPage') as string}
           </button>

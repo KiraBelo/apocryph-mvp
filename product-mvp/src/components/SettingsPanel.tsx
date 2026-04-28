@@ -12,11 +12,12 @@ function BtnGroup<T extends string>({ current, options, onSelect }: {
   onSelect: (v: T) => void
 }) {
   return (
-    <div className="flex gap-1.5 flex-wrap">
+    <div className="flex gap-1.5 flex-wrap" role="group">
       {options.map(o => (
         <button
           key={o.value}
           onClick={() => onSelect(o.value)}
+          aria-pressed={current === o.value}
           className={`font-mono text-[0.65rem] tracking-[0.08em] py-1 px-2.5 border cursor-pointer transition-all duration-150
             ${current === o.value
               ? 'border-accent bg-accent-dim text-accent'
@@ -197,6 +198,8 @@ export default function SettingsPanel() {
                 <button
                   key={th.value}
                   onClick={() => set('theme', th.value)}
+                  aria-pressed={theme === th.value}
+                  aria-label={th.label as string}
                   className={`flex flex-col items-center gap-1 p-2 border cursor-pointer transition-all ${theme === th.value ? 'border-accent' : 'border-edge'}`}
                   style={{ minWidth: 64 }}
                 >

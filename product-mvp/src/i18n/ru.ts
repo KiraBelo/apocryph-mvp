@@ -607,6 +607,7 @@ const ru = {
     notFound: 'Не найдено',
     forbidden: 'Нет доступа',
     networkError: 'Ошибка сети',
+    sseLost: 'Соединение прервано — обновите страницу',
     generic: 'Ошибка',
     errorPageLabel: '§ ошибка',
     errorPageTitle: 'Что-то пошло не так',

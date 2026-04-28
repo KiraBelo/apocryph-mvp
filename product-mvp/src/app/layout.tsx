@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import './globals.css'
 import Nav from '@/components/Nav'
 import BanBanner from '@/components/BanBanner'
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser()
+  const nonce = (await headers()).get('x-nonce') ?? undefined
 
   // Check ban status for logged-in users
   let banReason: string | null = null
@@ -29,9 +31,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     }
   }
 
+  // FOUC fix (audit-v4 medium): apply the saved theme before the first
+  // paint, so a user with `nocturne` saved doesn't see a flash of the
+  // default `light` palette while React boots. The script runs
+  // synchronously in <head>, before any styled content is rendered.
+  // Mirror the validation from ThemeProvider so saved values stay
+  // honoured across both paths.
+  const themeBootstrap = `
+(function(){try{var t=localStorage.getItem('apocryph-theme');if(t&&['light','sepia','ink','nocturne'].indexOf(t)!==-1){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();
+`
   return (
     <html lang="ru" data-theme="light" suppressHydrationWarning>
       <head>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Merriweather:ital,wght@0,300;0,400;1,300;1,400&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=Caveat:wght@400;500&family=Raleway:ital,wght@0,300;0,400;1,300;1,400&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono:wght@400&family=Neucha&family=Marck+Script&family=Montserrat:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Open+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Nunito:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />

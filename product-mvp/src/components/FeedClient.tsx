@@ -482,7 +482,7 @@ export default function FeedClient({ user }: Props) {
               <button
                 onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                 disabled={page <= 1}
-                className="btn-ghost text-[0.8rem] py-1.5 px-3 disabled:opacity-30 disabled:cursor-default"
+                className="btn-ghost pagination-btn text-[0.8rem] disabled:opacity-30 disabled:cursor-default"
               >
                 {t('feed.prevPage') as string}
               </button>
@@ -500,7 +500,7 @@ export default function FeedClient({ user }: Props) {
                     <button
                       key={item}
                       onClick={() => { setPage(item); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                      className={`font-mono text-[0.8rem] w-[32px] h-[32px] flex items-center justify-center cursor-pointer border
+                      className={`pagination-btn font-mono text-[0.8rem] cursor-pointer border
                         ${page === item
                           ? 'border-accent bg-accent-dim text-accent'
                           : 'border-edge bg-transparent text-ink-2 hover:border-accent hover:text-accent'}`}
@@ -512,7 +512,7 @@ export default function FeedClient({ user }: Props) {
               <button
                 onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
                 disabled={page >= totalPages}
-                className="btn-ghost text-[0.8rem] py-1.5 px-3 disabled:opacity-30 disabled:cursor-default"
+                className="btn-ghost pagination-btn text-[0.8rem] disabled:opacity-30 disabled:cursor-default"
               >
                 {t('feed.nextPage') as string}
               </button>
