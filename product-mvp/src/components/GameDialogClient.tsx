@@ -144,6 +144,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
     },
     onPublishRequest: onSsePublishRequest,
     onPublishRevoked: onSsePublishRevoked,
+    onConnectionLost: () => addToast(t('errors.sseLost') as string, 'error'),
   })
 
   // ── Handlers ──

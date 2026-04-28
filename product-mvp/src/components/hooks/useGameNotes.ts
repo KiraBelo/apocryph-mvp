@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { escapeHtml } from '@/lib/game-utils'
 import type { NoteEntry, Message } from '../game/types'
 import type { ToastType } from '../ToastProvider'
@@ -9,6 +9,14 @@ export function useGameNotes({ gameId, t, addToast }: {
   t: (key: string) => unknown
   addToast: (msg: string, type?: ToastType) => void
 }) {
+  // Holds the active quote-toast timer so unmount can clear it. Without
+  // this, navigating away within the 2 s window queues a setState on a
+  // dead component (audit-v4 medium: setTimeout cleanup).
+  const quoteToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (quoteToastTimer.current) clearTimeout(quoteToastTimer.current)
+  }, [])
+
   const [notes, setNotes] = useState<NoteEntry[]>([])
   const [notesLoaded, setNotesLoaded] = useState(false)
   const [notesLoading, setNotesLoading] = useState(false)
@@ -106,7 +114,11 @@ export function useGameNotes({ gameId, t, addToast }: {
     setNewNoteKey(k => k + 1)
     setActiveTab('notes')
     setQuoteToast(true)
-    setTimeout(() => setQuoteToast(false), 2000)
+    if (quoteToastTimer.current) clearTimeout(quoteToastTimer.current)
+    quoteToastTimer.current = setTimeout(() => {
+      setQuoteToast(false)
+      quoteToastTimer.current = null
+    }, 2000)
   }
 
   function startNoteEdit(note: NoteEntry) {
