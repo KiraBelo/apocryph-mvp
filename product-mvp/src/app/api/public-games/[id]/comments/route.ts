@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser, requireUser, handleAuthError } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import { sanitizeBody } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -85,6 +85,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
+// HIGH-F2 (audit-v4): parent_id used to be passed straight into Postgres,
+// so a malformed UUID returned 500 (uuid syntax) and a non-existent one
+// returned 500 (FK violation). Validate format up-front, then verify the
+// parent comment actually belongs to this game.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // POST — submit comment (authorized users)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // SECURITY (CRIT-2, audit-v4): see likes/route.ts comment.
@@ -107,6 +113,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
   }
 
+  if (parent_id !== null && (typeof parent_id !== 'string' || !UUID_RE.test(parent_id))) {
+    return NextResponse.json({ error: 'errors.invalidBody' }, { status: 400 })
+  }
+
   const sanitized = sanitizeBody(content)
   if (!sanitized?.trim()) return NextResponse.json({ error: 'emptyMessage' }, { status: 400 })
   if (sanitized.length > 10_000) return NextResponse.json({ error: 'messageTooLong' }, { status: 400 })
@@ -125,6 +135,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         [gameId, user.id]
       )
       if (!isAuthor) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+
+      const parent = await queryOne<{ id: string }>(
+        'SELECT id FROM game_comments WHERE id=$1 AND game_id=$2',
+        [parent_id, gameId]
+      )
+      if (!parent) return NextResponse.json({ error: 'notFound' }, { status: 404 })
     }
 
     await queryOne(
