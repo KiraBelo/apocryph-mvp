@@ -34,9 +34,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           [gameId]
         )
       } else {
-        // reject: revert to active, clear all consents
+        // reject: revert to active, clear all consents and any stale
+        // publication timestamp (HIGH-F1, audit-v4 — keeps approve/reject
+        // symmetric: approve sets published_at, reject clears it).
         await client.query(
-          "UPDATE games SET status='active' WHERE id=$1",
+          "UPDATE games SET status='active', published_at=NULL WHERE id=$1",
           [gameId]
         )
         await client.query(

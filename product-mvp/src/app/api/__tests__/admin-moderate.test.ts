@@ -185,6 +185,23 @@ describe('POST /api/admin/games/[id]/moderate', () => {
     expect(mockClient.query).toHaveBeenCalledTimes(3)
     expect(mockNotifyGame).toHaveBeenCalledWith(GAME_ID, { _type: 'statusChanged', status: 'active' })
   })
+
+  // HIGH-F1 (audit-v4): reject must clear published_at so that a previously
+  // approved+revoked game cannot keep its publication timestamp through a
+  // moderation cycle.
+  it('clears published_at on reject (HIGH-F1 regression)', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [{ status: 'moderation' }] }) // game status
+      .mockResolvedValueOnce({ rows: [] })                          // UPDATE status='active'
+      .mockResolvedValueOnce({ rows: [] })                          // DELETE consent
+
+    await moderateGame(makeModerateReq('reject'), { params: Promise.resolve({ id: GAME_ID }) })
+
+    const updateCall = mockClient.query.mock.calls[1]?.[0] as string
+    expect(updateCall).toMatch(/UPDATE\s+games/i)
+    expect(updateCall).toMatch(/status\s*=\s*'active'/i)
+    expect(updateCall).toMatch(/published_at\s*=\s*NULL/i)
+  })
 })
 
 // ── Tests: GET /api/public-games/[id]/likes ───────────────────────────────
