@@ -227,16 +227,26 @@ export default function RequestCard({
       <div className="card-tags">
         {request.tags.map(tag => (
           <span key={tag} className="relative inline-flex">
-            <span
-              onClick={hasTagMenu ? e => openMenu(e, tag) : undefined}
-              className={`tag tag-user ${hasTagMenu ? 'cursor-pointer' : ''} select-none
-                ${menuTag === tag ? '!border !border-accent !text-accent' : ''}`}
-            >
-              {tag.toLowerCase()}
-            </span>
+            {hasTagMenu ? (
+              <button
+                type="button"
+                onClick={e => openMenu(e, tag)}
+                aria-haspopup="menu"
+                aria-expanded={menuTag === tag}
+                className={`tag tag-user cursor-pointer select-none
+                  ${menuTag === tag ? '!border !border-accent !text-accent' : ''}`}
+              >
+                {tag.toLowerCase()}
+              </button>
+            ) : (
+              <span className="tag tag-user select-none">
+                {tag.toLowerCase()}
+              </span>
+            )}
 
             {menuTag === tag && (
               <div
+                role="menu"
                 onClick={e => e.stopPropagation()}
                 className="absolute top-[calc(100%+3px)] left-0 z-200 bg-surface border border-edge min-w-[150px] shadow-[0_2px_10px_var(--shadow)]"
               >
@@ -269,24 +279,27 @@ export default function RequestCard({
               ref={bodyRef}
               className={`card-body break-words ${isLong && !expanded ? 'card-body-clamped' : ''}`}
               onClick={e => {
+                // Spoiler reveal — single tag, harmless click handler stays
+                // a div because the body itself contains arbitrary rich
+                // text (links, headings) that cannot live inside a button.
                 const el = e.target as HTMLElement
                 if (el.classList.contains('ooc-spoiler')) {
                   el.classList.toggle('ooc-spoiler-open')
-                  return
                 }
-                if (isLong) setExpanded(x => !x)
               }}
               dangerouslySetInnerHTML={{ __html: request.body }}
             />
             {isLong && !expanded && <div className="card-body-fade" />}
           </div>
           {isLong && !expanded && (
-            <div
-              className="card-body-dots"
+            <button
+              type="button"
               onClick={() => setExpanded(true)}
+              aria-label={t('card.expand') as string}
+              className="card-body-dots"
             >
               ···
-            </div>
+            </button>
           )}
         </>
       )}

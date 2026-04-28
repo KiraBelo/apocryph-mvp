@@ -8,6 +8,9 @@ const en: Translations = {
     cancel: 'Cancel',
     ok: 'OK',
     close: 'Close',
+    remove: 'Remove',
+    retry: 'Retry',
+    loadFailed: 'Failed to load',
   },
 
   // ── Nav ──
@@ -136,6 +139,7 @@ const en: Translations = {
     hideTag: 'Hide tag',
     respond: 'Respond →',
     ownRequest: 'This is your request',
+    expand: 'Expand',
   },
 
   // ── Request Form ──

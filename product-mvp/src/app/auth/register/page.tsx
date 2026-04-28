@@ -48,11 +48,15 @@ export default function RegisterPage() {
           {t('auth.registerSubtitle') as string}
         </p>
 
-        <form onSubmit={submit} className="flex flex-col gap-5">
+        <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
           <label className="flex flex-col gap-[0.4rem]">
             <span className="section-label">{t('auth.email') as string}</span>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={255}
+              autoFocus
+              autoComplete="email"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? 'register-error' : undefined}
               className="input-base text-[1rem] p-[0.65rem_0.9rem] w-full"
               placeholder="your@email.com"
             />
@@ -63,6 +67,9 @@ export default function RegisterPage() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={6} maxLength={128}
+                autoComplete="new-password"
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'register-error' : undefined}
                 className="input-base text-[1rem] p-[0.65rem_0.9rem] pr-10 w-full"
                 placeholder={t('auth.passwordMinLength') as string}
               />
@@ -85,7 +92,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {error && <p className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
+          {error && <p id="register-error" role="alert" className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input

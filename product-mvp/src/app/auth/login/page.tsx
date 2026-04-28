@@ -49,11 +49,15 @@ export default function LoginPage() {
           {t('auth.loginTitle') as string}
         </h1>
 
-        <form onSubmit={submit} className="flex flex-col gap-5">
+        <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
           <label className="flex flex-col gap-[0.4rem]">
             <span className="section-label">{t('auth.email') as string}</span>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={255}
+              autoFocus
+              autoComplete="email"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? 'login-error' : undefined}
               className="input-base text-[1rem] p-[0.65rem_0.9rem] w-full" placeholder="your@email.com"
             />
           </label>
@@ -63,6 +67,9 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required maxLength={128}
+                autoComplete="current-password"
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'login-error' : undefined}
                 className="input-base text-[1rem] p-[0.65rem_0.9rem] pr-10 w-full" placeholder={t('auth.passwordPlaceholder') as string}
               />
               <button type="button" onClick={() => setShowPassword(v => !v)}
@@ -84,7 +91,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {error && <p className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
+          {error && <p id="login-error" role="alert" className="text-[#c0392b] font-mono text-[0.8rem]">{error}</p>}
 
           <button type="submit" disabled={loading} className="btn-primary text-[1rem] p-[0.7rem_1.4rem] mt-1">
             {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('auth.loginButton') as string}

@@ -6,6 +6,9 @@ const ru = {
     cancel: 'Отмена',
     ok: 'OK',
     close: 'Закрыть',
+    remove: 'Убрать',
+    retry: 'Повторить',
+    loadFailed: 'Не удалось загрузить данные',
   },
 
   // ── Nav ──
@@ -134,6 +137,7 @@ const ru = {
     hideTag: 'Скрыть тег',
     respond: 'Ответить',
     ownRequest: 'Это ваша заявка',
+    expand: 'Раскрыть',
   },
 
   // ── Request Form ──
