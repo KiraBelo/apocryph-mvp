@@ -6,6 +6,7 @@ import Breadcrumbs from './Breadcrumbs'
 import { useT } from './SettingsContext'
 import { useToast } from './ToastProvider'
 import ConfirmDialog from './ConfirmDialog'
+import { getPairingLabels } from '@/lib/labels'
 
 interface Request {
   id: string; title: string; body: string | null; type: string; content_level: string
@@ -42,10 +43,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
   }
   const typeLabels: Record<string, string> = { duo: t('filters.duo') as string, multiplayer: t('filters.multiplayer') as string }
   const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
-  const pairingLabels: Record<string, string> = {
-    sl: 'M/M', fm: 'F/F', gt: 'M/F',
-    any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string,
-  }
+  const pairingLabels = getPairingLabels(t)
   const languageLabels: Record<string, string> = { ru: t('filters.langRu') as string, en: t('filters.langEn') as string }
 
   async function toggleBookmark() {

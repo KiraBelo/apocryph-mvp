@@ -5,6 +5,7 @@ import { useT } from './SettingsContext'
 import { useToast } from './ToastProvider'
 import ConfirmDialog from './ConfirmDialog'
 import { Link2, Pencil, X, Check, Play, Pause, ChevronRight } from 'lucide-react'
+import { getPairingLabels } from '@/lib/labels'
 
 export interface MyRequest {
   id: string; title: string; body: string | null; type: string; content_level: string
@@ -24,7 +25,7 @@ export default function MyRequestsClient({ requests: initial, initialTab = 'acti
   const statusLabel: Record<string, string> = { draft: t('myRequests.drafts') as string, active: t('myRequests.inFeed') as string, inactive: t('myRequests.inactive') as string }
   const typeLabels: Record<string, string> = { duo: t('filters.duo') as string, multiplayer: t('filters.multiplayer') as string }
   const fandomTypeLabels: Record<string, string> = { fandom: t('filters.fandom') as string, original: t('filters.original') as string }
-  const pairingLabels: Record<string, string> = { sl: 'M/M', fm: 'F/F', gt: 'M/F', any: t('filters.anyPairing') as string, multi: t('filters.multi') as string, other: t('filters.other') as string }
+  const pairingLabels = getPairingLabels(t)
   const contentLabels: Record<string, string> = { none: t('filters.noNsfw') as string, rare: t('filters.nsfwRare') as string, often: t('filters.nsfwOften') as string, core: t('filters.nsfwCore') as string, flexible: t('filters.nsfwFlexible') as string }
 
   async function copyInvite(id: string) {

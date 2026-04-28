@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useT } from './SettingsContext'
+import { getPairingLabels } from '@/lib/labels'
 import { useToast } from './ToastProvider'
 import { Link2, Pencil, Star, ChevronRight, Check } from 'lucide-react'
 import type { RequestStatus } from '@/types/api'
@@ -65,14 +66,7 @@ export default function RequestCard({
     en: t('filters.langEn') as string,
   }
 
-  const pairingLabels: Record<string, string> = {
-    sl: 'M/M',
-    fm: 'F/F',
-    gt: 'M/F',
-    any: t('filters.anyPairing') as string,
-    multi: t('filters.multi') as string,
-    other: t('filters.other') as string,
-  }
+  const pairingLabels = getPairingLabels(t)
 
   const [bookmarked, setBookmarked] = useState(isBookmarked ?? false)
   const [loadingBm, setLoadingBm] = useState(false)

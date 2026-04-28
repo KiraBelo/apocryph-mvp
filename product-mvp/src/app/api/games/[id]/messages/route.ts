@@ -4,7 +4,7 @@ import { getUser, requireUser, handleAuthError } from '@/lib/session'
 import { notifyGame } from '@/lib/sse'
 import { sanitizeBody } from '@/lib/sanitize'
 import { getActiveStopPhrases, checkStopList, VIOLATION_THRESHOLD } from '@/lib/stoplist'
-import { requireParticipant } from '@/lib/auth'
+import { requireParticipant, isModerator } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { PAGE_SIZE } from '@/lib/constants'
 
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   // Verify caller is a participant (moderators can read any game)
-  const isMod = user.role === 'moderator' || user.role === 'admin'
+  const isMod = isModerator(user)
   const participant = await requireParticipant(gameId, user.id, { includeLeft: true })
   if (!participant && !isMod) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 

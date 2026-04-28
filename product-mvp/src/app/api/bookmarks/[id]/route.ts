@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, withTransaction } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 
 // POST — добавить в закладки
 export async function POST(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // Write endpoint — requireUser checks ban + session_version (CRIT-2 guard).
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id: requestId } = await params
 
@@ -37,8 +39,9 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
 // DELETE — удалить из закладок
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { id: requestId } = await params
   try {

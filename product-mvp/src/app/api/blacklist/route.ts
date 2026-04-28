@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { getUser, requireUser, handleAuthError } from '@/lib/session'
 
 // GET /api/blacklist — список скрытых тегов текущего пользователя
 export async function GET() {
@@ -21,8 +21,10 @@ export async function GET() {
 
 // POST /api/blacklist — добавить тег в чёрный список
 export async function POST(req: NextRequest) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // Write endpoint — requireUser checks ban + session_version (CRIT-2 guard).
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   let body
   try {
@@ -49,8 +51,9 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/blacklist — очистить весь чёрный список
 export async function DELETE() {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   try {
     await query('DELETE FROM user_tag_blacklist WHERE user_id = $1', [user.id])

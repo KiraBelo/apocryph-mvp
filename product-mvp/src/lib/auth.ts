@@ -1,5 +1,21 @@
 import bcrypt from 'bcryptjs'
 import { query, queryOne } from './db'
+import type { UserRole } from '@/types/api'
+
+/**
+ * True if the user has moderator-level permissions (moderator OR admin).
+ * Centralised to avoid the `role === 'moderator' || role === 'admin'` check
+ * scattered across read handlers — that pattern was duplicated in 4 places
+ * before audit-v4 cleanup and is easy to mistype as `&&`.
+ *
+ * Note: this only checks role. For *write* moderation actions, use
+ * `requireMod()` from lib/session — it additionally enforces ban +
+ * session_version against the DB.
+ */
+export function isModerator(user: { role: UserRole | string } | null | undefined): boolean {
+  if (!user) return false
+  return user.role === 'moderator' || user.role === 'admin'
+}
 
 export interface GameParticipant {
   id: string

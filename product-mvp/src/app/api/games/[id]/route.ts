@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { getUser, requireUser, handleAuthError } from '@/lib/session'
-import { requireParticipant } from '@/lib/auth'
+import { requireParticipant, isModerator } from '@/lib/auth'
 import { sanitizeNickname } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -10,7 +10,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { id: gameId } = await params
-  const isMod = user.role === 'moderator' || user.role === 'admin'
+  const isMod = isModerator(user)
 
   try {
     const game = await queryOne(

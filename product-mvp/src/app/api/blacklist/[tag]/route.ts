@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 import pool from '@/lib/db'
 
 // DELETE /api/blacklist/[tag] — убрать тег из чёрного списка
@@ -7,8 +7,10 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ tag: string }> }
 ) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // Write endpoint — requireUser checks ban + session_version (CRIT-2 guard).
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   const { tag } = await params
   try {
