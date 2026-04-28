@@ -120,6 +120,22 @@ describe('POST /api/games/[id]/leave', () => {
     expect(updateCall).toMatch(/left_at\s*=\s*NOW\(\)/i)
     expect(mockNotifyGame).toHaveBeenCalledWith(GAME_ID, expect.objectContaining({ _type: 'participantLeft' }))
   })
+
+  it('runs exactly one DB query — no dead-code SELECT after notify (audit-v4 low cleanup)', async () => {
+    mockRequireParticipant.mockResolvedValueOnce({
+      id: 'p1', game_id: GAME_ID, user_id: 'user-id', nickname: 'x',
+      avatar_url: null, banner_url: null, banner_pref: 'none',
+      left_at: null, leave_reason: null,
+    })
+    mockQuery.mockResolvedValue([])
+
+    await leavePost(makeReq({ reason: 'goodbye' }), { params: Promise.resolve({ id: GAME_ID }) })
+
+    expect(mockQuery).toHaveBeenCalledTimes(1)
+    const onlyCall = mockQuery.mock.calls[0][0] as string
+    expect(onlyCall).toMatch(/UPDATE/i)
+    expect(onlyCall).not.toMatch(/SELECT/i)
+  })
 })
 
 // ── /report ───────────────────────────────────────────────────────────────

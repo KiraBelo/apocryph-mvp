@@ -149,6 +149,7 @@ export default function TopBar({
                     ? <img
                         src={p.avatar_url}
                         alt={p.nickname}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           // Невалидный URL — скрываем <img>, следующий <span> будет виден.

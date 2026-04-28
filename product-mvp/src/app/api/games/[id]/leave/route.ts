@@ -35,12 +35,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Notify SSE subscribers about participant leaving
     notifyGame(gameId, { _type: 'participantLeft', userId: user.id })
 
-    // Проверяем, не осталось ли активных участников
-    await query(
-      'SELECT id FROM game_participants WHERE game_id=$1 AND left_at IS NULL',
-      [gameId]
-    )
-    // Если все вышли — ничего не делаем, игра просто "завершённая"
+    // (Was: a SELECT counting active participants here, with the comment
+    //  «if everyone left — do nothing». The result was never read or
+    //  used — pure dead code. audit-v4 low cleanup, removed.)
 
     return NextResponse.json({ ok: true })
   } catch (error) {
