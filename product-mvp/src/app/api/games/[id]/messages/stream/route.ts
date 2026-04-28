@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { requireUser } from '@/lib/session'
-import { requireParticipant } from '@/lib/auth'
+import { requireParticipant, isModerator } from '@/lib/auth'
 import { subscribe, canConnect, trackConnect, trackDisconnect } from '@/lib/sse'
 
 export const dynamic = 'force-dynamic'
@@ -16,8 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id: gameId } = await params
 
   // Verify user is a participant of this game (or a moderator)
-  const isMod = user.role === 'moderator' || user.role === 'admin'
-  if (!isMod) {
+  if (!isModerator(user)) {
     const participant = await requireParticipant(gameId, user.id, { includeLeft: true })
     if (!participant) return new Response('Forbidden', { status: 403 })
   }

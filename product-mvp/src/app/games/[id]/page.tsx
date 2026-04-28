@@ -4,6 +4,7 @@ import { queryOne, query } from '@/lib/db'
 import GameDialogClient from '@/components/GameDialogClient'
 import type { GameStatus, ModerationStatus } from '@/types/api'
 import { PAGE_SIZE } from '@/lib/constants'
+import { isModerator } from '@/lib/auth'
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id: gameId } = await params
@@ -15,7 +16,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   )
   if (!game) notFound()
 
-  const isMod = user.role === 'moderator' || user.role === 'admin'
+  const isMod = isModerator(user)
 
   const rawParticipants = await query<{
     id: string; user_id: string; nickname: string; avatar_url: string | null; banner_url: string | null; banner_pref: 'own' | 'partner' | 'none'; left_at: string | null; leave_reason: string | null

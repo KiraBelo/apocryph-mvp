@@ -17,6 +17,8 @@ vi.mock('@/lib/session', async () => {
 
 vi.mock('@/lib/auth', () => ({
   requireParticipant: vi.fn(),
+  isModerator: (u: { role?: string } | null | undefined) =>
+    !!u && (u.role === 'moderator' || u.role === 'admin'),
 }))
 
 import { query, queryOne } from '@/lib/db'

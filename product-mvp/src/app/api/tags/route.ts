@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/db'
-import { getUser } from '@/lib/session'
+import { requireUser, handleAuthError } from '@/lib/session'
 
 interface TagRow {
   id: number
@@ -106,10 +106,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/tags — create user tag
 export async function POST(req: NextRequest) {
-  const user = await getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
+  // Write endpoint — requireUser checks ban + session_version. Without
+  // it, a banned user could keep submitting tags (creating XSS vectors
+  // through tag names that show up across all users).
+  const auth = await requireUser()
+  if (auth.error) return handleAuthError(auth.error)
+  const { user } = auth
 
   let body
   try {
