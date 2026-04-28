@@ -110,7 +110,7 @@ export default function NotesTab({
                 {isDeleteConfirm && (
                   <div className="flex gap-[0.4rem] items-center">
                     <span className="font-mono text-[0.6rem] text-ink-2">{t('game.deleteConfirm') as string}</span>
-                    <button onClick={() => onDeleteNote(note.id)} className="bg-[#c0392b] text-white border-none font-mono text-[0.6rem] p-[0.2rem_0.5rem] cursor-pointer">{t('myRequests.yes') as string}</button>
+                    <button onClick={() => onDeleteNote(note.id)} className="bg-danger text-white border-none font-mono text-[0.6rem] p-[0.2rem_0.5rem] cursor-pointer">{t('myRequests.yes') as string}</button>
                     <button onClick={() => setDeleteConfirmId(null)} className="bg-transparent border border-edge text-ink-2 font-mono text-[0.6rem] p-[0.2rem_0.5rem] cursor-pointer">{t('myRequests.no') as string}</button>
                   </div>
                 )}

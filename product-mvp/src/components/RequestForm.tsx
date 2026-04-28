@@ -255,7 +255,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
       <label className="font-mono text-[0.62rem] tracking-[0.15em] uppercase text-ink-2">{label}</label>
       {children}
       {error && (
-        <p className="text-[#c0392b] font-mono text-[0.72rem]" role="alert" aria-live="polite">{error}</p>
+        <p className="text-danger font-mono text-[0.72rem]" role="alert" aria-live="polite">{error}</p>
       )}
     </div>
   )

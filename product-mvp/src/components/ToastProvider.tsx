@@ -43,7 +43,7 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
 
   const typeStyles: Record<ToastType, string> = {
     success: 'border-l-[3px] border-l-[#2d8a4e]',
-    error: 'border-l-[3px] border-l-[#c0392b]',
+    error: 'border-l-[3px] border-l-danger',
     warning: 'border-l-[3px] border-l-[#e67e22]',
     info: 'border-l-[3px] border-l-accent',
   }

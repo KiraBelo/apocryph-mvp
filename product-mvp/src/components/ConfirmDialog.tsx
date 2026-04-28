@@ -83,8 +83,7 @@ export default function ConfirmDialog({
           <button
             ref={confirmRef}
             onClick={onConfirm}
-            className="btn-primary text-[0.8rem] px-4 py-1.5"
-            style={danger ? { background: '#c0392b' } : undefined}
+            className={`btn-primary text-[0.8rem] px-4 py-1.5 ${danger ? 'bg-danger' : ''}`}
           >
             {resolvedConfirmLabel}
           </button>

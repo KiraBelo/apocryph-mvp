@@ -205,7 +205,7 @@ export default function RequestDetailClient({ request, user, isAuthor, isBookmar
             {t('detail.createInvite') as string}
           </button>
           <button onClick={deleteRequest} disabled={deleteLoading}
-            className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5 text-[#c0392b] border-[#c0392b]">
+            className="btn-ghost text-[0.7rem] tracking-[0.1em] uppercase py-1.5 px-3.5 text-danger border-danger">
             {deleteLoading ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t('detail.deleteButton') as string}
           </button>
         </div>

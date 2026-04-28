@@ -312,7 +312,7 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
               </label>
             ))}
           </div>
-          <button onClick={async () => { if (!leaveReason) { addToast(t('errors.selectLeaveReason') as string, 'error'); return }; try { const res = await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } router.push('/my/games') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="bg-[#c0392b] text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
+          <button onClick={async () => { if (!leaveReason) { addToast(t('errors.selectLeaveReason') as string, 'error'); return }; try { const res = await fetch(`/api/games/${gameId}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: leaveReason }) }); if (!res.ok) { const d = await safeJson(res); addToast(t(`errors.${d.error}`) as string || t('errors.networkError') as string, 'error'); return } router.push('/my/games') } catch { addToast(t('errors.networkError') as string, 'error') } }} className="bg-danger text-white font-heading italic border-none p-[0.6rem_1.4rem] cursor-pointer">{t('game.leaveButton') as string}</button>
         </Modal>
       )}
 

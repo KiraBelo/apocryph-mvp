@@ -68,7 +68,7 @@ export default function Nav({ user }: Props) {
       if (unreadIntervalRef.current) clearInterval(unreadIntervalRef.current)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchUnread новая ссылка на каждый рендер, но стабильна по семантике (read globals). Перезапуск при каждом ререндере не нужен.
+   
   }, [user])
 
   // Лёгкое обновление при смене маршрута: только fetchUnread(), без перезапуска
@@ -76,7 +76,7 @@ export default function Nav({ user }: Props) {
   useEffect(() => {
     if (!user) return
     fetchUnread()
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchUnread новая ссылка на каждый рендер, но стабильна по семантике.
+   
   }, [user, path])
 
   useEffect(() => {
@@ -108,7 +108,13 @@ export default function Nav({ user }: Props) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const badgeColor = icGames.length > 0 ? '#7d2c3e' : '#888888'
+    // Canvas can't use CSS vars directly (var(--badge-unread) returns
+    // a string, not a colour). We read the resolved value off :root so
+    // theme switches still propagate. Fallback for SSR/first-paint:
+    // the same hex that was hardcoded before audit-v4.
+    const rootStyle = getComputedStyle(document.documentElement)
+    const badgeUnread = rootStyle.getPropertyValue('--badge-unread').trim() || '#7d2c3e'
+    const badgeColor = icGames.length > 0 ? badgeUnread : '#888888'
     const label = total > 9 ? '9+' : String(total)
 
     const drawBadge = () => {

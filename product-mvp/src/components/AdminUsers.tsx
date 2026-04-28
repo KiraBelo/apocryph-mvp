@@ -142,7 +142,7 @@ export default function AdminUsers() {
                 <div className="meta-text mt-1">
                   {new Date(u.created_at).toLocaleDateString('ru')}
                   {u.banned_at && u.ban_reason && (
-                    <span className="ml-2 text-[#c0392b]">— {u.ban_reason}</span>
+                    <span className="ml-2 text-danger">— {u.ban_reason}</span>
                   )}
                 </div>
               </div>
