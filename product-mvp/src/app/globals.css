@@ -24,6 +24,8 @@
   --color-sms-mine-edge: var(--sms-mine-border);
   --color-post-mine: var(--post-mine-bg);
   --color-post-stripe: var(--post-mine-stripe);
+  --color-danger: var(--danger);
+  --color-badge-unread: var(--badge-unread);
   --font-heading: var(--serif);
   --font-body: var(--serif-body);
   --font-mono: var(--mono);
@@ -891,6 +893,13 @@
   --border:     #d3c9b8;
   --border-soft: #e2dbcd;
   --shadow:     #3a2a1a12;
+  /* Semantic warning/error red — used for ban banners, delete buttons,
+     form error text and destructive confirms. Inherits across themes
+     unless a theme overrides it (currently none do). */
+  --danger:     #c0392b;
+  /* Unread-messages badge in Nav. Different shade from --accent so the
+     badge stands out against the topbar at any theme. */
+  --badge-unread: #7d2c3e;
   /* Card system */
   --card-px:          1.1rem;
   --card-py:          0.9rem;
@@ -1236,7 +1245,7 @@ nav::after {
 }
 
 /* ── Badge variants (admin, status) ──────────── */
-.badge-danger  { color: #c0392b; background: #c0392b22; }
+.badge-danger  { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent); }
 .badge-admin   { color: #8b1a1a; background: #8b1a1a22; }
 .badge-mod     { color: #2980b9; background: #2980b922; }
 .badge-muted   { color: var(--text-2); background: var(--bg-3); }
@@ -1244,8 +1253,8 @@ nav::after {
 /* ── Danger button variant ───────────────────── */
 .btn-ghost-danger {
   background: none;
-  border: 1px solid #c0392b;
-  color: #c0392b;
+  border: 1px solid var(--danger);
+  color: var(--danger);
   font-family: var(--mono);
   font-size: 0.58rem;
   letter-spacing: 0.08em;
@@ -1253,7 +1262,7 @@ nav::after {
   transition: all 0.2s;
 }
 .btn-ghost-danger:hover {
-  background: #c0392b22;
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
 }
 
 /* ── Overlay backgrounds ─────────────────────── */
@@ -1349,7 +1358,7 @@ nav::after {
 }
 
 /* ── Error text ──────────────────────────────── */
-.text-error { color: #c0392b; }
+.text-error { color: var(--danger); }
 
 /* ── Form controls ───────────────────────────── */
 .accent-muted { accent-color: var(--text-2); }

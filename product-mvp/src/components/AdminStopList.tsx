@@ -214,7 +214,7 @@ export default function AdminStopList() {
                     </button>
                     <button
                       onClick={() => deletePhrase(p.id)}
-                      className="btn-ghost text-[0.7rem] px-3 py-1 text-[#c0392b] border-[#c0392b]"
+                      className="btn-ghost text-[0.7rem] px-3 py-1 text-danger border-danger"
                     >
                       ✕
                     </button>

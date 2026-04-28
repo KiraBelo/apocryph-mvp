@@ -66,6 +66,12 @@ export async function GET(req: NextRequest) {
       request_content_level: string | null; request_language: string | null; request_tags: string[] | null;
       ic_count: string; likes_count: string; participants: string; _total: string
     }>(
+      // LATERAL joins (audit-v4 medium): the previous implementation
+      // used three subqueries that aggregated the WHOLE table
+      // (messages / game_likes / game_participants) and then joined
+      // back. With LATERAL each aggregate runs only for the rows kept
+      // by the WHERE+LIMIT — for a paginated public catalog this
+      // bounds the work to PAGE_SIZE games regardless of total volume.
       `SELECT g.id, g.published_at, g.banner_url,
               r.title as request_title, r.type as request_type,
               r.fandom_type as request_fandom_type, r.pairing as request_pairing,
@@ -76,16 +82,16 @@ export async function GET(req: NextRequest) {
               COUNT(*) OVER() as _total
        FROM games g
        LEFT JOIN requests r ON r.id = g.request_id
-       LEFT JOIN (
-         SELECT game_id, COUNT(*) as ic_count FROM messages WHERE type = 'ic' GROUP BY game_id
-       ) mc ON mc.game_id = g.id
-       LEFT JOIN (
-         SELECT game_id, COUNT(*) as likes_count FROM game_likes GROUP BY game_id
-       ) lc ON lc.game_id = g.id
-       LEFT JOIN (
-         SELECT game_id, json_agg(json_build_object('nickname', nickname, 'avatar_url', avatar_url)) as participants
-         FROM game_participants GROUP BY game_id
-       ) pp ON pp.game_id = g.id
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) as ic_count FROM messages WHERE game_id = g.id AND type = 'ic'
+       ) mc ON true
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) as likes_count FROM game_likes WHERE game_id = g.id
+       ) lc ON true
+       LEFT JOIN LATERAL (
+         SELECT json_agg(json_build_object('nickname', nickname, 'avatar_url', avatar_url)) as participants
+         FROM game_participants WHERE game_id = g.id
+       ) pp ON true
        ${where}
        ORDER BY g.published_at DESC
        LIMIT $${p++} OFFSET $${p++}`,
