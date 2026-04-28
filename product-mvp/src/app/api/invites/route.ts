@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { requireUser, handleAuthError } from '@/lib/session'
+import { rateLimit } from '@/lib/rate-limit'
 import { randomBytes } from 'crypto'
 
 // POST — создать инвайт-ссылку
@@ -8,6 +9,12 @@ export async function POST(req: NextRequest) {
   const auth = await requireUser()
   if (auth.error) return handleAuthError(auth.error)
   const { user } = auth
+
+  // HIGH-S3 (audit-v4): every write endpoint has a rate limit. 10/min is
+  // generous for legitimate use (creating invite links is rare) and tight
+  // enough to make link-spamming impractical.
+  const { allowed } = rateLimit(`invites:${user.id}`, 10, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'limitReached' }, { status: 429 })
 
   let requestId: string
   try {

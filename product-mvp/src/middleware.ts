@@ -8,14 +8,18 @@ import { NextRequest, NextResponse } from 'next/server'
 // есть nonce/strict-dynamic. 'unsafe-inline' оставлен как fallback для
 // старых браузеров (которые игнорируют nonce/strict-dynamic).
 //
-// Без этого middleware CSP не имела бы смысла: 'unsafe-inline' пропускал
-// бы любой инжектированный <script>.
+// HIGH-S1 (audit-v4): `https:` убран из script-src — он добавлял доверие
+// к ЛЮБОМУ HTTPS-домену (полностью обходя whitelist), что в связке с
+// `'unsafe-inline'`-fallback расширяло поверхность XSS на старых браузерах.
+// Без него: на современных — nonce + strict-dynamic, на старых — только
+// 'self' + unsafe-inline. Любые сторонние скрипты (если понадобятся в
+// будущем) добавляем явно по hostname.
 export function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
 
   const cspHeader = [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline' https:`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline'`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com`,
     `img-src 'self' https: data:`,

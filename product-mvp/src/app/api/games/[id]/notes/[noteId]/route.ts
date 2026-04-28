@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { requireUser, handleAuthError } from '@/lib/session'
+import { rateLimit } from '@/lib/rate-limit'
 import { sanitizeBody } from '@/lib/sanitize'
 
 // PATCH — обновить заметку
@@ -11,6 +12,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (auth.error) return handleAuthError(auth.error)
   const { user } = auth
   const { id: gameId, noteId } = await params
+
+  // HIGH-S3 (audit-v4): notes are auto-saved on the client (debounced),
+  // so 60/min comfortably covers active editing while still blocking
+  // scripted bursts. Separate key from notes POST (20/min) — they have
+  // different usage profiles (creating vs continuous updating).
+  const { allowed } = rateLimit(`notes-update:${user.id}`, 60, 60_000)
+  if (!allowed) return NextResponse.json({ error: 'limitReached' }, { status: 429 })
 
   let body
   try {
