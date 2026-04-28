@@ -42,6 +42,21 @@ export default function ConfirmDialog({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onCancel])
 
+  // HIGH-U2 (audit-v4): cycle Tab between Cancel and Confirm so focus
+  // can never leak back to the page underneath while the modal is open.
+  function handleTrap(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Tab') return
+    const cancel = cancelRef.current
+    const confirm = confirmRef.current
+    if (!cancel || !confirm) return
+    const active = document.activeElement
+    if (e.shiftKey) {
+      if (active === cancel) { e.preventDefault(); confirm.focus() }
+    } else {
+      if (active === confirm) { e.preventDefault(); cancel.focus() }
+    }
+  }
+
   if (!open) return null
 
   return (
@@ -53,6 +68,7 @@ export default function ConfirmDialog({
         aria-describedby="confirm-dialog-message"
         className="modal p-6 max-w-[420px] w-full mx-4"
         onClick={e => e.stopPropagation()}
+        onKeyDown={handleTrap}
       >
         <h3 id="confirm-dialog-title" className="section-label mb-3">{title}</h3>
         <p id="confirm-dialog-message" className="font-body text-[0.9rem] text-ink mb-5 leading-relaxed">{message}</p>

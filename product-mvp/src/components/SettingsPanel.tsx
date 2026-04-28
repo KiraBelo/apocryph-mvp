@@ -47,16 +47,18 @@ function Row({ label, open, onToggle, children }: {
 }) {
   return (
     <div>
-      <div
+      <button
+        type="button"
         onClick={onToggle}
-        className={`font-body text-[0.88rem] cursor-pointer py-[0.3rem] px-[0.4rem] -mx-[0.4rem] select-none rounded transition-all duration-200 ${
+        aria-expanded={open}
+        className={`block w-full text-left font-body text-[0.88rem] cursor-pointer py-[0.3rem] px-[0.4rem] -mx-[0.4rem] select-none rounded transition-all duration-200 bg-transparent border-none ${
           open
             ? 'text-accent bg-accent-dim/50'
             : 'text-ink hover:text-accent hover:bg-accent-dim/30 hover:translate-x-[2px]'
         }`}
       >
         {label}
-      </div>
+      </button>
       {open && (
         <div className="pt-1 pb-[0.45rem]">
           {children}
@@ -163,7 +165,11 @@ export default function SettingsPanel() {
           <h2 className="font-heading italic font-light text-[1.3rem] text-ink">
             {t('settings.title') as string}
           </h2>
-          <button onClick={closePanel} className="bg-transparent border-none text-ink-2 cursor-pointer leading-none p-[0.2rem] flex items-center">
+          <button
+            onClick={closePanel}
+            aria-label={t('common.close') as string}
+            className="bg-transparent border-none text-ink-2 cursor-pointer leading-none p-[0.2rem] flex items-center"
+          >
             <X size={16} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
@@ -284,24 +290,28 @@ export default function SettingsPanel() {
                   background: hasContent || isOpen ? 'var(--bg-2)' : 'transparent',
                 }}
               >
-                <div
-                  onClick={() => togglePreset(i)}
-                  className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 cursor-pointer min-h-[32px]"
-                >
-                  <span className="overflow-hidden whitespace-nowrap text-ellipsis flex-1" style={{
-                    fontFamily: hasContent ? 'var(--serif-body)' : 'var(--mono)',
-                    fontSize: hasContent ? '0.82rem' : '0.58rem',
-                    letterSpacing: hasContent ? 'normal' : '0.1em',
-                    textTransform: hasContent ? 'none' : 'uppercase',
-                    color: hasContent ? 'var(--text)' : 'var(--border)',
-                  }}>
+                <div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 min-h-[32px]">
+                  <button
+                    type="button"
+                    onClick={() => togglePreset(i)}
+                    aria-expanded={isOpen}
+                    className="overflow-hidden whitespace-nowrap text-ellipsis flex-1 text-left bg-transparent border-none cursor-pointer"
+                    style={{
+                      fontFamily: hasContent ? 'var(--serif-body)' : 'var(--mono)',
+                      fontSize: hasContent ? '0.82rem' : '0.58rem',
+                      letterSpacing: hasContent ? 'normal' : '0.1em',
+                      textTransform: hasContent ? 'none' : 'uppercase',
+                      color: hasContent ? 'var(--text)' : 'var(--border)',
+                    }}
+                  >
                     {hasContent ? (preset.name || `${t('settings.presetName') as string} ${i + 1}`) : `${t('settings.presetName') as string} ${i + 1} — ${t('settings.presetEmpty') as string}`}
-                  </span>
+                  </button>
                   <div className="flex gap-0.5 shrink-0 items-center">
                     {hasContent && !isOpen && (
                       <button
                         onClick={e => { e.stopPropagation(); clearPreset(i) }}
                         title={t('settings.clearPreset') as string}
+                        aria-label={t('settings.clearPreset') as string}
                         className="bg-transparent border-none text-ink-2 cursor-pointer px-[0.2rem] py-[0.1rem] leading-none opacity-50 hover:opacity-100 flex items-center"
                       >
                         <X size={11} strokeWidth={2} aria-hidden="true" />

@@ -32,6 +32,10 @@ export default function LibraryClient() {
   const tPlural = usePlural()
   const [games, setGames] = useState<PublicGame[]>([])
   const [loading, setLoading] = useState(true)
+  // HIGH-U1 (audit-v4): track fetch failure so the user gets an error
+  // state with a Retry button instead of a permanent skeleton or
+  // misleading empty state.
+  const [error, setError] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
@@ -80,6 +84,7 @@ export default function LibraryClient() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(false)
     const params = new URLSearchParams()
     if (q) params.set('q', q)
     if (type) params.set('type', type)
@@ -91,11 +96,15 @@ export default function LibraryClient() {
     params.set('page', String(page))
     try {
       const res = await fetch(`/api/public-games?${params}`)
-      if (res.ok) {
-        const data = await res.json()
-        setGames(data.games)
-        setTotalPages(data.totalPages)
+      if (!res.ok) {
+        setError(true)
+        return
       }
+      const data = await res.json()
+      setGames(data.games)
+      setTotalPages(data.totalPages)
+    } catch {
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -155,6 +164,7 @@ export default function LibraryClient() {
               <button
                 type="button"
                 onClick={() => setFilterTags(filterTags.filter(t => t.slug !== tag.slug))}
+                aria-label={`${t('common.remove') as string}: ${tag.name || tag.slug}`}
                 className="ml-0.5 opacity-50 hover:opacity-100 cursor-pointer"
                 style={{ fontSize: '0.8rem', lineHeight: 1 }}
               >
@@ -179,6 +189,13 @@ export default function LibraryClient() {
               </div>
             </div>
           ))}
+        </div>
+      ) : error ? (
+        <div role="alert" className="flex flex-col items-start gap-3">
+          <p className="text-ink-2 font-heading italic">{t('common.loadFailed') as string}</p>
+          <button onClick={load} className="btn-ghost text-[0.8rem] px-4 py-1.5">
+            {t('common.retry') as string}
+          </button>
         </div>
       ) : games.length === 0 ? (
         <p className="text-ink-2 font-heading italic">{t('library.empty') as string}</p>
