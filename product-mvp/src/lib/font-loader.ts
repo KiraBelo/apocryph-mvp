@@ -1,4 +1,4 @@
-import { FONT_METADATA } from './fonts'
+import { FONT_METADATA, LAZY_GOOGLE_FONTS } from './fonts'
 
 const SELF_HOSTED = new Set(['Cormorant Garamond', 'Courier Prime'])
 const SYSTEM_FONTS = new Set(['Georgia', 'Times New Roman', 'Times', 'Arial', 'Helvetica', 'Calibri', 'Candara', 'Courier New', 'Courier'])
@@ -55,4 +55,66 @@ export function extractGoogleFontsFromHtml(html: string): string[] {
     result.add(firstName)
   }
   return [...result]
+}
+
+const _loaded = new Set<string>()
+let _allCatalogLoaded = false
+
+/** Только для тестов: сбрасывает кэш загруженных шрифтов. */
+export function _resetLoadedForTests(): void {
+  _loaded.clear()
+  _allCatalogLoaded = false
+}
+
+function appendLink(url: string): void {
+  if (typeof document === 'undefined') return
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = url
+  document.head.appendChild(link)
+}
+
+function toSpec(googleName: string): FontSpec | null {
+  const meta = FONT_METADATA[googleName]
+  if (!meta) return null
+  return { name: googleName, weights: meta.weights, italic: meta.italic }
+}
+
+/** Грузит один Google-шрифт. Принимает либо имя (`'Lora'`), либо CSS-список (`'Lora, serif'`). Идемпотентно. */
+export function loadFont(input: string): void {
+  const name = parseFirstFontName(input)
+  if (!name) return
+  if (_loaded.has(name)) return
+  const spec = toSpec(name)
+  if (!spec) return
+  appendLink(buildFontLinkUrl([spec]))
+  _loaded.add(name)
+}
+
+/** Грузит несколько шрифтов одним `<link>`. Пропускает уже загруженные. */
+export function loadFonts(inputs: string[]): void {
+  const specs: FontSpec[] = []
+  for (const input of inputs) {
+    const name = parseFirstFontName(input)
+    if (!name) continue
+    if (_loaded.has(name)) continue
+    const spec = toSpec(name)
+    if (!spec) continue
+    specs.push(spec)
+    _loaded.add(name)
+  }
+  if (specs.length === 0) return
+  appendLink(buildFontLinkUrl(specs))
+}
+
+/** Грузит весь каталог не-критичных шрифтов одним `<link>`. Одноразово за сессию. */
+export function loadAllCatalogFonts(): void {
+  if (_allCatalogLoaded) return
+  const remaining = LAZY_GOOGLE_FONTS.filter((n) => !_loaded.has(n))
+  if (remaining.length > 0) {
+    const specs = remaining.map(toSpec).filter((s): s is FontSpec => s !== null)
+    appendLink(buildFontLinkUrl(specs))
+    for (const s of specs) _loaded.add(s.name)
+  }
+  _allCatalogLoaded = true
 }
