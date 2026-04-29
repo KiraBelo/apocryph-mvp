@@ -21,6 +21,7 @@ export const FONT_GROUPS: FontGroup[] = [
       { label: 'Georgia',          value: 'Georgia, serif',                       googleName: null,                   weights: '',                  italic: false },
       { label: 'Times New Roman',  value: 'Times New Roman, Times, serif',        googleName: null,                   weights: '',                  italic: false },
       { label: 'EB Garamond',      value: 'EB Garamond, Georgia, serif',          googleName: 'EB Garamond',          weights: '400;500',           italic: true  },
+      // Cormorant: googleName=null — будет self-hosted через next/font в Task 5
       { label: 'Cormorant',        value: 'Cormorant Garamond, Georgia, serif',   googleName: null,                   weights: '',                  italic: false },
       { label: 'Lora',             value: 'Lora, Georgia, serif',                 googleName: 'Lora',                 weights: '400;500',           italic: true  },
       { label: 'Playfair Display', value: 'Playfair Display, Georgia, serif',     googleName: 'Playfair Display',     weights: '400;500',           italic: true  },
