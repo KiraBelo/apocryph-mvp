@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
+import { Cormorant_Garamond, Courier_Prime } from 'next/font/google'
 import './globals.css'
 import Nav from '@/components/Nav'
 import BanBanner from '@/components/BanBanner'
@@ -8,6 +9,25 @@ import SettingsPanel from '@/components/SettingsPanel'
 import ToastProvider from '@/components/ToastProvider'
 import { getUser } from '@/lib/session'
 import { queryOne } from '@/lib/db'
+import { buildFontsBootstrapScript } from '@/lib/font-bootstrap'
+
+const cormorantGaramond = Cormorant_Garamond({
+  weight: ['300', '400', '500', '600'],
+  style: ['normal', 'italic'],
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-cormorant',
+  display: 'swap',
+})
+
+const courierPrime = Courier_Prime({
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  subsets: ['latin'],
+  variable: '--font-courier-prime',
+  display: 'swap',
+})
+
+const fontsBootstrap = buildFontsBootstrapScript()
 
 export const metadata: Metadata = {
   title: 'Апокриф — анонимные текстовые ролевые игры',
@@ -41,12 +61,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 (function(){try{var t=localStorage.getItem('apocryph-theme');if(t&&['light','sepia','ink','nocturne'].indexOf(t)!==-1){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();
 `
   return (
-    <html lang="ru" data-theme="light" suppressHydrationWarning>
+    <html
+      lang="ru"
+      data-theme="light"
+      suppressHydrationWarning
+      className={`${cormorantGaramond.variable} ${courierPrime.variable}`}
+    >
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Merriweather:ital,wght@0,300;0,400;1,300;1,400&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=Caveat:wght@400;500&family=Raleway:ital,wght@0,300;0,400;1,300;1,400&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono:wght@400&family=Neucha&family=Marck+Script&family=Montserrat:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Open+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Nunito:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: fontsBootstrap }} />
       </head>
       <body>
         <SettingsProvider>
