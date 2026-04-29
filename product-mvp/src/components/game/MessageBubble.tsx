@@ -50,7 +50,7 @@ function MessageBubble({
       <div data-msg-id={msg.id} className="game-msg">
         <div className={`game-msg-avatar ${isMine ? 'game-msg-avatar-mine' : ''} !w-[28px] !h-[28px]`}>
           {msg.avatar_url
-            ? <img src={msg.avatar_url} alt={msg.nickname} className="w-full h-full object-cover" />
+            ? <img src={msg.avatar_url} alt={msg.nickname} loading="lazy" className="w-full h-full object-cover" />
             : <span className="font-mono text-[0.6rem] text-ink-2">{msg.nickname[0]}</span>
           }
         </div>
@@ -108,7 +108,7 @@ function MessageBubble({
       {/* Avatar */}
       <div className={`game-msg-avatar ${isMine ? 'game-msg-avatar-mine' : ''}`}>
         {msg.avatar_url
-          ? <img src={msg.avatar_url} alt={msg.nickname} className="w-full h-full object-cover" />
+          ? <img src={msg.avatar_url} alt={msg.nickname} loading="lazy" className="w-full h-full object-cover" />
           : <span className="font-heading text-[0.75rem] text-ink-2">{msg.nickname[0]}</span>
         }
       </div>

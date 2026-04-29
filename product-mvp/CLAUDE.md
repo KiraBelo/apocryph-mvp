@@ -134,7 +134,7 @@ product-mvp/
 
 ## Дизайн-система
 
-- Темы: light (пергамент), dusk (сумерки), midnight (полночь), redroom (красная комната), neon (неон)
+- Темы (4): light (бумага), sepia (сепия), ink (чернила), nocturne (полночь). Полный список — `[data-theme=...]` блоки в `globals.css` + валидация в `ThemeProvider.tsx` и FOUC-bootstrap в `layout.tsx`.
 - CSS-переменные: `--bg`, `--bg-2`, `--bg-3`, `--text`, `--text-2`, `--accent`, `--accent-2`, `--accent-dim`, `--border`
 - Light accent: `#8b1a1a` (тёмно-красный). Dark accent: `#c4b5f4` (лавандовый)
 - Шрифты: `--serif` (Cormorant Garamond), `--serif-body` / `--site-font` (Georgia), `--mono` (Courier Prime)
