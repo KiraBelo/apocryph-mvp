@@ -78,6 +78,39 @@ describe('loadFonts (DOM batch)', () => {
   })
 })
 
+describe('loadFont — deduplicates against existing DOM links', () => {
+  beforeEach(() => {
+    document.head.innerHTML = ''
+    _resetLoadedForTests()
+  })
+
+  it('does not append a second <link> when one already exists for that font', () => {
+    // Имитируем работу FOUC-bootstrap скрипта: вставляем <link> вручную.
+    const preloaded = document.createElement('link')
+    preloaded.rel = 'stylesheet'
+    preloaded.href = 'https://fonts.googleapis.com/css2?family=Lora:wght@400&display=swap'
+    document.head.appendChild(preloaded)
+
+    loadFont('Lora')
+
+    expect(document.head.querySelectorAll('link[rel="stylesheet"]').length).toBe(1)
+  })
+
+  it('loadFonts skips fonts already present in DOM', () => {
+    const preloaded = document.createElement('link')
+    preloaded.rel = 'stylesheet'
+    preloaded.href = 'https://fonts.googleapis.com/css2?family=Lora:wght@400&display=swap'
+    document.head.appendChild(preloaded)
+
+    loadFonts(['Lora', 'PT Serif'])
+
+    const links = document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+    expect(links.length).toBe(2)
+    expect(links[1].href).toContain('family=PT+Serif')
+    expect(links[1].href).not.toContain('family=Lora')
+  })
+})
+
 describe('loadAllCatalogFonts (DOM)', () => {
   beforeEach(() => {
     document.head.innerHTML = ''

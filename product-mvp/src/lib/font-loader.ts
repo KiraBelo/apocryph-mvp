@@ -80,11 +80,39 @@ function toSpec(googleName: string): FontSpec | null {
   return { name: googleName, weights: meta.weights, italic: meta.italic }
 }
 
+/**
+ * Уже ли есть в `<head>` `<link>` для этого шрифта (например, добавленный
+ * FOUC-bootstrap в layout.tsx). Сравниваем по `family=<encoded name>` —
+ * это уникальный сегмент Google Fonts CSS API URL.
+ */
+function isFontInDom(name: string): boolean {
+  if (typeof document === 'undefined') return false
+  const encoded = encodeURIComponent(name).replace(/%20/g, '+')
+  const needle = `family=${encoded}`
+  const links = document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+  for (const link of links) {
+    const href = link.href
+    if (!href.includes('fonts.googleapis.com')) continue
+    if (
+      href.includes(`${needle}&`) ||
+      href.includes(`${needle}:`) ||
+      href.endsWith(needle)
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
 /** Грузит один Google-шрифт. Принимает либо имя (`'Lora'`), либо CSS-список (`'Lora, serif'`). Идемпотентно. */
 export function loadFont(input: string): void {
   const name = parseFirstFontName(input)
   if (!name) return
   if (_loaded.has(name)) return
+  if (isFontInDom(name)) {
+    _loaded.add(name)
+    return
+  }
   const spec = toSpec(name)
   if (!spec) return
   appendLink(buildFontLinkUrl([spec]))
@@ -98,6 +126,10 @@ export function loadFonts(inputs: string[]): void {
     const name = parseFirstFontName(input)
     if (!name) continue
     if (_loaded.has(name)) continue
+    if (isFontInDom(name)) {
+      _loaded.add(name)
+      continue
+    }
     const spec = toSpec(name)
     if (!spec) continue
     specs.push(spec)
@@ -110,7 +142,7 @@ export function loadFonts(inputs: string[]): void {
 /** Грузит весь каталог не-критичных шрифтов одним `<link>`. Одноразово за сессию. */
 export function loadAllCatalogFonts(): void {
   if (_allCatalogLoaded) return
-  const remaining = LAZY_GOOGLE_FONTS.filter((n) => !_loaded.has(n))
+  const remaining = LAZY_GOOGLE_FONTS.filter((n) => !_loaded.has(n) && !isFontInDom(n))
   if (remaining.length > 0) {
     const specs = remaining.map(toSpec).filter((s): s is FontSpec => s !== null)
     appendLink(buildFontLinkUrl(specs))
