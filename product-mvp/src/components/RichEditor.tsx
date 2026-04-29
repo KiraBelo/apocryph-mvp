@@ -10,6 +10,7 @@ import FontFamily from '@tiptap/extension-font-family'
 import Underline from '@tiptap/extension-underline'
 import { useState, useEffect, useRef } from 'react'
 import { FONT_GROUPS } from '@/lib/fonts'
+import { loadAllCatalogFonts } from '@/lib/font-loader'
 import { useT } from './SettingsContext'
 import { X, Music, MessageSquareCheck, Smile, Dice5 } from 'lucide-react'
 
@@ -178,7 +179,7 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
     if (content !== editor.getHTML()) {
       editor.commands.setContent(content)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [editor, content])
 
   // Close emoji picker on click outside
@@ -323,7 +324,10 @@ export default function RichEditor({ content, onChange, placeholder, minHeight =
         <div className="relative flex items-center" ref={fontMenuRef}>
           <button
             type="button"
-            onClick={() => setFontMenuOpen(!fontMenuOpen)}
+            onClick={() => {
+              if (!fontMenuOpen) loadAllCatalogFonts()
+              setFontMenuOpen(!fontMenuOpen)
+            }}
             title={t('editor.font') as string}
             className="border-none p-[0.05rem_0.15rem] cursor-pointer rounded-[2px]
               bg-transparent text-ink-2 hover:text-ink transition-colors max-w-[90px] truncate font-heading italic leading-none"

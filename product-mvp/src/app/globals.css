@@ -928,10 +928,10 @@
   --game-toolbar-btn:  0.65rem;
   --game-send-size:    0.55rem;
   --game-panel-w:      320px;
-  --serif:      'Cormorant Garamond', Georgia, serif;
+  --serif:      var(--font-cormorant), 'Cormorant Garamond', Georgia, serif;
   --site-font:  Georgia, serif;
   --serif-body: var(--site-font);
-  --mono:       'Courier Prime', 'Courier New', monospace;
+  --mono:       var(--font-courier-prime), 'Courier Prime', 'Courier New', monospace;
   --chat-bg:         #e6ded0;
   --sms-bg:          #f3eee6;
   --sms-border:      #d8cebd;

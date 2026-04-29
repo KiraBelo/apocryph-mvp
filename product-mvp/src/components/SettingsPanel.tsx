@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSettings, useT, type Settings } from './SettingsContext'
 import type { TagPreset } from './SettingsContext'
 import { FONT_GROUPS } from '@/lib/fonts'
+import { loadAllCatalogFonts } from '@/lib/font-loader'
 import { X, ChevronDown } from 'lucide-react'
 import type { Lang } from '@/i18n'
 
@@ -236,7 +237,14 @@ export default function SettingsPanel() {
             />
           </Row>
 
-          <Row label={t('settings.font') as string} open={openField === 'font'} onToggle={() => toggle('font')}>
+          <Row
+            label={t('settings.font') as string}
+            open={openField === 'font'}
+            onToggle={() => {
+              if (openField !== 'font') loadAllCatalogFonts()
+              toggle('font')
+            }}
+          >
             <div className="relative">
               <button
                 className="select-base w-full text-left"

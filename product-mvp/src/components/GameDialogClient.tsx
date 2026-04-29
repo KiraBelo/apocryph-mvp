@@ -24,6 +24,7 @@ import { useGameSearch } from './hooks/useGameSearch'
 import { useDiceRoller } from './hooks/useDiceRoller'
 import usePublishFlow from './hooks/usePublishFlow'
 import { useToast } from './ToastProvider'
+import { extractGoogleFontsFromHtml, loadFonts } from '@/lib/font-loader'
 
 export default function GameDialogClient({ gameId, game, initialMessages, initialPage, totalPages: initTotalPages, participants, me, requestTitle }: GameDialogProps) {
   const router = useRouter()
@@ -84,6 +85,14 @@ export default function GameDialogClient({ gameId, game, initialMessages, initia
   const notesHook = useGameNotes({ gameId, t, addToast })
   const search = useGameSearch({ gameId, icMessages: chat.icMessages, oocMessages: chat.oocMessages, notes: notesHook.notes })
   const dice = useDiceRoller({ gameId, participantId: me.id, t, addToast })
+
+  // Лениво подгружаем Google-шрифты, использованные в IC/OOC-постах. Реагируем
+  // на любые обновления (initial load, пагинация, SSE), loadFonts идемпотентен.
+  useEffect(() => {
+    const html = [...chat.icMessages, ...chat.oocMessages].map(m => m.content).join('')
+    const fonts = extractGoogleFontsFromHtml(html)
+    if (fonts.length > 0) loadFonts(fonts)
+  }, [chat.icMessages, chat.oocMessages])
 
   // ── Scroll collapse refs ──
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)

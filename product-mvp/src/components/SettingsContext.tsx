@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { translate, plural, type Lang } from '@/i18n'
+import { loadFont } from '@/lib/font-loader'
 
 export type Theme = 'light' | 'sepia' | 'ink' | 'nocturne'
 export type FontSize = 'small' | 'medium' | 'large'
@@ -145,6 +146,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings(loaded)
     applyAllToDOM(loaded)
 
+    // Догружаем полный набор весов выбранного siteFont. FOUC-bootstrap в layout.tsx
+    // вставляет <link> до первой отрисовки, но это идемпотентно — loadFont
+    // пропустит дубликат, если шрифт уже в head.
+    if (loaded.siteFont !== DEFAULTS.siteFont) {
+      loadFont(loaded.siteFont)
+    }
+
     try {
       const saved = localStorage.getItem(TAG_PRESETS_KEY)
       if (saved) setTagPresets(JSON.parse(saved))
@@ -153,6 +161,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   function set<K extends keyof Settings>(key: K, value: Settings[K]) {
+    if (key === 'siteFont') {
+      loadFont(value as string)
+    }
     localStorage.setItem(KEYS[key], String(value))
     applyOne(key, value)
     setSettings(prev => ({ ...prev, [key]: value }))

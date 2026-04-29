@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useT } from './SettingsContext'
 import PublicComments from './game/PublicComments'
 import { Heart } from 'lucide-react'
+import { extractGoogleFontsFromHtml, loadFonts } from '@/lib/font-loader'
 
 const MsgContent = memo(function MsgContent({ html, className }: { html: string; className?: string }) {
   return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
@@ -85,6 +86,15 @@ export default function PublicGameViewer({ gameId, userId }: { gameId: string; u
   }
 
   useEffect(() => { load() }, [load])
+
+  // Лениво подгружаем Google-шрифты, использованные в постах текущей страницы.
+  // Это убирает нужду тащить весь каталог в библиотеку и стороннее чтение.
+  useEffect(() => {
+    if (!data?.messages?.length) return
+    const html = data.messages.map(m => m.content).join('')
+    const fonts = extractGoogleFontsFromHtml(html)
+    if (fonts.length > 0) loadFonts(fonts)
+  }, [data])
 
   if (loading && !data) {
     return (
