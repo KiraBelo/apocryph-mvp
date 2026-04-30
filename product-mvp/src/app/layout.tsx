@@ -68,8 +68,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={`${cormorantGaramond.variable} ${courierPrime.variable}`}
     >
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: fontsBootstrap }} />
+        {/* Nonce приходит из middleware (header `x-nonce`) и доступен только
+            на сервере. На клиенте при гидрации React видит атрибут пустым и
+            ругается на mismatch — suppressHydrationWarning гасит проверку
+            именно для этого тега. CSP уже применён браузером при парсинге,
+            так что отказ React переустанавливать атрибут безопасен. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeBootstrap }}
+        />
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: fontsBootstrap }}
+        />
       </head>
       <body>
         <SettingsProvider>
