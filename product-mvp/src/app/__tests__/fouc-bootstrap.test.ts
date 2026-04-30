@@ -47,6 +47,23 @@ describe('FOUC bootstrap script in layout.tsx (audit-v4 medium)', () => {
     // by the strict-dynamic CSP set in middleware.ts (HIGH-S1 fix).
     expect(layoutSrc).toMatch(/<script\s+nonce=\{nonce\}/)
   })
+
+  it('suppresses hydration warnings on every inline <script nonce={nonce}>', () => {
+    // Headers (and thus the nonce value) live only on the server. When
+    // React hydrates on the client it has no `nonce` to compare against,
+    // so it complains that the server attribute (`nonce="ZjQ2..."`) and
+    // the client attribute (`nonce=""`) differ. The fix is to mark each
+    // such <script> with `suppressHydrationWarning`. CSP enforcement
+    // already happened at parse time, so React rewriting (or not) the
+    // attribute on the client doesn't change behaviour.
+    const scriptTags = layoutSrc.match(/<script\s+nonce=\{nonce\}[\s\S]*?\/>/g) ?? []
+    expect(scriptTags.length).toBeGreaterThan(0)
+    for (const tag of scriptTags) {
+      expect(tag, 'each <script nonce={nonce}> needs suppressHydrationWarning').toContain(
+        'suppressHydrationWarning',
+      )
+    }
+  })
 })
 
 function extractThemes(src: string): string[] {

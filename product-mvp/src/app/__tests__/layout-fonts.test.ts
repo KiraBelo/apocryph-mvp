@@ -44,11 +44,15 @@ describe('layout.tsx — fonts migration regression guard', () => {
     expect(layoutSrc).toMatch(/courierPrime\.variable/)
   })
 
-  it('inlines the FOUC bootstrap for siteFont preload', () => {
+  it('inlines the FOUC bootstrap for siteFont preload with nonce', () => {
     expect(layoutSrc).toMatch(/buildFontsBootstrapScript/)
     // Скрипт должен попадать в head через dangerouslySetInnerHTML
     expect(layoutSrc).toMatch(/dangerouslySetInnerHTML=\{\{\s*__html:\s*fontsBootstrap\s*\}\}/)
-    // Nonce обязателен, иначе CSP заблокирует
-    expect(layoutSrc).toMatch(/<script\s+nonce=\{nonce\}\s+dangerouslySetInnerHTML=\{\{\s*__html:\s*fontsBootstrap/)
+    // Nonce обязателен, иначе CSP заблокирует. JSX может быть многострочным,
+    // поэтому ищем атрибут внутри тега <script ... fontsBootstrap ... />.
+    const scriptTags = layoutSrc.match(/<script\b[\s\S]*?\/>/g) ?? []
+    const fontsScript = scriptTags.find((t) => t.includes('fontsBootstrap'))
+    expect(fontsScript, 'fontsBootstrap <script> tag').toBeDefined()
+    expect(fontsScript!).toContain('nonce={nonce}')
   })
 })
